@@ -1,0 +1,67 @@
+{
+    "userId": "kunde1",
+    "structuredKlonData": {
+      "yearlyGoals": [
+        {
+          "id": "goal1",
+          "name": "Finanzielle Unabhängigkeit",
+          "description": "Ziel ist es, finanzielle Unabhängigkeit zu erreichen.",
+          "dueDate": "2024-12-31",
+          "progress": 0,
+          "linkedApps": ["finanzappDaten"],
+          "createdAt": "2024-01-01T00:00:00Z"
+        }
+      ],
+      "monthlyGoals": [
+        {
+          "id": "goal2",
+          "name": "5 mal Schwimmen",
+          "description": "Im Monat 5 mal Schwimmen gehen.",
+          "dueDate": "2024-10-31",
+          "progress": 2,
+          "linkedApps": ["skilltree"],
+          "createdAt": "2024-10-01T00:00:00Z"
+        }
+      ],
+      "weeklyGoals": [
+        {
+          "id": "goal3",
+          "name": "2 Trades analysieren",
+          "description": "Zwei Trades analysieren und daraus lernen.",
+          "dueDate": "2024-10-28",
+          "progress": 1,
+          "linkedApps": ["tradingJournal"],
+          "createdAt": "2024-10-22T00:00:00Z"
+        }
+      ],
+      "dailyTasks": [
+        {
+          "id": "task1",
+          "TaskTime": "daily",
+          "name": "Schwimmen gehen",
+          "description": "Schwimmeinheit im Schwimmbad",
+          "points": 5,
+          "status": "incomplete",
+          "dueDate": "2024-10-25",
+          "frequency": "weekly",
+          "category": "Fitness",
+          "linkedApps": ["stats", "skilltree"],
+          "createdAt": "2024-10-23T08:00:00Z",
+          "updatedAt": "2024-10-23T08:00:00Z"
+        }
+      ]
+    },
+    "finanzappDaten": {
+      "income": 3000,
+      "expenses": [
+        { "category": "Miete", "amount": 1200 },
+        { "category": "Lebensmittel", "amount": 300 }
+      ],
+      "savingsGoal": {
+        "goal": 5000,
+        "currentSavings": 2000,
+        "dueDate": "2024-12-31"
+      }
+    }
+  }
+  
