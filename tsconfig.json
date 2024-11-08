@@ -18,10 +18,14 @@
         "name": "next"
       }
     ],
+    "baseUrl": ".",
     "paths": {
-      "@/*": ["./*"]
-    }
+    "@/*": ["./*"],
+    "@/lib/*": ["./lib/*"]
+}
+    
+    
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "components/to-do.js"],
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "components/to-do.ts"],
   "exclude": ["node_modules"]
 }

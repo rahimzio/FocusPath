@@ -1,6 +1,9 @@
-import { MongoClient, Db } from 'mongodb';
+import { MongoClient, Db, Collection, ObjectId } from 'mongodb';
 
 class MongoDB {
+  static disconnect() {
+      throw new Error('Method not implemented.');
+  }
   public client: MongoClient;
   public db: Db | undefined;
   private connectionPromise: Promise<void>;
@@ -16,7 +19,6 @@ class MongoDB {
     this.connect();
   }
 
-
   public async connect(): Promise<void> {
     try {
       await this.client.connect();
@@ -30,11 +32,9 @@ class MongoDB {
     }
   }
 
-  
   public getDbConnectionPromise(): Promise<void> {
     return this.connectionPromise;
   }
-
 
   public async disconnect() {
     if (this.client) {
@@ -42,24 +42,35 @@ class MongoDB {
       console.log('Disconnected from database');
     }
   }
-}
 
-// Hauptlogik zur Verbindung mit der Cosmos DB
-(async () => {
-  const connectionString = process.env.AZURE_COSMOS_CONNECTION_STRING as string;
-  const databaseName = 'your-database-name'; // Ersetze dies durch den Namen deiner Datenbank
+  async updateTaskStatus(taskId: string, status: string) {
+    if(this.db){
+    const collection = this.db.collection('tasks'); // 'tasks' ist der Name der Collection
 
-  const mongoDB = new MongoDB(connectionString, databaseName);
+    // Aktualisiere den Status der Aufgabe anhand ihrer ID
+    const result = await collection.updateOne(
+      { _id: new ObjectId(taskId) }, // Sucht nach der Aufgabe mit der angegebenen ID
+      { $set: { status: status } }   // Setzt den Status auf den neuen Wert
+    );
 
-  try {
-    await mongoDB.getDbConnectionPromise();
-    // Hier kannst du mit der Datenbank arbeiten
-    // Beispiel: const collection = mongoDB.db?.collection('your-collection-name');
-  } catch (error) {
-    console.error('Error connecting to MongoDB:', error);
-  } finally {
-    await mongoDB.disconnect();
+    return result;
   }
-})();
+  }
+
+  // Methode zum Abrufen der Aufgaben-Sammlung
+  public getTasksCollection(): Collection {
+    if (!this.db) {
+      throw new Error('Database connection not established');
+    }
+    return this.db.collection('tasks'); // Sammlung "tasks" verwenden
+  }
+
+  // Methode zum Hinzufügen einer Aufgabe
+  public async addTask(task: any): Promise<any> {
+    const collection = this.getTasksCollection();
+    const result = await collection.insertOne(task);
+    return result;
+  }
+}
 
 export default MongoDB;
