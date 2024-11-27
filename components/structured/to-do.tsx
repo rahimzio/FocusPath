@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { global } from 'styled-jsx/css';
 
 interface Task {
   _id: string;  
@@ -90,46 +91,45 @@ function TaskList() {
   };
 
   return (
-    <div>
-      <h1>Meine Aufgaben</h1>
-
-      {/* Auswahl der Ansicht */}
-      <div>
-        <button onClick={() => setViewType('daily')}>Tägliche Ziele</button>
-        <button onClick={() => setViewType('weekly')}>Wöchentliche Ziele</button>
-        <button onClick={() => setViewType('monthly')}>Monatliche Ziele</button>
-        <button onClick={() => setViewType('yearly')}>Jährliche Ziele</button>
-      </div>
-
-      {/* Anzeige der Aufgaben */}
-      <ul>
-        {tasks.length > 0 ? (
-          tasks.map(task => (
-            <li key={task._id}>
-              <h2>{task.name}</h2>
-              <p>{task.description}</p>
-              <p>Punkte: {task.points}</p>
-              <p>Status: {task.status}</p>
-              <p>Fällig am: {task.dueDate}</p>
-              <p>Kategorie: {task.category}</p>
-              
-              {/* Checkbox zum Abhaken */}
-              <label>
-                <input
-                  type="checkbox"
-                  checked={task.status === 'complete'}
-                  onChange={(e) => handleTaskCheck(task._id, e.target.checked)}
-                />
-                Abhaken
-              </label>
-            </li>
-          ))
-        ) : (
-          <li>Keine Aufgaben gefunden.</li>
-        )}
-      </ul>
+    <div className="task-container">
+    <h1>Meine Aufgaben</h1>
+  
+    {/* Auswahl der Ansicht */}
+    <div className="view-buttons">
+      <button onClick={() => setViewType('daily')}>Tägliche Ziele</button>
+      <button onClick={() => setViewType('weekly')}>Wöchentliche Ziele</button>
+      <button onClick={() => setViewType('monthly')}>Monatliche Ziele</button>
+      <button onClick={() => setViewType('yearly')}>Jährliche Ziele</button>
     </div>
-  );
+  
+    {/* Anzeige der Aufgaben */}
+    <ul className="task-list">
+      {tasks.length > 0 ? (
+        tasks.map(task => (
+          <li key={task._id} className="task-item">
+            <h2 className="task-name">{task.name}</h2>
+            <p className="task-description">{task.description}</p>
+            <p><strong>Punkte:</strong> {task.points}</p>
+            <p><strong>Status:</strong> {task.status}</p>
+            <p><strong>Fällig am:</strong> {task.dueDate}</p>
+            <p><strong>Kategorie:</strong> {task.category}</p>
+            
+            {/* Checkbox zum Abhaken */}
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={task.status === 'complete'}
+                onChange={(e) => handleTaskCheck(task._id, e.target.checked)}
+              />
+              Abhaken
+            </label>
+          </li>
+        ))
+      ) : (
+        <li className="no-tasks">Keine Aufgaben gefunden.</li>
+      )}
+    </ul>
+  </div>)  
 }
 
 export default TaskList;

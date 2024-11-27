@@ -65,3 +65,164 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+/* Gesamtcontainer für die Seite, um den weißen Rand hinzuzufügen */
+body {
+  background-color: #000; /* Hintergrund der Seite ist schwarz */
+  margin: 0;
+  padding: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh; /* Vollständige Höhe des Viewports */
+}
+
+/* Weißer Rand um den gesamten Container */
+.page-wrapper {
+  border: 10px solid #fff; /* Weißer Rand um die gesamte Seite */
+  padding: 20px; /* Innenabstand innerhalb des weißen Rahmens */
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Container für den Inhalt */
+.task-container {
+  font-family: Arial, sans-serif;
+  max-height: 100vh;
+  background-color: #0a0a18; /* Hintergrund des Containers */
+  padding: 30px; /* Innenabstand */
+  border-radius: 25px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  width: 100%; /* Volle Breite im Container */
+}
+
+/* Stil für die Hauptüberschrift */
+h1 {
+  text-align: center;
+  color: #333;
+}
+
+/* Button-Container für die Ansichtsauswahl */
+.view-buttons {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.view-buttons button {
+  background-color: #007bff;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  margin: 0 10px;
+  cursor: pointer;
+  border-radius: 5px;
+  font-size: 16px;
+  transition: background-color 0.3s;
+}
+
+.view-buttons button:hover {
+  background-color: #0056b3;
+}
+
+/* Liste der Aufgaben */
+.task-list {
+  list-style-type: none;
+  padding: 0;
+}
+
+.task-item {
+  background-color: white;
+  margin: 15px 0;
+  padding: 20px;
+  border-radius: 45px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.task-name {
+  color: #333;
+  font-size: 1.5em;
+  margin-bottom: 10px;
+}
+
+.task-description {
+  color: #555;
+  font-size: 1em;
+}
+
+.task-item p {
+  font-size: 0.9em;
+  color: #666;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+}
+
+.checkbox-label input {
+  margin-right: 10px;
+}
+
+/* Falls keine Aufgaben vorhanden sind */
+.no-tasks {
+  text-align: center;
+  color: #888;
+  font-style: italic;
+}
+
+
+/* styles.css */
+body {
+  font-family: Arial, sans-serif;
+}
+
+.sidebar {
+  width: 250px;
+  background-color: #2c3e50;
+  color: white;
+  padding: 20px;
+}
+
+.sidebar ul {
+  list-style-type: none;
+  padding: 0;
+}
+
+.sidebar ul li {
+  margin: 10px 0;
+}
+
+.sidebar ul li a {
+  color: white;
+  text-decoration: none;
+}
+
+.main-content {
+  padding: 20px;
+}
+
+.filters button {
+  margin-right: 10px;
+}
+
+.task-card {
+  border: 1px solid #ddd;
+  padding: 15px;
+  margin: 10px 0;
+}
+
+.fab {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background-color: #ff4081;
+  border: none;
+  border-radius: 50%;
+  padding: 20px;
+  color: white;
+  font-size: 24px;
+}

@@ -12,3 +12,13 @@ export interface Task {
     updatedAt: string;
   }
   
+  export interface Goal {
+    goalId: string;
+    title: string;
+    description: string;
+    dueDate: string;
+    progress: number; // Prozentualer Fortschritt
+    linkedTasks: string[]; // Verknüpfte Task-IDs
+    createdAt: string;
+    updatedAt: string;
+  }
