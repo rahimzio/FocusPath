@@ -65,3 +65,27 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+/* components/trading/TradingOverview.module.css */
+.container {
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+}
+
+.header {
+  margin-bottom: 20px;
+}
+
+.content {
+  display: flex;
+  flex-direction: row;
+}
+
+.sidebar {
+  flex: 1;
+}
+
+.main {
+  flex: 2;
+}
