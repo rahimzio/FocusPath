@@ -19,32 +19,32 @@ const items = [
   },
   {
     title: "To-dos",
-    url: "/todos",
+    url: "/overview/todos",
     icon: Inbox,
   },
   {
     title: "Finanzen",
-    url: "/finance", // Dies sollte "/finance" sein
+    url: "/overview/finance", // Dies sollte "/finance" sein
     icon: Calendar,
   },
   {
     title: "Trading",
-    url: "/trading", // Dies sollte "/trading" sein
+    url: "/overview/trading", // Dies sollte "/trading" sein
     icon: Search,
   },
   {
     title: "Stats",
-    url: "/stats",
+    url: "/overview/stats",
     icon: Settings,
   },
   {
     title: "Skilltree",
-    url: "/skilltree",
+    url: "/overview/skilltree",
     icon: Settings,
   },
   {
     title: "Settings",
-    url: "/settings",
+    url: "/overview/settings",
     icon: Settings,
   },
 ];

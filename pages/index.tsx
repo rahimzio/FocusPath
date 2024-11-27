@@ -1,11 +1,11 @@
 'use client';
 import { global } from "styled-jsx/css";
-import TaskList from "@/components/structured/to-do";
-import CreateTask from "@/components/structured/createTask";
+import TaskList from "@/components/todos/to-do";
+import CreateTask from "@/components/todos/createTask";
 import { useState } from "react";
-import SheetComponent from "@/components/structured/popUpCreateTask";
+import SheetComponent from "@/components/todos/popUpCreateTask";
 import { Skeleton } from "@/components/ui/skeleton";
-import TodayView from "@/components/structured/todayView";
+import TodayView from "@/components/todos/todayView";
 export default function Home() {
   const [showTaskList, setShowTaskList] = useState(true);
 
