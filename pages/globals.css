@@ -66,6 +66,32 @@ body {
   }
 }
 
+
+/* components/trading/TradingOverview.module.css */
+.container {
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+}
+
+.header {
+  margin-bottom: 20px;
+}
+
+.content {
+  display: flex;
+  flex-direction: row;
+}
+
+.sidebar {
+  flex: 1;
+}
+
+.main {
+  flex: 2;
+}
+
+
 /* Gesamtcontainer für die Seite, um den weißen Rand hinzuzufügen */
 body {
   background-color: #000; /* Hintergrund der Seite ist schwarz */

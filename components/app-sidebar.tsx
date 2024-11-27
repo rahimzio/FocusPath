@@ -1,5 +1,3 @@
-import { Calendar, Home, Inbox, Search, Settings } from "lucide-react"
- 
 import {
   Sidebar,
   SidebarContent,
@@ -9,47 +7,48 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/components/ui/sidebar"
- 
-// Menu items.
+} from "@/components/ui/sidebar";
+import { Calendar, Home, Inbox, Search, Settings } from "lucide-react";
+import Link from "next/link"; // Link wird importiert
+
 const items = [
   {
     title: "Home",
-    url: "#",
+    url: "/",
     icon: Home,
   },
   {
     title: "To-dos",
-    url: "#",
+    url: "/todos",
     icon: Inbox,
   },
   {
-    title: "finanzen",
-    url: "#",
+    title: "Finanzen",
+    url: "/finance", // Dies sollte "/finance" sein
     icon: Calendar,
   },
   {
     title: "Trading",
-    url: "#",
+    url: "/trading", // Dies sollte "/trading" sein
     icon: Search,
   },
   {
     title: "Stats",
-    url: "#",
+    url: "/stats",
     icon: Settings,
   },
   {
     title: "Skilltree",
-    url: "#",
+    url: "/skilltree",
     icon: Settings,
   },
   {
     title: "Settings",
-    url: "#",
+    url: "/settings",
     icon: Settings,
   },
-]
- 
+];
+
 export function AppSidebar() {
   return (
     <Sidebar>
@@ -61,10 +60,13 @@ export function AppSidebar() {
               {items.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
-                    <a href={item.url}>
-                      <item.icon />
-                      <span>{item.title}</span>
-                    </a>
+                    {/* Entferne das <a> Tag und benutze nur Link */}
+                    <Link href={item.url}>
+                      <div>
+                        <item.icon />
+                        <span>{item.title}</span>
+                      </div>
+                    </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
@@ -73,5 +75,5 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
     </Sidebar>
-  )
+  );
 }

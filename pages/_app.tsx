@@ -1,17 +1,19 @@
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import { Sidebar } from "@/components/ui/sidebar";
+// pages/_app.tsx
+import React from "react";
+import { AppProps } from "next/app";
+import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import "./globals.css";
-import type { AppProps } from "next/app";
 
-export default function App({ Component, pageProps }: AppProps) {
+function MyApp({ Component, pageProps }: AppProps) {
   return (
     <SidebarProvider>
-      <AppSidebar /> {/* Sidebar appears on all pages */}
+      <AppSidebar />
       <main>
-      <SidebarTrigger />
         <Component {...pageProps} />
       </main>
     </SidebarProvider>
   );
 }
+
+export default MyApp;
