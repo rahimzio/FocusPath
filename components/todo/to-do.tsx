@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 
 interface Task {
-  _id: string;  
+  _id: string;
   id: string;
   name: string;
   description: string;
@@ -36,22 +36,24 @@ interface UserData {
 
 function TaskList() {
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [viewType, setViewType] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>('daily');
+  const [viewType, setViewType] = useState<
+    "daily" | "weekly" | "monthly" | "yearly"
+  >("daily");
 
   useEffect(() => {
-    fetch('/api/task/getTask')
-      .then(response => response.json())
+    fetch("/api/task/getTask")
+      .then((response) => response.json())
       .then((data: UserData) => {
         console.log("API response:", data);
 
         switch (viewType) {
-          case 'weekly':
+          case "weekly":
             setTasks(data.structuredKlonData.weeklyGoals || []);
             break;
-          case 'monthly':
+          case "monthly":
             setTasks(data.structuredKlonData.monthlyGoals || []);
             break;
-          case 'yearly':
+          case "yearly":
             setTasks(data.structuredKlonData.yearlyGoals || []);
             break;
           default:
@@ -59,7 +61,7 @@ function TaskList() {
         }
       })
       .catch((error) => {
-        console.error('Fehler beim Abrufen der Daten:', error);
+        console.error("Fehler beim Abrufen der Daten:", error);
         setTasks([]); // Fallback auf ein leeres Array bei einem Fehler
       });
   }, [viewType]);
@@ -69,23 +71,25 @@ function TaskList() {
     console.log("taskId:", taskId);
     try {
       const response = await fetch(`/api/task/updateStatus/${taskId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: checked ? 'complete' : 'incomplete' }),
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: checked ? "complete" : "incomplete" }),
       });
 
       if (response.ok) {
         // Status der Aufgabe im Frontend aktualisieren
-        setTasks(prevTasks =>
-          prevTasks.map(task =>
-            task._id === taskId ? { ...task, status: checked ? 'complete' : 'incomplete' } : task
+        setTasks((prevTasks) =>
+          prevTasks.map((task) =>
+            task._id === taskId
+              ? { ...task, status: checked ? "complete" : "incomplete" }
+              : task
           )
         );
       } else {
-        console.error('Fehler beim Aktualisieren des Aufgabenstatus');
+        console.error("Fehler beim Aktualisieren des Aufgabenstatus");
       }
     } catch (error) {
-      console.error('Fehler beim Senden der Anfrage:', error);
+      console.error("Fehler beim Senden der Anfrage:", error);
     }
   };
 
@@ -95,16 +99,18 @@ function TaskList() {
 
       {/* Auswahl der Ansicht */}
       <div>
-        <button onClick={() => setViewType('daily')}>Tägliche Ziele</button>
-        <button onClick={() => setViewType('weekly')}>Wöchentliche Ziele</button>
-        <button onClick={() => setViewType('monthly')}>Monatliche Ziele</button>
-        <button onClick={() => setViewType('yearly')}>Jährliche Ziele</button>
+        <button onClick={() => setViewType("daily")}>Tägliche Ziele</button>
+        <button onClick={() => setViewType("weekly")}>
+          Wöchentliche Ziele
+        </button>
+        <button onClick={() => setViewType("monthly")}>Monatliche Ziele</button>
+        <button onClick={() => setViewType("yearly")}>Jährliche Ziele</button>
       </div>
 
       {/* Anzeige der Aufgaben */}
       <ul>
         {tasks.length > 0 ? (
-          tasks.map(task => (
+          tasks.map((task) => (
             <li key={task._id}>
               <h2>{task.name}</h2>
               <p>{task.description}</p>
@@ -112,12 +118,12 @@ function TaskList() {
               <p>Status: {task.status}</p>
               <p>Fällig am: {task.dueDate}</p>
               <p>Kategorie: {task.category}</p>
-              
+
               {/* Checkbox zum Abhaken */}
               <label>
                 <input
                   type="checkbox"
-                  checked={task.status === 'complete'}
+                  checked={task.status === "complete"}
                   onChange={(e) => handleTaskCheck(task._id, e.target.checked)}
                 />
                 Abhaken

@@ -19,32 +19,37 @@ const items = [
   },
   {
     title: "To-dos",
-    url: "/todos",
+    url: "/overview/todos",
     icon: Inbox,
   },
   {
     title: "Finanzen",
-    url: "/finance", // Dies sollte "/finance" sein
+    url: "/overview/finance",
     icon: Calendar,
   },
   {
     title: "Trading",
-    url: "/trading", // Dies sollte "/trading" sein
+    url: "/overview/trading",
     icon: Search,
   },
   {
+    title: "sport",
+    url: "/overview/sport",
+    icon: Settings,
+  },
+  {
     title: "Stats",
-    url: "/stats",
+    url: "/overview/stats",
     icon: Settings,
   },
   {
     title: "Skilltree",
-    url: "/skilltree",
+    url: "/overview/Skilltree",
     icon: Settings,
   },
   {
     title: "Settings",
-    url: "/settings",
+    url: "/overview/Settings",
     icon: Settings,
   },
 ];
