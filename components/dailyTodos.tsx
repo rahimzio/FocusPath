@@ -61,7 +61,7 @@ const DailyTaskList = () => {
 
   const handleTaskCheck = async (taskId: string, checked: boolean) => {
     try {
-      const response = await fetch(`/api/task/updateStatus/${taskId}`, {
+      const response = await fetch(`/api/task/updateTask?taskId=${taskId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: checked ? "completed" : "incomplete" }),
@@ -96,29 +96,64 @@ const DailyTaskList = () => {
   const handleEditTask = async (event: React.FormEvent) => {
     event.preventDefault();
 
-    if (editedTask) {
-      const response = await fetch(`/api/task/updateTask`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(editedTask),
-      });
+    // Überprüfen Sie, ob die Aufgabe bearbeitet werden soll
+    if (!editedTask) {
+      console.error("Keine Aufgabe zum Bearbeiten ausgewählt");
+      return;
+    }
 
-      if (response.ok) {
-        setTasks((prevTasks) =>
-          prevTasks.map((task) =>
-            task._id === editedTask._id ? editedTask : task
-          )
-        );
-        setEditedTask(null); // Schließe das Editieren
-        setSelectedTask(null); // Schließe das Pop-up
-      } else {
-        alert("Fehler beim Bearbeiten der Aufgabe");
+    console.log("Bearbeiten der Aufgabe mit ID:", editedTask._id);
+
+    // Senden der PUT-Anfrage
+    try {
+      const response = await fetch(
+        `/api/task/updateTask?taskId=${editedTask._id}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(editedTask),
+        }
+      );
+
+      // Protokollieren Sie die Antwort des Servers
+      console.log("Antwort des Servers:", response);
+
+      // Überprüfen Sie den Status der Antwort
+      if (!response.ok) {
+        const errorMessage = await response.text();
+        console.error("Fehler beim Bearbeiten der Aufgabe:", errorMessage);
+        alert("Fehler beim Bearbeiten der Aufgabe. " + errorMessage);
+        return;
       }
+
+      // Wenn die Anfrage erfolgreich war, aktualisieren Sie die Liste der Aufgaben
+      const updatedTask = await response.json();
+      console.log("Aufgabe erfolgreich aktualisiert:", updatedTask);
+
+      setTasks((prevTasks) =>
+        prevTasks.map((task) =>
+          task._id === editedTask._id ? editedTask : task
+        )
+      );
+      setEditedTask(null); // Schließe den Bearbeitungsdialog
+      setSelectedTask(null); // Schließe das Pop-up
+    } catch (error) {
+      console.error("Fehler beim Senden der Anfrage:", error);
+      alert("Fehler beim Bearbeiten der Aufgabe.");
     }
   };
 
   return (
     <div className="space-y-6">
+      <div className="flex flex-row">
+        <div>Heutiges Datum +</div>
+        <div>
+          anzahl der kompletten punkte die ich bis jetzt gesammelt habe +
+        </div>
+        <div>in % wie viel ich für heute erledigt habe</div>
+      </div>
       {/* Container für Aufgaben ohne Uhrzeit */}
       <div className="sticky top-0 bg-gray-100 p-4 rounded-lg shadow-md z-10 mb-10">
         <h2 className="text-xl font-semibold mb-4 text-gray-700">
@@ -211,6 +246,24 @@ const DailyTaskList = () => {
             >
               Editieren
             </button>
+
+            <button
+              onClick={() =>
+                handleTaskCheck(
+                  selectedTask._id,
+                  selectedTask.status !== "completed"
+                )
+              }
+              className={`mt-4 ${
+                selectedTask.status === "completed"
+                  ? "bg-green-500"
+                  : "bg-red-500"
+              } text-white px-4 py-2 rounded-md`}
+            >
+              {selectedTask.status === "completed"
+                ? "Markieren als nicht erledigt"
+                : "Markieren als erledigt"}
+            </button>
           </DialogContent>
         </Dialog>
       )}
@@ -241,7 +294,22 @@ const DailyTaskList = () => {
                 }
                 className="p-2 mb-4 border border-gray-300 rounded-md w-full"
               />
-              {/* Weitere Felder für das Bearbeiten der Aufgabe hier */}
+              <input
+                type="date"
+                value={editedTask.dueDate}
+                onChange={(e) =>
+                  setEditedTask({ ...editedTask, dueDate: e.target.value })
+                }
+                className="p-2 mb-4 border border-gray-300 rounded-md w-full"
+              />
+              <input
+                type="time"
+                value={editedTask.time}
+                onChange={(e) =>
+                  setEditedTask({ ...editedTask, time: e.target.value })
+                }
+                className="p-2 mb-4 border border-gray-300 rounded-md w-full"
+              />
               <button
                 type="submit"
                 className="bg-green-500 text-white px-4 py-2 rounded-md"
