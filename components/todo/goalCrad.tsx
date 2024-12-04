@@ -1,8 +1,8 @@
 // GoalCard.tsx
-import { Goal } from '@/utils/interface';
-import React from 'react';
+import { Goals } from "@/utils/interface";
+import React from "react";
 
-const GoalCard = ({ goal }: { goal: Goal }) => {
+const GoalCard = ({ goal }: { goal: Goals }) => {
   return (
     <div className="goal-card">
       <h3>{goal.title}</h3>

@@ -3,27 +3,29 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import MongoDB from '../db/mongo';
 
 const handler = async (req: NextApiRequest, res: NextApiResponse) => {
-  const mongoDB = new MongoDB(process.env.AZURE_COSMOS_CONNECTION_STRING as string, 'your-database-name'); // DB-Verbindung
+  const mongoDB = new MongoDB(process.env.AZURE_COSMOS_CONNECTION_STRING as string, 'your-database-name');
 
   try {
     await mongoDB.getDbConnectionPromise();
-    const collection = mongoDB.db?.collection('tasks'); // Greife auf die 'tasks' Sammlung zu
+    const collection = mongoDB.db?.collection('tasks');
 
-    // Abfrage der Daten
-    const tasks = await collection?.find({}).toArray();
+    // Heutiges Datum
+    const today = new Date().toISOString().split("T")[0];
 
-    // Debugging-Ausgabe: Überprüfen der Datenstruktur
-    console.log("Tasks from DB:", tasks);
+    // Abfrage nach täglichen Aufgaben (daily) ohne Uhrzeit
+    const tasks = await collection?.find({
+      frequency: 'daily',
+      $or: [
+        { timebased: false },
+        { timebased: true, dueDate: today }
+      ]
+    }).toArray();
 
     if (tasks) {
       const structuredTasks = {
         dailyTasks: tasks.filter(task => task.frequency === 'daily'),
-        weeklyGoals: tasks.filter(task => task.frequency === 'weekly'),
-        monthlyGoals: tasks.filter(task => task.frequency === 'monthly'),
-        yearlyGoals: tasks.filter(task => task.frequency === 'yearly'),
+        // Hier können auch wöchentliche, monatliche etc. Aufgaben gefiltert werden
       };
-
-      console.log("Structured Tasks:", structuredTasks); // Debugging-Ausgabe
 
       res.status(200).json({ structuredKlonData: structuredTasks });
     } else {

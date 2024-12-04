@@ -9,7 +9,7 @@ function MyApp({ Component, pageProps }: AppProps) {
   return (
     <SidebarProvider>
       <AppSidebar />
-      <main>
+      <main className="Main">
         <Component {...pageProps} />
       </main>
     </SidebarProvider>
