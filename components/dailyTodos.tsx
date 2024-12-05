@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Task } from "@/utils/interface";
 import SheetWithCreateTask from "./todo/popUpCreateTask"; // Importiere das PopUp zum Erstellen von Aufgaben
+import DailyTaskListHeader from "./todo/dailyToDoHeader";
 import {
   Dialog,
   DialogTrigger,
@@ -11,6 +12,8 @@ import {
   DialogTitle,
   DialogClose,
 } from "@/components/ui/dialog"; // Importiere Dialog-Komponenten
+import Calendar from "react-calendar"; // Importiere den Kalender
+import { Value } from "react-calendar/dist/esm/shared/types.js";
 
 interface UserData {
   userId: string;
@@ -24,40 +27,41 @@ interface UserData {
 
 const DailyTaskList = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [viewType, setViewType] = useState<
-    "daily" | "weekly" | "monthly" | "yearly"
-  >("daily");
   const [selectedTask, setSelectedTask] = useState<Task | null>(null); // Zustand für das Pop-up
   const [editedTask, setEditedTask] = useState<Task | null>(null); // Zustand für die bearbeitete Aufgabe
+  const [showCalendar, setShowCalendar] = useState(false); // Zustand für das Anzeigen des Kalenders
+  const [selectedDate, setSelectedDate] = useState<string>(""); // Zustand für das ausgewählte Datum
 
-  useEffect(() => {
+  // Hilfsfunktion zum Formatieren des Datums im Format YYYY-MM-DD
+  const formatDate = (date: Date) => {
+    return (
+      date.getFullYear() +
+      "-" +
+      ("0" + (date.getMonth() + 1)).slice(-2) +
+      "-" +
+      ("0" + date.getDate()).slice(-2)
+    );
+  };
+
+  // Aktuelles Datum formatieren
+  const today = formatDate(new Date());
+
+  const fetchTasks = () => {
     fetch("/api/task/getTask")
       .then((response) => response.json())
       .then((data: UserData) => {
-        const today = new Date().toISOString().split("T")[0]; // Heutiges Datum
         const dailyTasks = data.structuredKlonData.dailyTasks || [];
-
-        // Aufgaben ohne Uhrzeit (timebased: false)
-        const tasksWithoutTime = dailyTasks.filter((task) => !task.timebased);
-
-        // Aufgaben mit Uhrzeit und Heutigem Datum
-        const tasksWithTime = dailyTasks.filter(
-          (task) => task.timebased && task.dueDate === today
-        );
-
-        // Sortiere Aufgaben mit Uhrzeit nach Zeit
-        tasksWithTime.sort((a, b) => a.time.localeCompare(b.time));
-
-        // Kombiniere Aufgaben ohne und mit Uhrzeit
-        const allTasks = [...tasksWithoutTime, ...tasksWithTime];
-
-        setTasks(allTasks);
+        setTasks(dailyTasks);
       })
       .catch((error) => {
         console.error("Fehler beim Abrufen der Daten:", error);
         setTasks([]); // Fallback auf ein leeres Array bei einem Fehler
       });
-  }, [viewType]);
+  };
+
+  useEffect(() => {
+    fetchTasks();
+  }, []); // useEffect wird nur einmal beim Laden der Komponente ausgeführt
 
   const handleTaskCheck = async (taskId: string, checked: boolean) => {
     try {
@@ -68,13 +72,7 @@ const DailyTaskList = () => {
       });
 
       if (response.ok) {
-        setTasks((prevTasks) =>
-          prevTasks.map((task) =>
-            task._id === taskId
-              ? { ...task, status: checked ? "completed" : "incomplete" }
-              : task
-          )
-        );
+        fetchTasks(); // Aufgabenliste aktualisieren
       } else {
         console.error("Fehler beim Aktualisieren des Aufgabenstatus");
       }
@@ -83,12 +81,10 @@ const DailyTaskList = () => {
     }
   };
 
-  // Funktion zum Öffnen des Pop-up Modals für detaillierte Ansicht
   const openTaskDetails = (task: Task) => {
     setSelectedTask(task); // Setze die ausgewählte Aufgabe für das Pop-up
   };
 
-  // Funktion zum Öffnen des Editier-Dialogs
   const openEditDialog = (task: Task) => {
     setEditedTask(task); // Setze die Aufgabe zur Bearbeitung
   };
@@ -102,25 +98,16 @@ const DailyTaskList = () => {
       return;
     }
 
-    console.log("Bearbeiten der Aufgabe mit ID:", editedTask._id);
-
-    // Senden der PUT-Anfrage
     try {
       const response = await fetch(
         `/api/task/updateTask?taskId=${editedTask._id}`,
         {
           method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify(editedTask),
         }
       );
 
-      // Protokollieren Sie die Antwort des Servers
-      console.log("Antwort des Servers:", response);
-
-      // Überprüfen Sie den Status der Antwort
       if (!response.ok) {
         const errorMessage = await response.text();
         console.error("Fehler beim Bearbeiten der Aufgabe:", errorMessage);
@@ -128,32 +115,49 @@ const DailyTaskList = () => {
         return;
       }
 
-      // Wenn die Anfrage erfolgreich war, aktualisieren Sie die Liste der Aufgaben
-      const updatedTask = await response.json();
-      console.log("Aufgabe erfolgreich aktualisiert:", updatedTask);
+      console.log("Aufgabe erfolgreich aktualisiert");
 
-      setTasks((prevTasks) =>
-        prevTasks.map((task) =>
-          task._id === editedTask._id ? editedTask : task
-        )
-      );
-      setEditedTask(null); // Schließe den Bearbeitungsdialog
+      setEditedTask(null); // Schließe das Bearbeitungsdialog
       setSelectedTask(null); // Schließe das Pop-up
+      fetchTasks(); // Aufgabenliste aktualisieren
     } catch (error) {
       console.error("Fehler beim Senden der Anfrage:", error);
       alert("Fehler beim Bearbeiten der Aufgabe.");
     }
   };
 
+  const handleDateChange = (date: Value) => {
+    if (date && date instanceof Date) {
+      const formattedDate = formatDate(date);
+      setSelectedDate(formattedDate);
+      setShowCalendar(false); // Schließe den Kalender nach der Auswahl
+    }
+  };
+
+  // Funktion zum Abrufen des anzuzeigenden Datums
+  const displayDate = selectedDate || today;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-row">
-        <div>Heutiges Datum +</div>
-        <div>
-          anzahl der kompletten punkte die ich bis jetzt gesammelt habe +
+        <div
+          className="cursor-pointer font-semibold text-lg"
+          onClick={() => setShowCalendar(!showCalendar)}
+        >
+          {selectedDate
+            ? `Angestrebtes Datum: ${new Date(selectedDate).toLocaleDateString(
+                "de-DE"
+              )}`
+            : `Heutiges Datum: ${new Date().toLocaleDateString("de-DE")}`}
         </div>
-        <div>in % wie viel ich für heute erledigt habe</div>
+        {showCalendar && (
+          <Calendar
+            onChange={handleDateChange}
+            value={selectedDate ? new Date(selectedDate) : new Date()}
+          />
+        )}
       </div>
+
       {/* Container für Aufgaben ohne Uhrzeit */}
       <div className="sticky top-0 bg-gray-100 p-4 rounded-lg shadow-md z-10 mb-10">
         <h2 className="text-xl font-semibold mb-4 text-gray-700">
@@ -162,7 +166,9 @@ const DailyTaskList = () => {
         <div className="space-y-4 overflow-y-auto max-h-[300px]">
           {tasks.length > 0 ? (
             tasks
-              .filter((task) => !task.timebased)
+              .filter(
+                (task) => !task.timebased && task.dueDate === displayDate // Filter nach Datum
+              )
               .map((task) => (
                 <div
                   key={task._id}
@@ -189,16 +195,15 @@ const DailyTaskList = () => {
       {/* Container für Aufgaben mit Uhrzeit */}
       <div className="bg-white p-4 rounded-lg shadow-md z-10 mb-10">
         <h2 className="text-xl font-semibold mb-4 text-gray-700">
-          Aufgaben für den heutigen Tag
+          Aufgaben für {new Date(displayDate).toLocaleDateString("de-DE")}
         </h2>
         <div className="space-y-4 overflow-y-auto max-h-[300px]">
           {tasks.length > 0 ? (
             tasks
               .filter(
-                (task) =>
-                  task.timebased &&
-                  task.dueDate === new Date().toISOString().split("T")[0]
+                (task) => task.timebased && task.dueDate === displayDate // Filter nach Datum
               )
+              .sort((a, b) => a.time.localeCompare(b.time)) // Sortiere nach Uhrzeit
               .map((task) => (
                 <div
                   key={task._id}
@@ -216,7 +221,7 @@ const DailyTaskList = () => {
               ))
           ) : (
             <p className="text-sm text-gray-500">
-              Keine Aufgaben für heute mit Uhrzeit gefunden.
+              Keine Aufgaben für diesen Tag gefunden.
             </p>
           )}
         </div>
@@ -290,7 +295,10 @@ const DailyTaskList = () => {
               <textarea
                 value={editedTask.description}
                 onChange={(e) =>
-                  setEditedTask({ ...editedTask, description: e.target.value })
+                  setEditedTask({
+                    ...editedTask,
+                    description: e.target.value,
+                  })
                 }
                 className="p-2 mb-4 border border-gray-300 rounded-md w-full"
               />
@@ -321,6 +329,7 @@ const DailyTaskList = () => {
         </Dialog>
       )}
 
+      {/* Wichtig: Behalte die SheetWithCreateTask-Komponente bei */}
       <SheetWithCreateTask />
     </div>
   );
