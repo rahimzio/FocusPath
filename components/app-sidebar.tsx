@@ -53,6 +53,11 @@ const items = [
   icon: Inbox,
   },
   {
+    title: "calorin tracker",
+    url: "/overview/calorin-tracker",
+    icon: Inbox,
+    },
+  {
     title: "Settings",
     url: "/overview/Settings",
     icon: Settings,
