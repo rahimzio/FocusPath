@@ -2,17 +2,14 @@
 
 import { useState, useEffect } from "react";
 import { Task } from "@/utils/interface";
-import SheetWithCreateTask from "./todo/popUpCreateTask"; // Importiere das PopUp zum Erstellen von Aufgaben
-import DailyTaskListHeader from "./todo/dailyToDoHeader";
+import SheetWithCreateTask from "./todo/popUpCreateTask"; // Wichtig: Beibehalten
 import {
   Dialog,
-  DialogTrigger,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogClose,
-} from "@/components/ui/dialog"; // Importiere Dialog-Komponenten
-import Calendar from "react-calendar"; // Importiere den Kalender
+} from "@/components/ui/dialog";
+import Calendar from "react-calendar";
 import { Value } from "react-calendar/dist/esm/shared/types.js";
 
 interface UserData {
@@ -27,43 +24,65 @@ interface UserData {
 
 const DailyTaskList = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null); // Zustand für das Pop-up
-  const [editedTask, setEditedTask] = useState<Task | null>(null); // Zustand für die bearbeitete Aufgabe
-  const [showCalendar, setShowCalendar] = useState(false); // Zustand für das Anzeigen des Kalenders
-  const [selectedDate, setSelectedDate] = useState<string>(""); // Zustand für das ausgewählte Datum
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [editedTask, setEditedTask] = useState<Task | null>(null);
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<string>("");
 
   // Hilfsfunktion zum Formatieren des Datums im Format YYYY-MM-DD
   const formatDate = (date: Date) => {
-    return (
-      date.getFullYear() +
-      "-" +
-      ("0" + (date.getMonth() + 1)).slice(-2) +
-      "-" +
-      ("0" + date.getDate()).slice(-2)
-    );
+    const year = date.getFullYear();
+    const month = ("0" + (date.getMonth() + 1)).slice(-2);
+    const day = ("0" + date.getDate()).slice(-2);
+    return `${year}-${month}-${day}`;
   };
 
-  // Aktuelles Datum formatieren
   const today = formatDate(new Date());
 
-  const fetchTasks = () => {
-    fetch("/api/task/getTask")
-      .then((response) => response.json())
-      .then((data: UserData) => {
-        const dailyTasks = data.structuredKlonData.dailyTasks || [];
-        setTasks(dailyTasks);
-      })
-      .catch((error) => {
-        console.error("Fehler beim Abrufen der Daten:", error);
-        setTasks([]); // Fallback auf ein leeres Array bei einem Fehler
-      });
+  /**
+   * Ruft Aufgaben für ein bestimmtes Datum ab. Falls kein Datum übergeben wird,
+   * wird das currently selectedDate oder heute verwendet.
+   */
+  const fetchTasks = async (dateParam?: string) => {
+    const dateToUse = dateParam || selectedDate || today;
+    console.log("fetchTasks aufgerufen mit date:", dateToUse);
+
+    try {
+      const response = await fetch(`/api/task/getTask?date=${dateToUse}`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Fehler beim Abrufen der Daten:", errorText);
+        throw new Error("Fehler beim Abrufen der Daten: " + errorText);
+      }
+
+      const data: UserData = await response.json();
+      const dailyTasks = data.structuredKlonData.dailyTasks || [];
+      console.log("Tasks vom Server für", dateToUse, ":", dailyTasks);
+
+      // Wir setzen alle Tasks. Da der Server bereits nach Datum filtert,
+      // sollten wir im Idealfall nur noch nach timebased unterscheiden müssen.
+      setTasks(dailyTasks);
+    } catch (error) {
+      console.error("Fehler beim Abrufen der Daten (Catch-Block):", error);
+      setTasks([]);
+      throw error; // Werfen, um zu signalisieren, dass etwas schiefging
+    }
   };
 
   useEffect(() => {
-    fetchTasks();
-  }, []); // useEffect wird nur einmal beim Laden der Komponente ausgeführt
+    // Initial einmalige Ladung der Aufgaben für heute
+    fetchTasks().catch((err) => {
+      console.error("Fehler beim Initial-Fetch:", err);
+    });
+  }, []);
 
   const handleTaskCheck = async (taskId: string, checked: boolean) => {
+    console.log(
+      "handleTaskCheck aufgerufen für Task:",
+      taskId,
+      "checked:",
+      checked
+    );
     try {
       const response = await fetch(`/api/task/updateTask?taskId=${taskId}`, {
         method: "PUT",
@@ -71,32 +90,43 @@ const DailyTaskList = () => {
         body: JSON.stringify({ status: checked ? "completed" : "incomplete" }),
       });
 
-      if (response.ok) {
-        fetchTasks(); // Aufgabenliste aktualisieren
-      } else {
-        console.error("Fehler beim Aktualisieren des Aufgabenstatus");
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(
+          "Fehler beim Aktualisieren des Aufgabenstatus:",
+          errorText
+        );
+        throw new Error(
+          "Fehler beim Aktualisieren des Aufgabenstatus:" + errorText
+        );
       }
+
+      console.log("Status erfolgreich aktualisiert, Tasks neu laden...");
+      await fetchTasks(); // Aufgabenliste aktualisieren
     } catch (error) {
       console.error("Fehler beim Senden der Anfrage:", error);
     }
   };
 
   const openTaskDetails = (task: Task) => {
-    setSelectedTask(task); // Setze die ausgewählte Aufgabe für das Pop-up
+    console.log("openTaskDetails für Task:", task._id, task.name);
+    setSelectedTask(task);
   };
 
   const openEditDialog = (task: Task) => {
-    setEditedTask(task); // Setze die Aufgabe zur Bearbeitung
+    console.log("openEditDialog für Task:", task._id, task.name);
+    setEditedTask(task);
   };
 
   const handleEditTask = async (event: React.FormEvent) => {
     event.preventDefault();
 
-    // Überprüfen Sie, ob die Aufgabe bearbeitet werden soll
     if (!editedTask) {
       console.error("Keine Aufgabe zum Bearbeiten ausgewählt");
       return;
     }
+
+    console.log("handleEditTask für Task:", editedTask._id, editedTask.name);
 
     try {
       const response = await fetch(
@@ -115,11 +145,10 @@ const DailyTaskList = () => {
         return;
       }
 
-      console.log("Aufgabe erfolgreich aktualisiert");
-
-      setEditedTask(null); // Schließe das Bearbeitungsdialog
-      setSelectedTask(null); // Schließe das Pop-up
-      fetchTasks(); // Aufgabenliste aktualisieren
+      console.log("Aufgabe erfolgreich aktualisiert, Tasks neu laden...");
+      setEditedTask(null);
+      setSelectedTask(null);
+      await fetchTasks();
     } catch (error) {
       console.error("Fehler beim Senden der Anfrage:", error);
       alert("Fehler beim Bearbeiten der Aufgabe.");
@@ -129,20 +158,34 @@ const DailyTaskList = () => {
   const handleDateChange = (date: Value) => {
     if (date && date instanceof Date) {
       const formattedDate = formatDate(date);
+      console.log("handleDateChange aufgerufen, neues Datum:", formattedDate);
       setSelectedDate(formattedDate);
-      setShowCalendar(false); // Schließe den Kalender nach der Auswahl
+      setShowCalendar(false);
+      // Nach Datumsauswahl erneut Aufgaben abrufen
+      fetchTasks(formattedDate).catch((err) => {
+        console.error("Fehler beim Fetch nach Datumsauswahl:", err);
+      });
     }
   };
 
-  // Funktion zum Abrufen des anzuzeigenden Datums
   const displayDate = selectedDate || today;
+
+  console.log(
+    "Rendering DailyTaskList mit displayDate:",
+    displayDate,
+    "und tasks:",
+    tasks
+  );
 
   return (
     <div className="space-y-6">
       <div className="flex flex-row">
         <div
           className="cursor-pointer font-semibold text-lg"
-          onClick={() => setShowCalendar(!showCalendar)}
+          onClick={() => {
+            console.log("Kalender Anzeige getoggled");
+            setShowCalendar(!showCalendar);
+          }}
         >
           {selectedDate
             ? `Angestrebtes Datum: ${new Date(selectedDate).toLocaleDateString(
@@ -166,13 +209,26 @@ const DailyTaskList = () => {
         <div className="space-y-4 overflow-y-auto max-h-[300px]">
           {tasks.length > 0 ? (
             tasks
-              .filter(
-                (task) => !task.timebased && task.dueDate === displayDate // Filter nach Datum
-              )
+              .filter((task) => {
+                const taskDueDate = formatDate(new Date(task.dueDate));
+                const passt = !task.timebased && taskDueDate === displayDate;
+                if (!passt) {
+                  console.log(
+                    "Aufgabe ohne Uhrzeit wird gefiltert (nicht angezeigt):",
+                    task._id,
+                    task.name,
+                    "dueDate:",
+                    taskDueDate,
+                    "displayDate:",
+                    displayDate
+                  );
+                }
+                return passt;
+              })
               .map((task) => (
                 <div
                   key={task._id}
-                  onClick={() => openTaskDetails(task)} // Öffne das Pop-up
+                  onClick={() => openTaskDetails(task)}
                   className="cursor-pointer p-3 border border-gray-300 rounded-md hover:bg-gray-50"
                 >
                   <h3 className="font-semibold text-sm text-gray-800">
@@ -200,14 +256,27 @@ const DailyTaskList = () => {
         <div className="space-y-4 overflow-y-auto max-h-[300px]">
           {tasks.length > 0 ? (
             tasks
-              .filter(
-                (task) => task.timebased && task.dueDate === displayDate // Filter nach Datum
-              )
-              .sort((a, b) => a.time.localeCompare(b.time)) // Sortiere nach Uhrzeit
+              .filter((task) => {
+                const taskDueDate = formatDate(new Date(task.dueDate));
+                const passt = task.timebased && taskDueDate === displayDate;
+                if (!passt && task.timebased) {
+                  console.log(
+                    "Zeitbasierte Aufgabe wird gefiltert (nicht angezeigt):",
+                    task._id,
+                    task.name,
+                    "dueDate:",
+                    taskDueDate,
+                    "displayDate:",
+                    displayDate
+                  );
+                }
+                return passt;
+              })
+              .sort((a, b) => (a.time || "").localeCompare(b.time || ""))
               .map((task) => (
                 <div
                   key={task._id}
-                  onClick={() => openTaskDetails(task)} // Öffne das Pop-up
+                  onClick={() => openTaskDetails(task)}
                   className="cursor-pointer p-3 border border-gray-300 rounded-md hover:bg-gray-50"
                 >
                   <h3 className="font-semibold text-sm text-gray-800">
@@ -231,7 +300,11 @@ const DailyTaskList = () => {
       {selectedTask && (
         <Dialog
           open={Boolean(selectedTask)}
-          onOpenChange={(open) => setSelectedTask(open ? selectedTask : null)}
+          onOpenChange={(open) => {
+            if (!open)
+              console.log("Popup geschlossen für Task:", selectedTask._id);
+            setSelectedTask(open ? selectedTask : null);
+          }}
         >
           <DialogContent>
             <DialogHeader>
@@ -295,10 +368,7 @@ const DailyTaskList = () => {
               <textarea
                 value={editedTask.description}
                 onChange={(e) =>
-                  setEditedTask({
-                    ...editedTask,
-                    description: e.target.value,
-                  })
+                  setEditedTask({ ...editedTask, description: e.target.value })
                 }
                 className="p-2 mb-4 border border-gray-300 rounded-md w-full"
               />
@@ -329,7 +399,7 @@ const DailyTaskList = () => {
         </Dialog>
       )}
 
-      {/* Wichtig: Behalte die SheetWithCreateTask-Komponente bei */}
+      {/* Wichtige Komponente beibehalten */}
       <SheetWithCreateTask />
     </div>
   );
