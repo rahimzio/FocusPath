@@ -46,7 +46,7 @@ const DailyTaskList = () => {
   const fetchTasks = async (dateParam?: string) => {
     const dateToUse = dateParam || selectedDate || today;
     console.log("fetchTasks aufgerufen mit date:", dateToUse);
-
+/*
     try {
       const response = await fetch(`/api/task/getTask?date=${dateToUse}`);
       if (!response.ok) {
