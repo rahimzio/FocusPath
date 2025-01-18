@@ -22,7 +22,7 @@ export default function CreateTask() {
   });
 
   // Funktion zum Erstellen einer neuen Aufgabe
-  const handleSubmit = async (event: React.FormEvent) => {
+ /* const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
 
     // Sende die Aufgabe zur API
@@ -55,9 +55,55 @@ export default function CreateTask() {
     } else {
       alert("Fehler beim Erstellen der Aufgabe");
     }
-  };
+  };*/
+  
+  const [tasks, setTasks] = useState<Task[]>([]);  // Array von Aufgaben (Task[])
 
-  // Funktion zum Ändern der Eingabewerte
+  // handleSubmit-Funktion zum Hinzufügen einer neuen Aufgabe
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    
+    const response = await fetch("/api/task/createTask", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(task),
+    });
+  
+    if (response.ok) {
+      alert("Aufgabe erfolgreich erstellt!");
+  
+      const newTask = await response.json();  // Neuen Task von der API erhalten
+      setTasks((prevTasks) => [...prevTasks, newTask]);  // tasks aktualisieren
+  
+      // Zurücksetzen der Eingabewerte
+      setTask({
+        _id: "",
+        id: "",
+        name: "",
+        description: "",
+        points: 0,
+        status: "incomplete",
+        dueDate: "",
+        frequency: "daily",
+        category: "",
+        linkedApps: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        timebased: false,
+        time: "",
+      });
+    } else {
+      alert("Fehler beim Erstellen der Aufgabe");
+    }
+  };
+ 
+
+
+ 
+  
+  
   const handleChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement

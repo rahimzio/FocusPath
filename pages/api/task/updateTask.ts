@@ -1,55 +1,46 @@
-import { NextApiRequest, NextApiResponse } from 'next';
-import { ObjectId } from 'mongodb';
-import MongoDB from '../db/mongo';
+// pages/api/task/updateTask.ts
+import { NextApiRequest, NextApiResponse } from "next";
+import { ObjectId } from "mongodb";
+import { connectToDatabase, disconnectFromDatabase } from "../db/mongo";
+import { Task } from "@/utils/interface";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const { taskId } = req.query;
-  const updatedTask = req.body;
+  // Erlaube nur PUT
+  if (req.method !== "PUT") {
+    return res.status(405).json({ message: "Method not allowed. Use PUT." });
+  }
 
-  // Loggen Sie die eingehenden Daten für Debugging
-  console.log('Aktualisiere Aufgabe mit taskId:', taskId);
-  console.log('Daten der Aufgabe:', updatedTask);
-
-  if (req.method === 'PUT') {
-    if (!taskId || !updatedTask) {
-      console.error("Fehlende taskId oder Task-Daten");
-      return res.status(400).json({ message: 'Fehlende taskId oder Task-Daten' });
+  try {
+    // 1) Hole taskId aus der Query
+    const { taskId } = req.query;
+    if (!taskId || typeof taskId !== "string") {
+      return res.status(400).json({ message: "Missing or invalid taskId parameter" });
     }
 
-    if (!ObjectId.isValid(taskId as string)) {
-      console.error('Ungültige taskId');
-      return res.status(400).json({ message: 'Ungültige taskId' });
+    // 2) Neue Felder aus dem Body
+    //    Du kannst *alle* Felder annehmen, oder gezielt name, description, etc.
+    const updateFields = req.body as Partial<Task>;
+    updateFields.updatedAt = new Date().toISOString();
+
+    // 3) DB-Verbindung
+    const { db } = await connectToDatabase();
+    const tasksColl = db.collection<Task>("tasks");
+
+    // 4) Update
+    const result = await tasksColl.updateOne(
+      { _id: new ObjectId(taskId) },
+      { $set: updateFields }
+    );
+
+    await disconnectFromDatabase();
+
+    if (result.modifiedCount === 0) {
+      return res.status(404).json({ message: "Task not found or not updated" });
     }
 
-    const mongoDB = new MongoDB(process.env.AZURE_COSMOS_CONNECTION_STRING as string, 'your-database-name');
-
-    try {
-      await mongoDB.getDbConnectionPromise();
-      const collection = mongoDB.db?.collection('tasks');
-
-      // Entferne das '_id'-Feld aus 'updatedTask'
-      delete updatedTask._id;
-
-      // Loggen Sie das Update
-      console.log("Versuche, die Aufgabe zu aktualisieren:", taskId);
-
-      const result = await collection?.updateOne(
-        { _id: new ObjectId(taskId as string) }, // taskId als ObjectId
-        { $set: updatedTask }
-      );
-
-      if (result?.modifiedCount === 1) {
-        return res.status(200).json({ message: 'Aufgabe erfolgreich aktualisiert' });
-      } else {
-        console.error("Aufgabe nicht gefunden oder Status unverändert");
-        return res.status(404).json({ message: 'Aufgabe nicht gefunden' });
-      }
-    } catch (error) {
-      console.error('Fehler beim Aktualisieren der Aufgabe:', error);
-      res.status(500).json({ message: 'Fehler beim Aktualisieren der Aufgabe' });
-    }
-  } else {
-    console.error("Methode nicht erlaubt");
-    res.status(405).json({ message: 'Methode nicht erlaubt' });
+    return res.status(200).json({ message: "Task updated successfully" });
+  } catch (error) {
+    console.error("Error updating task:", error);
+    return res.status(500).json({ message: "Internal server error" });
   }
 }

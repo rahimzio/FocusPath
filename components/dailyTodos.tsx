@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Task } from "@/utils/interface";
-import SheetWithCreateTask from "./todo/popUpCreateTask"; // Wichtig: Beibehalten
+import SheetWithCreateTask from "@/components/todo/popUpCreateTask";
 import {
   Dialog,
   DialogContent,
@@ -11,184 +11,243 @@ import {
 } from "@/components/ui/dialog";
 import Calendar from "react-calendar";
 import { Value } from "react-calendar/dist/esm/shared/types.js";
+import { FaCheckCircle } from "react-icons/fa"; // Optional: Icon hinzufügen
+import { toast } from 'react-toastify'; // Importiere toast
 
-interface UserData {
-  userId: string;
-  structuredKlonData: {
-    dailyTasks: Task[];
-    weeklyGoals: Task[];
-    monthlyGoals: Task[];
-    yearlyGoals: Task[];
-  };
+// Hilfsfunktion, um ein Date-Objekt als YYYY-MM-DD zu formatieren
+function formatDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 const DailyTaskList = () => {
+  // Liste der Tasks, die wir vom Server bekommen
   const [tasks, setTasks] = useState<Task[]>([]);
+
+  // Kalender-Logik
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<string>(() =>
+    formatDate(new Date()) // Standard: heute
+  );
+
+  // Detail-Ansicht & Edit-Dialog
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [editedTask, setEditedTask] = useState<Task | null>(null);
-  const [showCalendar, setShowCalendar] = useState(false);
-  const [selectedDate, setSelectedDate] = useState<string>("");
 
-  // Hilfsfunktion zum Formatieren des Datums im Format YYYY-MM-DD
-  const formatDate = (date: Date) => {
-    const year = date.getFullYear();
-    const month = ("0" + (date.getMonth() + 1)).slice(-2);
-    const day = ("0" + date.getDate()).slice(-2);
-    return `${year}-${month}-${day}`;
-  };
+  // ------------------------------------------------
+  // 1) fetchTasks => holt gefilterte Tasks vom Server
+  // ------------------------------------------------
+  async function fetchTasks(dateParam?: string) {
+    // Wenn kein Datum angegeben, nimm das heutige
+    const dateToUse = dateParam || formatDate(new Date());
+    console.log(`Fetching tasks for date: ${dateToUse}`);
 
-  const today = formatDate(new Date());
-
-  /**
-   * Ruft Aufgaben für ein bestimmtes Datum ab. Falls kein Datum übergeben wird,
-   * wird das currently selectedDate oder heute verwendet.
-   */
-  const fetchTasks = async (dateParam?: string) => {
-    const dateToUse = dateParam || selectedDate || today;
-    console.log("fetchTasks aufgerufen mit date:", dateToUse);
-/*
     try {
-      const response = await fetch(`/api/task/getTask?date=${dateToUse}`);
+      // Hier rufen wir z. B. /api/task/getTasks?date=2025-01-18 auf
+      const response = await fetch(`/api/task/getTasks?date=${dateToUse}`);
+      console.log(`Response von getTasks:`, response);
       if (!response.ok) {
         const errorText = await response.text();
-        console.error("Fehler beim Abrufen der Daten:", errorText);
-        throw new Error("Fehler beim Abrufen der Daten: " + errorText);
+        console.error("Fehler beim Abrufen der Tasks:", errorText);
+        toast.error("Fehler beim Abrufen der Aufgaben.");
+        return;
       }
 
-      const data: UserData = await response.json();
-      const dailyTasks = data.structuredKlonData.dailyTasks || [];
-      console.log("Tasks vom Server für", dateToUse, ":", dailyTasks);
-
-      // Wir setzen alle Tasks. Da der Server bereits nach Datum filtert,
-      // sollten wir im Idealfall nur noch nach timebased unterscheiden müssen.
-      setTasks(dailyTasks);
+      const data = await response.json();
+      console.log("Daten von getTasks:", JSON.stringify(data, null, 2));
+      const fetchedTasks: Task[] = data.tasks || [];
+      setTasks(fetchedTasks);
+      console.log("Aktualisierte Tasks im State:", fetchedTasks);
     } catch (error) {
-      console.error("Fehler beim Abrufen der Daten (Catch-Block):", error);
-      setTasks([]);
-      throw error; // Werfen, um zu signalisieren, dass etwas schiefging
+      console.error("Fetch error:", error);
+      toast.error("Fehler beim Abrufen der Aufgaben.");
     }
-  };
+  }
 
-  useEffect(() => {
-    // Initial einmalige Ladung der Aufgaben für heute
-    fetchTasks().catch((err) => {
-      console.error("Fehler beim Initial-Fetch:", err);
-    });
-  }, []);
-
-  const handleTaskCheck = async (taskId: string, checked: boolean) => {
+  // ------------------------------------------------
+  // 2) Handle Check/Uncheck => completeTask/undoCompletion
+  // ------------------------------------------------
+  async function handleCheckTask(taskId: string, date: string, checked: boolean) {
     console.log(
-      "handleTaskCheck aufgerufen für Task:",
-      taskId,
-      "checked:",
-      checked
+      `handleCheckTask aufgerufen mit: taskId=${taskId}, date=${date}, checked=${checked}`
     );
     try {
-      const response = await fetch(`/api/task/updateTask?taskId=${taskId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: checked ? "completed" : "incomplete" }),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(
-          "Fehler beim Aktualisieren des Aufgabenstatus:",
-          errorText
-        );
-        throw new Error(
-          "Fehler beim Aktualisieren des Aufgabenstatus:" + errorText
-        );
+      if (checked) {
+        // => completed
+        const response = await fetch("/api/task/completeTask", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ taskId, date }),
+        });
+        console.log(`Response von completeTask:`, response);
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error("Fehler bei completeTask:", errorText);
+          toast.error("Fehler beim Abschließen der Aufgabe.");
+          return;
+        } else {
+          toast.success("Aufgabe erfolgreich abgeschlossen!");
+        }
+      } else {
+        // => incomplete
+        const response = await fetch("/api/task/undoCompletion", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ taskId, date }),
+        });
+        console.log(`Response von undoCompletion:`, response);
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error("Fehler bei undoCompletion:", errorText);
+          toast.error("Fehler beim Rückgängigmachen der Aufgabe.");
+          return;
+        } else {
+          toast.info("Aufgabe als offen markiert.");
+        }
       }
 
-      console.log("Status erfolgreich aktualisiert, Tasks neu laden...");
-      await fetchTasks(); // Aufgabenliste aktualisieren
+      // Nach Update Tasks erneut laden
+      await fetchTasks(date);
     } catch (error) {
-      console.error("Fehler beim Senden der Anfrage:", error);
+      console.error("Fehler beim Aktualisieren des Status:", error);
+      toast.error("Ein unerwarteter Fehler ist aufgetreten.");
     }
-  };
+  }
 
-  const openTaskDetails = (task: Task) => {
-    console.log("openTaskDetails für Task:", task._id, task.name);
-    setSelectedTask(task);
-  };
+  // ------------------------------------------------
+  // 3) Aufgaben löschen
+  // ------------------------------------------------
+  async function handleDeleteTask(taskId: string) {
+    if (!confirm("Willst du diese Aufgabe wirklich löschen?")) return;
 
-  const openEditDialog = (task: Task) => {
-    console.log("openEditDialog für Task:", task._id, task.name);
-    setEditedTask(task);
-  };
+    console.log(`handleDeleteTask aufgerufen mit: taskId=${taskId}`);
 
-  const handleEditTask = async (event: React.FormEvent) => {
+    try {
+      const response = await fetch(`/api/task/deleteTask?taskId=${taskId}`, {
+        method: "DELETE",
+      });
+      console.log(`Response von deleteTask:`, response);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Fehler beim Löschen der Task:", errorText);
+        toast.error("Löschen fehlgeschlagen.");
+        return;
+      }
+      // Nach Löschen Tasks erneut laden
+      await fetchTasks(selectedDate);
+      toast.success("Aufgabe erfolgreich gelöscht.");
+    } catch (error) {
+      console.error("Fehler beim Löschen der Task:", error);
+      toast.error("Ein unerwarteter Fehler ist aufgetreten.");
+    }
+  }
+
+  // ------------------------------------------------
+  // 4) useEffect => beim ersten Laden + bei Änderung von selectedDate
+  // ------------------------------------------------
+  useEffect(() => {
+    fetchTasks(selectedDate);
+  }, [selectedDate]);
+
+  // ------------------------------------------------
+  // 5) Zeitbasierte vs. nicht-zeitbasierte Tasks
+  // ------------------------------------------------
+  const nonTimebasedTasks = tasks.filter((task) => !task.timebased);
+  const timebasedTasks = tasks.filter((task) => task.timebased);
+
+  // ------------------------------------------------
+  // 6) Kalender-Logik
+  // ------------------------------------------------
+  function handleDateChange(dateValue: Value) {
+    if (dateValue instanceof Date) {
+      const formattedDate = formatDate(dateValue);
+      console.log(`Datum geändert auf: ${formattedDate}`);
+      setSelectedDate(formattedDate);
+    }
+  }
+
+  // ------------------------------------------------
+  // 7) Task-Editieren
+  // ------------------------------------------------
+  async function handleEditTask(event: React.FormEvent) {
     event.preventDefault();
-
-    if (!editedTask) {
-      console.error("Keine Aufgabe zum Bearbeiten ausgewählt");
+    if (!editedTask || !editedTask._id) {
+      console.error("Keine Task ausgewählt");
+      toast.error("Keine Aufgabe ausgewählt zum Bearbeiten.");
       return;
     }
-
-    console.log("handleEditTask für Task:", editedTask._id, editedTask.name);
-
+    console.log(`handleEditTask aufgerufen mit:`, editedTask);
     try {
       const response = await fetch(
         `/api/task/updateTask?taskId=${editedTask._id}`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(editedTask),
+          body: JSON.stringify({
+            name: editedTask.name,
+            description: editedTask.description,
+            points: editedTask.points,
+            dueDate: editedTask.dueDate,
+            time: editedTask.time,
+            frequency: editedTask.frequency,
+            category: editedTask.category,
+          }),
         }
       );
-
+      console.log(`Response von updateTask:`, response);
       if (!response.ok) {
         const errorMessage = await response.text();
-        console.error("Fehler beim Bearbeiten der Aufgabe:", errorMessage);
-        alert("Fehler beim Bearbeiten der Aufgabe. " + errorMessage);
+        console.error("Fehler beim Bearbeiten:", errorMessage);
+        toast.error("Fehler beim Bearbeiten der Aufgabe.");
         return;
       }
-
-      console.log("Aufgabe erfolgreich aktualisiert, Tasks neu laden...");
+      // Edit-Dialog schließen
       setEditedTask(null);
       setSelectedTask(null);
-      await fetchTasks();
+
+      // Neu laden
+      await fetchTasks(selectedDate);
+      toast.success("Aufgabe erfolgreich bearbeitet!");
     } catch (error) {
-      console.error("Fehler beim Senden der Anfrage:", error);
-      alert("Fehler beim Bearbeiten der Aufgabe.");
+      console.error("Fehler beim Bearbeiten:", error);
+      toast.error("Ein unerwarteter Fehler ist aufgetreten.");
     }
-  };
+  }
 
-  const handleDateChange = (date: Value) => {
-    if (date && date instanceof Date) {
-      const formattedDate = formatDate(date);
-      console.log("handleDateChange aufgerufen, neues Datum:", formattedDate);
-      setSelectedDate(formattedDate);
-      setShowCalendar(false);
-      // Nach Datumsauswahl erneut Aufgaben abrufen
-      fetchTasks(formattedDate).catch((err) => {
-        console.error("Fehler beim Fetch nach Datumsauswahl:", err);
-      });
-    }
-  };
+  // ------------------------------------------------
+  // 8) Detail-Ansicht öffnen
+  // ------------------------------------------------
+  function openTaskDetails(task: Task) {
+    console.log(`openTaskDetails aufgerufen mit:`, task);
+    setSelectedTask(task);
+  }
 
-  const displayDate = selectedDate || today;
+  // ------------------------------------------------
+  // 9) Edit-Dialog öffnen
+  // ------------------------------------------------
+  function openEditDialog(task: Task) {
+    console.log(`openEditDialog aufgerufen mit:`, task);
+    setEditedTask(task);
+  }
 
-  console.log(
-    "Rendering DailyTaskList mit displayDate:",
-    displayDate,
-    "und tasks:",
-    tasks
-  );
-
+  // ------------------------------------------------
+  // RENDER
+  // ------------------------------------------------
   return (
     <div className="space-y-6">
-      <div className="flex flex-row">
+      {/* Datum + Kalender */}
+      <div className="flex flex-row items-center gap-4">
         <div
           className="cursor-pointer font-semibold text-lg"
           onClick={() => {
-            console.log("Kalender Anzeige getoggled");
+            console.log("Kalender anzeigen/verstecken");
             setShowCalendar(!showCalendar);
           }}
         >
           {selectedDate
-            ? `Angestrebtes Datum: ${new Date(selectedDate).toLocaleDateString(
+            ? `Gewähltes Datum: ${new Date(selectedDate).toLocaleDateString(
                 "de-DE"
               )}`
             : `Heutiges Datum: ${new Date().toLocaleDateString("de-DE")}`}
@@ -196,157 +255,192 @@ const DailyTaskList = () => {
         {showCalendar && (
           <Calendar
             onChange={handleDateChange}
-            value={selectedDate ? new Date(selectedDate) : new Date()}
+            value={new Date(selectedDate)}
           />
         )}
       </div>
 
-      {/* Container für Aufgaben ohne Uhrzeit */}
-      <div className="sticky top-0 bg-gray-100 p-4 rounded-lg shadow-md z-10 mb-10">
+      {/* Aufgaben ohne Uhrzeit */}
+      <div className="bg-gray-100 p-4 rounded-lg shadow-md mb-10 text-black">
         <h2 className="text-xl font-semibold mb-4 text-gray-700">
           Aufgaben ohne Uhrzeit
         </h2>
-        <div className="space-y-4 overflow-y-auto max-h-[300px]">
-          {tasks.length > 0 ? (
-            tasks
-              .filter((task) => {
-                const taskDueDate = formatDate(new Date(task.dueDate));
-                const passt = !task.timebased && taskDueDate === displayDate;
-                if (!passt) {
-                  console.log(
-                    "Aufgabe ohne Uhrzeit wird gefiltert (nicht angezeigt):",
-                    task._id,
-                    task.name,
-                    "dueDate:",
-                    taskDueDate,
-                    "displayDate:",
-                    displayDate
-                  );
-                }
-                return passt;
-              })
-              .map((task) => (
-                <div
-                  key={task._id}
-                  onClick={() => openTaskDetails(task)}
-                  className="cursor-pointer p-3 border border-gray-300 rounded-md hover:bg-gray-50"
-                >
-                  <h3 className="font-semibold text-sm text-gray-800">
-                    {task.name}
-                  </h3>
-                  <p className="text-xs text-gray-500">{task.description}</p>
-                  <p className="text-xs text-gray-400">
-                    Fällig am: {task.dueDate}
-                  </p>
+        {nonTimebasedTasks.length === 0 ? (
+          <p className="text-gray-600">Keine Aufgaben ohne Uhrzeit vorhanden.</p>
+        ) : (
+          <div className="space-y-4 overflow-y-auto max-h-[300px]">
+            {nonTimebasedTasks.map((task) => (
+              <div
+                key={task._id}
+                className={`p-3 border rounded flex items-center ${
+                  task.status === "completed" ? "completed" : ""
+                }`}
+              >
+                <div className="flex-grow">
+                  <h4 className="font-semibold">{task.name}</h4>
+                  <p>{task.description}</p>
                 </div>
-              ))
-          ) : (
-            <p className="text-sm text-gray-500">
-              Keine Aufgaben ohne Uhrzeit gefunden.
-            </p>
-          )}
-        </div>
+                {task.status === "completed" && (
+                  <FaCheckCircle className="text-green-500 ml-2" />
+                )}
+                {/* Checkbox */}
+                <div className="mt-2 flex items-center">
+                  <input
+                    id={`taskCheck-${task._id}`}
+                    type="checkbox"
+                    checked={task.status === "completed"}
+                    onChange={(e) =>
+                      handleCheckTask(task._id!, selectedDate, e.target.checked)
+                    }
+                  />
+                  <label
+                    htmlFor={`taskCheck-${task._id}`}
+                    className="ml-2 select-none"
+                  >
+                    {task.status === "completed" ? "Abgeschlossen" : "Offen"}
+                  </label>
+                </div>
+
+                <div className="mt-2 flex gap-2">
+                  <button
+                    onClick={() => openTaskDetails(task)}
+                    className="bg-blue-500 text-white px-2 py-1 rounded"
+                  >
+                    Details
+                  </button>
+                  <button
+                    onClick={() => openEditDialog(task)}
+                    className="bg-green-500 text-white px-2 py-1 rounded"
+                  >
+                    Editieren
+                  </button>
+                  <button
+                    onClick={() => handleDeleteTask(task._id!)}
+                    className="bg-red-500 text-white px-2 py-1 rounded"
+                  >
+                    Löschen
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Container für Aufgaben mit Uhrzeit */}
-      <div className="bg-white p-4 rounded-lg shadow-md z-10 mb-10">
+      {/* Aufgaben mit Uhrzeit */}
+      <div className="bg-white p-4 rounded-lg shadow-md mb-10 text-black">
         <h2 className="text-xl font-semibold mb-4 text-gray-700">
-          Aufgaben für {new Date(displayDate).toLocaleDateString("de-DE")}
+          Aufgaben mit Uhrzeit
         </h2>
-        <div className="space-y-4 overflow-y-auto max-h-[300px]">
-          {tasks.length > 0 ? (
-            tasks
-              .filter((task) => {
-                const taskDueDate = formatDate(new Date(task.dueDate));
-                const passt = task.timebased && taskDueDate === displayDate;
-                if (!passt && task.timebased) {
-                  console.log(
-                    "Zeitbasierte Aufgabe wird gefiltert (nicht angezeigt):",
-                    task._id,
-                    task.name,
-                    "dueDate:",
-                    taskDueDate,
-                    "displayDate:",
-                    displayDate
-                  );
-                }
-                return passt;
-              })
-              .sort((a, b) => (a.time || "").localeCompare(b.time || ""))
-              .map((task) => (
-                <div
-                  key={task._id}
-                  onClick={() => openTaskDetails(task)}
-                  className="cursor-pointer p-3 border border-gray-300 rounded-md hover:bg-gray-50"
-                >
-                  <h3 className="font-semibold text-sm text-gray-800">
-                    {task.name}
-                  </h3>
-                  <p className="text-xs text-gray-500">{task.description}</p>
-                  <p className="text-xs text-gray-400">
-                    Fällig am: {task.dueDate} um {task.time}
-                  </p>
+        {timebasedTasks.length === 0 ? (
+          <p className="text-gray-600">
+            Keine zeitbasierten Aufgaben vorhanden.
+          </p>
+        ) : (
+          <div className="space-y-4 overflow-y-auto max-h-[300px]">
+            {timebasedTasks.map((task) => (
+              <div
+                key={task._id}
+                className={`p-3 border rounded flex items-center ${
+                  task.status === "completed" ? "completed" : ""
+                }`}
+              >
+                <div className="flex-grow">
+                  <h4 className="font-semibold">{task.name}</h4>
+                  <p>{task.description}</p>
+                  {task.time && (
+                    <p className="text-sm">
+                      <span className="font-medium">Uhrzeit:</span> {task.time}
+                    </p>
+                  )}
                 </div>
-              ))
-          ) : (
-            <p className="text-sm text-gray-500">
-              Keine Aufgaben für diesen Tag gefunden.
-            </p>
-          )}
-        </div>
+                {task.status === "completed" && (
+                  <FaCheckCircle className="text-green-500 ml-2" />
+                )}
+                {/* Checkbox */}
+                <div className="mt-2 flex items-center">
+                  <input
+                    id={`timeTaskCheck-${task._id}`}
+                    type="checkbox"
+                    checked={task.status === "completed"}
+                    onChange={(e) =>
+                      handleCheckTask(task._id!, selectedDate, e.target.checked)
+                    }
+                  />
+                  <label
+                    htmlFor={`timeTaskCheck-${task._id}`}
+                    className="ml-2 select-none"
+                  >
+                    {task.status === "completed" ? "Abgeschlossen" : "Offen"}
+                  </label>
+                </div>
+
+                <div className="mt-2 flex gap-2">
+                  <button
+                    onClick={() => openTaskDetails(task)}
+                    className="bg-blue-500 text-white px-2 py-1 rounded"
+                  >
+                    Details
+                  </button>
+                  <button
+                    onClick={() => openEditDialog(task)}
+                    className="bg-green-500 text-white px-2 py-1 rounded"
+                  >
+                    Editieren
+                  </button>
+                  <button
+                    onClick={() => handleDeleteTask(task._id!)}
+                    className="bg-red-500 text-white px-2 py-1 rounded"
+                  >
+                    Löschen
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Pop-up für die detaillierte Ansicht der Aufgabe */}
+      {/* Detail-Popup */}
       {selectedTask && (
         <Dialog
           open={Boolean(selectedTask)}
-          onOpenChange={(open) => {
-            if (!open)
-              console.log("Popup geschlossen für Task:", selectedTask._id);
-            setSelectedTask(open ? selectedTask : null);
-          }}
+          onOpenChange={(open) => setSelectedTask(open ? selectedTask : null)}
         >
           <DialogContent>
             <DialogHeader>
               <DialogTitle>{selectedTask.name}</DialogTitle>
             </DialogHeader>
-            <p>{selectedTask.description}</p>
-            <p>Punkte: {selectedTask.points}</p>
-            <p>Status: {selectedTask.status}</p>
-            <p>Fällig am: {selectedTask.dueDate}</p>
-            <p>Uhrzeit: {selectedTask.time}</p>
-            <p>Kategorie: {selectedTask.category}</p>
-
-            {/* Editieren-Button */}
-            <button
-              onClick={() => openEditDialog(selectedTask)}
-              className="mt-4 bg-yellow-500 text-white px-4 py-2 rounded-md"
-            >
-              Editieren
-            </button>
-
-            <button
-              onClick={() =>
-                handleTaskCheck(
-                  selectedTask._id,
-                  selectedTask.status !== "completed"
-                )
-              }
-              className={`mt-4 ${
-                selectedTask.status === "completed"
-                  ? "bg-green-500"
-                  : "bg-red-500"
-              } text-white px-4 py-2 rounded-md`}
-            >
-              {selectedTask.status === "completed"
-                ? "Markieren als nicht erledigt"
-                : "Markieren als erledigt"}
-            </button>
+            <div className="space-y-2 mt-4">
+              <p>{selectedTask.description}</p>
+              <p>
+                <span className="font-semibold">Punkte:</span>{" "}
+                {selectedTask.points}
+              </p>
+              <p>
+                <span className="font-semibold">Status:</span>{" "}
+                {selectedTask.status}
+              </p>
+              <p>
+                <span className="font-semibold">Fällig am:</span>{" "}
+                {selectedTask.dueDate}
+              </p>
+              {selectedTask.time && (
+                <p>
+                  <span className="font-semibold">Uhrzeit:</span>{" "}
+                  {selectedTask.time}
+                </p>
+              )}
+              <p>
+                <span className="font-semibold">Kategorie:</span>{" "}
+                {selectedTask.category}
+              </p>
+            </div>
           </DialogContent>
         </Dialog>
       )}
 
-      {/* Pop-up für das Bearbeiten einer Aufgabe */}
+      {/* Edit-Popup */}
       {editedTask && (
         <Dialog
           open={Boolean(editedTask)}
@@ -354,40 +448,100 @@ const DailyTaskList = () => {
         >
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Editiere Aufgabe</DialogTitle>
+              <DialogTitle>Aufgabe bearbeiten</DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleEditTask}>
+            <form onSubmit={handleEditTask} className="mt-4 space-y-4">
+              {/* Name */}
               <input
                 type="text"
                 value={editedTask.name}
                 onChange={(e) =>
                   setEditedTask({ ...editedTask, name: e.target.value })
                 }
-                className="p-2 mb-4 border border-gray-300 rounded-md w-full"
+                className="p-2 border border-gray-300 rounded-md w-full"
+                placeholder="Aufgabenname"
+                required
               />
+
+              {/* Beschreibung */}
               <textarea
                 value={editedTask.description}
                 onChange={(e) =>
                   setEditedTask({ ...editedTask, description: e.target.value })
                 }
-                className="p-2 mb-4 border border-gray-300 rounded-md w-full"
+                className="p-2 border border-gray-300 rounded-md w-full"
+                placeholder="Beschreibung"
+                required
               />
+
+              {/* Punkte */}
+              <input
+                type="number"
+                value={editedTask.points}
+                onChange={(e) =>
+                  setEditedTask({
+                    ...editedTask,
+                    points: parseInt(e.target.value, 10) || 0,
+                  })
+                }
+                className="p-2 border border-gray-300 rounded-md w-full"
+                placeholder="Punkte"
+                min={0}
+                required
+              />
+
+              {/* Datum */}
               <input
                 type="date"
                 value={editedTask.dueDate}
                 onChange={(e) =>
                   setEditedTask({ ...editedTask, dueDate: e.target.value })
                 }
-                className="p-2 mb-4 border border-gray-300 rounded-md w-full"
+                className="p-2 border border-gray-300 rounded-md w-full"
+                required
               />
+
+              {/* Uhrzeit */}
               <input
                 type="time"
-                value={editedTask.time}
+                value={editedTask.time ?? ""}
                 onChange={(e) =>
                   setEditedTask({ ...editedTask, time: e.target.value })
                 }
-                className="p-2 mb-4 border border-gray-300 rounded-md w-full"
+                className="p-2 border border-gray-300 rounded-md w-full"
               />
+
+              {/* Frequenz */}
+              <select
+                value={editedTask.frequency}
+                onChange={(e) =>
+                  setEditedTask({
+                    ...editedTask,
+                    frequency: e.target.value as Task["frequency"],
+                  })
+                }
+                className="p-2 border border-gray-300 rounded-md w-full"
+                required
+              >
+                <option value="once">Einmalig</option>
+                <option value="daily">Täglich</option>
+                <option value="weekly">Wöchentlich</option>
+                <option value="monthly">Monatlich</option>
+                <option value="yearly">Jährlich</option>
+              </select>
+
+              {/* Kategorie */}
+              <input
+                type="text"
+                value={editedTask.category}
+                onChange={(e) =>
+                  setEditedTask({ ...editedTask, category: e.target.value })
+                }
+                className="p-2 border border-gray-300 rounded-md w-full"
+                placeholder="Kategorie"
+                required
+              />
+
               <button
                 type="submit"
                 className="bg-green-500 text-white px-4 py-2 rounded-md"
@@ -399,7 +553,7 @@ const DailyTaskList = () => {
         </Dialog>
       )}
 
-      {/* Wichtige Komponente beibehalten */}
+      {/* Button zum Erstellen einer neuen Aufgabe */}
       <SheetWithCreateTask />
     </div>
   );

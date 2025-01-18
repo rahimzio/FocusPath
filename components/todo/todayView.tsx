@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import TaskCard from "./taskCard";
 import { Task } from "@/utils/interface";
+import TaskItem from "./taskItem";
 import SheetWithCreateTask from "./popUpCreateTask";
 const TodayView = () => {
   const [tasks, setTasks] = useState<Task[]>([]);

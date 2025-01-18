@@ -1,37 +1,38 @@
+// utils/interface.ts
 export interface Task {
-  _id: string;
-  id: string;
+  _id?: string; // MongoDB ObjectId wird als String übergeben
+  id?: string;
   name: string;
   description: string;
   points: number;
-  status: "incomplete" | "completed"; // Ändere hier den Status in "completed"
-  dueDate: string; // Datum, z.B. '2024-11-08'
-  timebased: boolean; // gibt an, ob eine Uhrzeit existiert
-  time: string; // z.B. '12:00' (nur wenn timebased = true)
+  status?: "completed" | "incomplete";
+  dueDate: string;      // "YYYY-MM-DD"
   frequency: "once" | "daily" | "weekly" | "monthly" | "yearly";
   category: string;
   linkedApps: string[];
   createdAt: string;
   updatedAt: string;
+  timebased: boolean;
+  time?: string;
+  duration?: string;
+  goalId?: string; // in createTask übergeben, wenn verknüpft
 }
 
-
-export interface Expense {
-  id?: string;         // Optional, wird für die eindeutige Identifizierung der Ausgabe benötigt
-  name: string;        // Name der Ausgabe (z.B. "Miete", "Stromrechnung")
-  amount: number;      // Betrag der Ausgabe (z.B. 150 EUR)
-  category: string;    // Kategorie der Ausgabe (z.B. "Wohnen", "Essen")
-  frequency: string;   // Häufigkeit der Ausgabe (z.B. "monatlich", "wöchentlich")
-  dueDate: string;     // Fälligkeitsdatum der Ausgabe (z.B. "2024-10-31")
-  createdAt: string;   // Erstellungsdatum der Ausgabe
-  updatedAt: string;   // Letzte Aktualisierung der Ausgabe
+export interface Goal {
+  id: string; // oder _id?: string (wenn du Mongo für Goals verwendest)
+  title: string;
+  description: string;
+  dueDate: string;
+  progress: number;
+  tasks: string[];
+  createdAt: string;
+  updatedAt: string;
 }
-
-
-export interface Goals{
-  id:string;
-  title:string;
-  description:string;
-  dueDate:string;
-  progress:number;
+export interface Completion {
+  _id?: string; // MongoDB ObjectId
+  taskId: string;  // bezieht sich auf Task._id
+  date: string;    // z.B. "2025-01-19"
+  status: "completed" | "incomplete";
+  // optional: userId, falls pro Benutzer
+  // optional: timestamp / Zeit
 }

@@ -1,76 +1,40 @@
-import { MongoClient, Db, Collection, ObjectId } from 'mongodb';
+// db/mongo.ts
+import { MongoClient, Db } from "mongodb";
 
-class MongoDB {
-  static disconnect() {
-      throw new Error('Method not implemented.');
-  }
-  public client: MongoClient;
-  public db: Db | undefined;
-  private connectionPromise: Promise<void>;
-  private resolveConnectionPromise!: (value: void | PromiseLike<void>) => void;
-  private rejectConnectionPromise!: (reason?: any) => void;
+let client: MongoClient | null = null;
+let db: Db | null = null;
 
-  constructor(public uri: string, public dbName: string) {
-    this.client = new MongoClient(this.uri);
-    this.connectionPromise = new Promise<void>((resolve, reject) => {
-      this.resolveConnectionPromise = resolve;
-      this.rejectConnectionPromise = reject;
-    });
-    this.connect();
+const DB_NAME = "your-database-name"; // Ggf. anpassen
+
+export async function connectToDatabase() {
+  if (client && db) {
+    // bereits verbunden
+    return { client, db };
   }
 
-  public async connect(): Promise<void> {
-    try {
-      await this.client.connect();
-      this.db = this.client.db(this.dbName);
-      this.resolveConnectionPromise();
-      console.log(`Connected to database: ${this.dbName}`);
-    } catch (error) {
-      console.error(`Failed to connect to ${this.dbName}`, error);
-      this.rejectConnectionPromise(error);
-      throw error;
+  try {
+    const uri = process.env.AZURE_COSMOS_CONNECTION_STRING;
+    if (!uri) {
+      throw new Error("AZURE_COSMOS_CONNECTION_STRING nicht gesetzt!");
     }
-  }
 
-  public getDbConnectionPromise(): Promise<void> {
-    return this.connectionPromise;
-  }
+    client = new MongoClient(uri);
+    await client.connect();
+    db = client.db(DB_NAME);
 
-  public async disconnect() {
-    if (this.client) {
-      await this.client.close();
-      console.log('Disconnected from database');
-    }
-  }
-
-  async updateTaskStatus(taskId: string, status: string) {
-    if(this.db){
-    const collection = this.db.collection('tasks'); // 'tasks' ist der Name der Collection
-
-    // Aktualisiere den Status der Aufgabe anhand ihrer ID
-    const result = await collection.updateOne(
-      { _id: new ObjectId(taskId) }, // Sucht nach der Aufgabe mit der angegebenen ID
-      { $set: { status: status } }   // Setzt den Status auf den neuen Wert
-    );
-
-    return result;
-  }
-  }
-
-  // Methode zum Abrufen der Aufgaben-Sammlung
-  public getTasksCollection(): Collection {
-    if (!this.db) {
-      throw new Error('Database connection not established');
-    }
-    return this.db.collection('tasks'); // Sammlung "tasks" verwenden
-  }
-
-  // Methode zum Hinzufügen einer Aufgabe
-  public async addTask(task: any): Promise<any> {
-    const collection = this.getTasksCollection();
-    const result = await collection.insertOne(task);
-    return result;
+    console.log("Mit MongoDB (Cosmos) verbunden.");
+    return { client, db };
+  } catch (error) {
+    console.error("Fehler beim Verbinden zur MongoDB:", error);
+    throw error;
   }
 }
 
-export default MongoDB;
+export async function disconnectFromDatabase() {
+  if (client) {
+    await client.close();
+    client = null;
+    db = null;
+    console.log("Verbindung zur MongoDB geschlossen.");
+  }
+}
