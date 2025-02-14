@@ -1,6 +1,5 @@
 "use client";
 import DailyTaskList from "@/components/dailyTodos";
-import CreateTask from "@/components/todo/createTask";
 import { useState } from "react";
 import { Sidebar } from "@/components/ui/sidebar";
 import SheetComponent from "@/components/todo/popUpCreateTask";
@@ -26,7 +25,7 @@ export default function Home() {
       ) : (
         <div>
           <h1>Create Task</h1>
-          <CreateTask />
+          
         </div>
       )}
     </div>

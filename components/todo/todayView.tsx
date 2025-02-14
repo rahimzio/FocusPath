@@ -24,7 +24,7 @@ const TodayView = () => {
       // Update the UI after the task has been updated
       setTasks((prevTasks) =>
         prevTasks.map((task) =>
-          task.id === taskId ? { ...task, dueDate: newDueTime } : task
+          task._id === taskId ? { ...task, dueDate: newDueTime } : task
         )
       );
     });
@@ -35,7 +35,7 @@ const TodayView = () => {
       <h1>Today's Tasks</h1>
       <div className="task-timeline">
         {tasks.map((task) => (
-          <TaskCard key={task.id} task={task} onDrag={handleDrag} />
+          <TaskCard key={task._id} task={task} onDrag={handleDrag} />
         ))}
       </div>
       <SheetWithCreateTask />

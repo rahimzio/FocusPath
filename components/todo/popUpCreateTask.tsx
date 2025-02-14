@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Task, Goal } from "@/utils/interface";
+import { Task, Goal, SubTask } from "@/utils/interface";
 import {
   Sheet,
   SheetContent,
@@ -10,21 +10,25 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { v4 as uuidv4 } from "uuid"; // Für die Erzeugung eindeutiger IDs
 
 // Beispiel: Vordefinierte Goals
 const predefinedGoals: Goal[] = [
   {
-    id: "sport",
+    _id: "sport",
     title: "Sport",
     description: "Fitnessziele und sportliche Aktivitäten",
-    dueDate: "",
     progress: 0,
     tasks: [],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+    endDate: "",
+    startDate: "",
+    type: "daily",
+    subGoals: [],
   },
   {
-    id: "finanzen",
+    _id: "finanzen",
     title: "Finanzen",
     description: "Verwaltung und Organisation der Finanzen",
     dueDate: "",
@@ -32,14 +36,17 @@ const predefinedGoals: Goal[] = [
     tasks: [],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+    endDate: "",
+    startDate: "",
+    type: "daily",
+    subGoals: [],
   },
-  // ... usw ...
+  // ... weitere Ziele
 ];
 
 export default function SheetWithCreateTask() {
-  // Task für das Formular
-  const [task, setTask] = useState<Omit<Task, "_id">>({
-    // kein _id (Mongo generiert es)
+  // Hauptaufgaben-Objekt (ohne _id und subTasks)
+  const [task, setTask] = useState<Omit<Task, "_id" | "subTasks">>({
     id: "",
     name: "",
     description: "",
@@ -53,57 +60,67 @@ export default function SheetWithCreateTask() {
     updatedAt: new Date().toISOString(),
     timebased: false,
     time: "",
-    // duration?: string
+    progress: 0,
+    duration: "",
   });
 
-  // Liste aller Tasks (lokal, nur zur Demo)
+  // Subtasks-Array
+  const [subTasks, setSubTasks] = useState<SubTask[]>([]);
+
+  // Liste aller Tasks (nur Demo)
   const [tasks, setTasks] = useState<Task[]>([]);
 
-  // Alle Goals (prädefiniert + aus DB)
+  // Alle Goals (vordefiniert + aus der DB)
   const [goals, setGoals] = useState<Goal[]>([]);
   const [selectedGoalId, setSelectedGoalId] = useState<string>("");
 
-  // 1) Goals laden
+  // Goals laden
   useEffect(() => {
-    fetch("/api/goals/getGoals") // => { goals: [...] }
+    fetch("/api/goals/getGoals")
       .then((res) => res.json())
-      .then((data: { goals: Goal[] }) => {
-        // Kombiniere vordefinierte + geladene
-        const combinedGoals = [...predefinedGoals, ...data.goals];
-        setGoals(combinedGoals);
+      .then((data: { goals?: Goal[] }) => {
+        if (data.goals && Array.isArray(data.goals) && data.goals.length > 0) {
+          const combinedGoals = [...predefinedGoals, ...data.goals];
+          setGoals(combinedGoals);
+        } else {
+          console.log("Keine Ziele gefunden. Verwende nur vordefinierte Ziele.");
+          setGoals(predefinedGoals);
+        }
       })
-      .catch((error) => console.error("Fehler beim Laden der Ziele", error));
+      .catch((error) => {
+        console.error("Fehler beim Laden der Ziele", error);
+        // Bei Fehlern wird stattdessen auf die vordefinierten Ziele zurückgegriffen
+        setGoals(predefinedGoals);
+      });
   }, []);
 
-  // 2) Handle Submit = Task erstellen
+  // Beim Absenden der Formulardaten wird die Aufgabe inkl. Subtasks erstellt
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
 
-    // Sende POST-Request
+    const payload = {
+      ...task,
+      goalId: selectedGoalId || undefined,
+      subTasks, // Hier werden die Subtasks hinzugefügt
+    };
+
     const response = await fetch("/api/task/createTask", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...task,
-        goalId: selectedGoalId || undefined,
-      }),
+      body: JSON.stringify(payload),
     });
 
     if (response.ok) {
       alert("Aufgabe erfolgreich erstellt!");
       const jsonData = await response.json();
-      // jsonData => { message: "...", taskId: "..." }
-
-      // Baue ein Task-Objekt, damit wir es in tasks integrieren können
       const insertedTask: Task = {
-        _id: jsonData.taskId, // vom Server bekommen
-        ...task,             // restliche Felder
+        _id: jsonData.taskId,
+        ...task,
+        subTasks,
       };
-
-      // tasks-State updaten
       setTasks((prev) => [...prev, insertedTask]);
 
-      // Task-Formular zurücksetzen
+      // Formular zurücksetzen
       setTask({
         id: "",
         name: "",
@@ -118,14 +135,17 @@ export default function SheetWithCreateTask() {
         updatedAt: new Date().toISOString(),
         timebased: false,
         time: "",
+        progress: 0,
+        duration: "",
       });
+      setSubTasks([]);
       setSelectedGoalId("");
     } else {
       alert("Fehler beim Erstellen der Aufgabe");
     }
   };
 
-  // 3) Eingabewerte aktualisieren
+  // Aktualisierung der Hauptaufgabenfelder
   const handleChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
@@ -136,6 +156,35 @@ export default function SheetWithCreateTask() {
       ...prev,
       [name]: name === "points" ? parseInt(value, 10) || 0 : value,
     }));
+  };
+
+  // Funktion zum Hinzufügen eines leeren Subtasks mit eindeutiger ID
+  const addSubTask = () => {
+    setSubTasks((prev) => [
+      ...prev,
+      { _id: uuidv4(), name: "", description: "", status: "incomplete" },
+    ]);
+  };
+
+  // Aktualisierung der Subtask-Felder
+  const handleSubTaskChange = (
+    index: number,
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+  ) => {
+    const { name, value } = e.target;
+    setSubTasks((prev) =>
+      prev.map((subtask, i) => {
+        if (i === index) {
+          return { ...subtask, [name]: name === "points" ? parseInt(value, 10) || 0 : value };
+        }
+        return subtask;
+      })
+    );
+  };
+
+  // Entfernen eines Subtasks
+  const removeSubTask = (index: number) => {
+    setSubTasks((prev) => prev.filter((_, i) => i !== index));
   };
 
   return (
@@ -153,7 +202,7 @@ export default function SheetWithCreateTask() {
           </SheetHeader>
 
           <form onSubmit={handleSubmit} className="mt-4">
-            {/* Name */}
+            {/* Hauptaufgabenfelder */}
             <div className="mb-4">
               <label htmlFor="name" className="block text-sm font-medium text-gray-700">
                 Name
@@ -169,7 +218,6 @@ export default function SheetWithCreateTask() {
               />
             </div>
 
-            {/* Beschreibung */}
             <div className="mb-4">
               <label htmlFor="description" className="block text-sm font-medium text-gray-700">
                 Beschreibung
@@ -184,7 +232,6 @@ export default function SheetWithCreateTask() {
               />
             </div>
 
-            {/* Punkte */}
             <div className="mb-4">
               <label htmlFor="points" className="block text-sm font-medium text-gray-700">
                 Punkte
@@ -200,7 +247,6 @@ export default function SheetWithCreateTask() {
               />
             </div>
 
-            {/* Fälligkeitsdatum */}
             <div className="mb-4">
               <label htmlFor="dueDate" className="block text-sm font-medium text-gray-700">
                 Fälligkeitsdatum
@@ -216,7 +262,6 @@ export default function SheetWithCreateTask() {
               />
             </div>
 
-            {/* Häufigkeit */}
             <div className="mb-4">
               <label htmlFor="frequency" className="block text-sm font-medium text-gray-700">
                 Häufigkeit
@@ -236,7 +281,6 @@ export default function SheetWithCreateTask() {
               </select>
             </div>
 
-            {/* Zielauswahl */}
             <div className="mb-4">
               <label htmlFor="goalId" className="block text-sm font-medium text-gray-700">
                 Ziel
@@ -250,14 +294,13 @@ export default function SheetWithCreateTask() {
               >
                 <option value="">(Kein Ziel)</option>
                 {goals.map((goal) => (
-                  <option key={goal.id} value={goal.id}>
+                  <option key={goal._id} value={goal._id}>
                     {goal.title}
                   </option>
                 ))}
               </select>
             </div>
 
-            {/* Kategorie */}
             <div className="mb-4">
               <label htmlFor="category" className="block text-sm font-medium text-gray-700">
                 Kategorie
@@ -273,7 +316,6 @@ export default function SheetWithCreateTask() {
               />
             </div>
 
-            {/* Verlinkte Apps */}
             <div className="mb-4">
               <label htmlFor="linkedApps" className="block text-sm font-medium text-gray-700">
                 Verlinkte Apps (Komma-getrennt)
@@ -291,7 +333,6 @@ export default function SheetWithCreateTask() {
               />
             </div>
 
-            {/* Uhrzeit */}
             <div className="mb-4">
               <label htmlFor="time" className="block text-sm font-medium text-gray-700">
                 Uhrzeit (optional)
@@ -307,7 +348,6 @@ export default function SheetWithCreateTask() {
               />
             </div>
 
-            {/* Checkbox Zeitbasiert */}
             <div className="mb-4 flex items-center gap-2">
               <label htmlFor="timebased" className="block text-sm font-medium text-gray-700">
                 Zeitbasiert
@@ -321,6 +361,84 @@ export default function SheetWithCreateTask() {
                   setTask((prev) => ({ ...prev, timebased: !prev.timebased }))
                 }
               />
+            </div>
+
+            {/* Subtasks-Bereich */}
+            <div className="mb-4 border-t pt-4">
+              <h3 className="text-lg font-semibold mb-2">Subtasks (optional)</h3>
+              {subTasks.map((subtask, index) => (
+                <div key={subtask._id || index} className="mb-4 p-2 border rounded">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="font-medium">Subtask {index + 1}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeSubTask(index)}
+                      className="text-red-600 text-sm"
+                    >
+                      Entfernen
+                    </button>
+                  </div>
+                  <div className="mb-2">
+                    <label
+                      htmlFor={`subtask-name-${index}`}
+                      className="block text-sm font-medium text-gray-700"
+                    >
+                      Name
+                    </label>
+                    <input
+                      type="text"
+                      id={`subtask-name-${index}`}
+                      name="name"
+                      value={subtask.name}
+                      onChange={(e) => handleSubTaskChange(index, e)}
+                      required
+                      className="mt-1 block w-full rounded-md border-gray-300"
+                    />
+                  </div>
+                  <div className="mb-2">
+                    <label
+                      htmlFor={`subtask-description-${index}`}
+                      className="block text-sm font-medium text-gray-700"
+                    >
+                      Beschreibung
+                    </label>
+                    <textarea
+                      id={`subtask-description-${index}`}
+                      name="description"
+                      value={subtask.description || ""}
+                      onChange={(e) => handleSubTaskChange(index, e)}
+                      className="mt-1 block w-full rounded-md border-gray-300"
+                    />
+                  </div>
+                  <div className="mb-2">
+                    <label
+                      htmlFor={`subtask-status-${index}`}
+                      className="block text-sm font-medium text-gray-700"
+                    >
+                      Status
+                    </label>
+                    <select
+                      id={`subtask-status-${index}`}
+                      name="status"
+                      value={subtask.status}
+                      onChange={(e) => handleSubTaskChange(index, e)}
+                      className="mt-1 block w-full rounded-md border-gray-300"
+                    >
+                      <option value="incomplete">Unvollständig</option>
+                      <option value="in-progress">In Bearbeitung</option>
+                      <option value="completed">Abgeschlossen</option>
+                      <option value="on-hold">Pausiert</option>
+                    </select>
+                  </div>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={addSubTask}
+                className="bg-green-600 text-white px-3 py-1 rounded-md hover:bg-green-700"
+              >
+                Subtask hinzufügen
+              </button>
             </div>
 
             <button

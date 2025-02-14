@@ -1,40 +1,34 @@
-// db/mongo.ts
 import { MongoClient, Db } from "mongodb";
 
-let client: MongoClient | null = null;
-let db: Db | null = null;
+let cachedClient: MongoClient | null = null;
+let cachedDb: Db | null = null;
 
 const DB_NAME = "your-database-name"; // Ggf. anpassen
 
 export async function connectToDatabase() {
-  if (client && db) {
-    // bereits verbunden
-    return { client, db };
+  if (cachedClient && cachedDb) {
+    console.log("🔄 Verwende bestehende MongoDB-Verbindung.");
+    return { client: cachedClient, db: cachedDb };
   }
 
   try {
     const uri = process.env.AZURE_COSMOS_CONNECTION_STRING;
-    if (!uri) {
-      throw new Error("AZURE_COSMOS_CONNECTION_STRING nicht gesetzt!");
-    }
+    if (!uri) throw new Error("❌ AZURE_COSMOS_CONNECTION_STRING nicht gesetzt!");
 
-    client = new MongoClient(uri);
-    await client.connect();
-    db = client.db(DB_NAME);
+    console.log("🔄 Stelle Verbindung zu MongoDB (Cosmos) her...");
+    cachedClient = new MongoClient(uri, { maxPoolSize: 10 }); // Erhöht Pool-Größe
+    await cachedClient.connect();
+    cachedDb = cachedClient.db(DB_NAME);
 
-    console.log("Mit MongoDB (Cosmos) verbunden.");
-    return { client, db };
+    console.log("✅ Erfolgreich mit MongoDB (Cosmos) verbunden.");
+    return { client: cachedClient, db: cachedDb };
   } catch (error) {
-    console.error("Fehler beim Verbinden zur MongoDB:", error);
+    console.error("❌ Fehler beim Verbinden zur MongoDB:", error);
     throw error;
   }
 }
 
+// Entferne das Schließen der Verbindung!
 export async function disconnectFromDatabase() {
-  if (client) {
-    await client.close();
-    client = null;
-    db = null;
-    console.log("Verbindung zur MongoDB geschlossen.");
-  }
+  console.log("⚠️ `disconnectFromDatabase()` wird nicht mehr automatisch aufgerufen.");
 }

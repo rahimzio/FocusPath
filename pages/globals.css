@@ -768,7 +768,18 @@ button {
   cursor: pointer;
   border-radius: 5px;
 }
+.progress-container {
+  width: 100%;
+  background-color: #e5e7eb; /* Tailwind's gray-200 */
+  border-radius: 9999px;
+  height: 16px; /* h-4 */
+}
 
+.progress-bar {
+  height: 100%;
+  background-color: #3b82f6; /* Tailwind's blue-500 */
+  border-radius: 9999px;
+}
 button:hover {
   background-color: #0056b3;
 }
@@ -776,4 +787,18 @@ button:hover {
   text-decoration: line-through;
   color: gray;
   background-color: #f0f0f0; /* Optional: Hintergrundfarbe ändern */
+}/* globals.css */
+
+/* Optional: Zusätzliche Styles für die ProgressBar */
+.progress-container {
+  width: 100%;
+  background-color: #e5e7eb; /* Tailwind's gray-200 */
+  border-radius: 9999px;
+  height: 16px; /* h-4 */
+}
+
+.progress-bar {
+  height: 100%;
+  background-color: #3b82f6; /* Tailwind's blue-500 */
+  border-radius: 9999px;
 }

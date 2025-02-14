@@ -1,7 +1,7 @@
-// pages/api/goal/getGoals.ts
+// pages/api/task/getAllTasks.ts
 import { NextApiRequest, NextApiResponse } from "next";
 import { connectToDatabase, disconnectFromDatabase } from "../db/mongo";
-import { Goal } from "@/utils/interface"; 
+import { Task } from "@/utils/interface"; 
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "GET") {
@@ -10,15 +10,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const { db } = await connectToDatabase();
-    const goalsColl = db.collection<Goal>("goals");
+    const tasksColl = db.collection<Task>("tasks");
 
-    const allGoals = await goalsColl.find({}).toArray();
-    console.log("Alle Ziele:", allGoals);
+    const allTasks = await tasksColl.find({}).toArray();
+    console.log("Alle Tasks für Dashboard:", allTasks);
 
     await disconnectFromDatabase();
-    return res.status(200).json({ goals: allGoals });
+    return res.status(200).json({ tasks: allTasks });
   } catch (error) {
-    console.error("Fehler bei getGoals:", error);
+    console.error("Fehler bei getAllTasks:", error);
     return res.status(500).json({ message: "Internal server error" });
   }
 }

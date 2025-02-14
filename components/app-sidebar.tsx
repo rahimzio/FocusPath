@@ -28,6 +28,11 @@ const items = [
     icon: Calendar,
   },
   {
+    title: "Goals",
+    url: "/goals",
+    icon: Calendar,
+  },
+  {
     title: "Trading",
     url: "/overview/trading",
     icon: Search,
