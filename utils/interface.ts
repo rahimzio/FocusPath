@@ -81,7 +81,7 @@ export interface Task {
  * Hier kann _id ein string sein.
  */
 export interface Goal {
-  _id?: string;
+  _id: string;
   title: string;
   description: string;
   dueDate?: string;

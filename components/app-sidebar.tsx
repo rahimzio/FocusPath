@@ -80,7 +80,6 @@ export function AppSidebar() {
               {items.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
-                    {/* Entferne das <a> Tag und benutze nur Link */}
                     <Link href={item.url}>
                       <div>
                         <item.icon />

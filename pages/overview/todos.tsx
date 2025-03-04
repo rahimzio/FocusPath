@@ -1,7 +1,7 @@
 import dynamic from "next/dynamic";
 import React from "react";
 
-const ToDoOverview = dynamic(() => import("@/components/todo/to-do"), {
+const ToDoOverview = dynamic(() => import("@/components/bin/to-do"), {
   loading: () => <p>Loading...</p>,
   ssr: false, // Optional: Deaktiviert die serverseitige Darstellung
 });

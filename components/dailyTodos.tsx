@@ -65,33 +65,6 @@ const DailyTaskList = () => {
       toast.error("Fehler beim Abrufen der Aufgaben.");
     }
   }
-
-  // ------------------------------------------------
-  // 2) fetchGoals => holt alle Ziele vom Server
-  // ------------------------------------------------
-  /*
-  async function fetchGoals() {
-    try {
-      const response = await fetch("/api/goals/getGoalsWithProgress");
-      console.log("Response von getGoalsWithProgress:", response);
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Fehler beim Abrufen der Ziele:", errorText);
-        toast.error("Fehler beim Abrufen der Ziele.");
-        return;
-      }
-
-      const data = await response.json();
-      console.log("Daten von getGoalsWithProgress:", JSON.stringify(data, null, 2));
-      const fetchedGoals: GoalWithProgress[] = data.goals || [];
-      setGoals(fetchedGoals);
-      console.log("Aktualisierte Ziele im State:", fetchedGoals);
-    } catch (error) {
-      console.error("Fetch error:", error);
-      toast.error("Fehler beim Abrufen der Ziele.");
-    }
-  }*/
-
   // ------------------------------------------------
   // 3) Handle Check/Uncheck für Hauptaufgaben
   // ------------------------------------------------
