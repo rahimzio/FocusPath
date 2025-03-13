@@ -66,10 +66,45 @@ const DailyTaskList = () => {
     }
   }
 
+
+
+
+
+
+
+  async function handleTaskCompletion(taskId: string) {
+    try {
+      await fetch("/api/task/updateTaskProgress", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taskId, status: "completed" }),
+      });
+  
+      // Aktualisiere die abgeschlossene Aufgabe direkt im UI
+      setTasks(tasks.map(task => (task._id === taskId ? { ...task, status: "completed" } : task)));
+  
+      // Lade die Ziele neu, um den Fortschritt zu aktualisieren
+      fetchGoals();
+    } catch (error) {
+      console.error("Fehler beim Aktualisieren der Aufgabe:", error);
+      toast.error("Fehler beim Abschließen der Aufgabe.");
+    }
+  }
   // ------------------------------------------------
   // 2) fetchGoals => holt alle Ziele vom Server
   // ------------------------------------------------
-  /*
+  /**async function fetchGoals() {
+  try {
+    const response = await fetch("/api/goals/getGoalsWithProgress");
+    if (!response.ok) throw new Error("Fehler beim Abrufen der Ziele.");
+    const data = await response.json();
+    setGoals(data.goals || []);
+  } catch (error) {
+    console.error(error);
+    toast.error("Fehler beim Laden der Ziele.");
+  }
+}
+ */
   async function fetchGoals() {
     try {
       const response = await fetch("/api/goals/getGoalsWithProgress");
@@ -90,7 +125,7 @@ const DailyTaskList = () => {
       console.error("Fetch error:", error);
       toast.error("Fehler beim Abrufen der Ziele.");
     }
-  }*/
+  }
 
   // ------------------------------------------------
   // 3) Handle Check/Uncheck für Hauptaufgaben
@@ -130,7 +165,7 @@ const DailyTaskList = () => {
         }
       }
       await fetchTasks(date);
-      //await fetchGoals();
+      await fetchGoals();
     } catch (error) {
       console.error("Fehler beim Aktualisieren des Status:", error);
       toast.error("Ein unerwarteter Fehler ist aufgetreten.");
@@ -181,7 +216,7 @@ const DailyTaskList = () => {
       
       // Optionale Aktualisierung der Gesamt-Taskliste und Ziele
       await fetchTasks(date);
-      //await fetchGoals();
+      await fetchGoals();
     } catch (error) {
       console.error("Fehler beim Aktualisieren des Subtask-Status:", error);
       toast.error("Ein unerwarteter Fehler ist aufgetreten.");
@@ -220,7 +255,7 @@ const DailyTaskList = () => {
   // ------------------------------------------------
   useEffect(() => {
     fetchTasks(selectedDate);
-    //fetchGoals();
+     fetchGoals();
   }, [selectedDate]);
 
   // ------------------------------------------------
@@ -347,6 +382,7 @@ const DailyTaskList = () => {
     if (goals.length === 0) {
       return <p className="text-gray-600">Keine Ziele vorhanden.</p>;
     }
+    
 
     return (
       <div className="bg-green-100 p-4 rounded-lg shadow-md mb-10 text-black">
@@ -425,12 +461,51 @@ const DailyTaskList = () => {
 
       {/* Fortschrittsanzeige für Ziele */}
       {renderGoalsWithProgress()}
+      <h2 className="text-2xl font-bold mt-8 mb-4 text-center">Ziel-Fortschritt</h2>
+{goals.length > 0 ? (
+  <div className="space-y-4">
+    {goals.map((goal) => (
+      <div key={goal._id} className="bg-white p-4 rounded-lg shadow">
+        <h3 className="text-lg font-semibold">{goal.title}</h3>
+        <ProgressBar progress={goal.progress} />
+        <p className="mt-2 text-sm text-gray-700">{goal.progress}% abgeschlossen</p>
+      </div>
+    ))}
+  </div>
+) : (
+  <p className="text-gray-600 text-center">Keine Ziele vorhanden.</p>
+)}
+
+      
 
       {/* Aufgaben ohne Uhrzeit */}
       <div className="bg-gray-100 p-4 rounded-lg shadow-md mb-10 text-black">
         <h2 className="text-xl font-semibold mb-4 text-gray-700">
           Aufgaben ohne Uhrzeit
         </h2>
+        <div>
+        {tasks.length > 0 ? (
+  <div className="space-y-4">
+    {tasks.map((task) => (
+      <div key={task._id} className="bg-white p-4 rounded-lg shadow flex justify-between items-center">
+        <div>
+          <h2 className="text-lg font-semibold">{task.name}</h2>
+          <p className="text-gray-600">{task.description}</p>
+        </div>
+        <button
+          onClick={() => handleTaskCompletion(task._id)}
+          className={`px-4 py-2 rounded-lg ${task.status === "completed" ? "bg-green-500" : "bg-gray-300"}`}
+        >
+          {task.status === "completed" ? "Erledigt" : "Abschließen"}
+        </button>
+      </div>
+    ))}
+  </div>
+) : (
+  <p className="text-gray-600 text-center">Keine Aufgaben für heute.</p>
+)}
+
+        </div>
         {tasks.filter((task) => !task.timebased).length === 0 ? (
           <p className="text-gray-600">Keine Aufgaben ohne Uhrzeit vorhanden.</p>
         ) : (

@@ -61,8 +61,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }));
     console.log("Alle formatierten Subtasks:", formattedSubTasks);
 
-    // goalId soll nur string oder undefined sein, kein null
-    // Wir ermitteln ein validGoalId, das entweder goalId oder undefined ist.
     const validGoalId = goalId && isValidObjectId(goalId) ? goalId : undefined;
 
     const newTaskForDB: Omit<TaskDocument, "_id"> = {
@@ -76,7 +74,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       linkedApps: linkedApps || [],
       timebased: !!timebased,
       time: time || "",
-      goalId: validGoalId, // string | undefined
+      goalId: validGoalId,
       progress: 0,
       subTasks: formattedSubTasks,
       createdAt: new Date().toISOString(),
@@ -88,7 +86,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const result = await tasksCollection.insertOne(newTaskForDB);
     console.log("Ergebnis des Insert:", result);
 
-    // Nur updaten, wenn validGoalId wirklich vorhanden ist
     if (result.insertedId && validGoalId) {
       console.log(`Füge Task ${result.insertedId.toString()} zum Ziel ${validGoalId} hinzu...`);
       const updateResult = await goalsCollection.updateOne(
@@ -100,7 +97,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       );
       console.log("Ergebnis des Ziel-Updates:", updateResult);
     } else {
-      console.error(`Kein gültiges goalId vorhanden: ${goalId}`);
+      console.log(`Task wurde ohne Ziel erstellt (goalId: ${goalId})`);
     }
 
     console.log("Aufgabe erfolgreich erstellt.");

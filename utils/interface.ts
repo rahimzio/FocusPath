@@ -26,26 +26,42 @@ export interface TaskDocument {
   createdAt: string;
   updatedAt: string;
   subTasks?: SubTask[];
+  weight?: number;
   // ggf. weitere Felder
 }
 
 export interface GoalDocument {
   _id: ObjectId;
   title: string;
-  description: string;
+  description: string | "";
+  startDate: string;
+  endDate:string,
+  type: "daily" | "weekly" | "monthly" | "yearly"
   dueDate: string;
-  progress: number;      // 0-100%
-  tasks: string[];       // Liste von Task-IDs als string
+  progress: number;
+  tasks: string[];
   createdAt: string;
   parentGoalId?: string;
-  updatedAt: Date;
+  updatedAt: string;
+  priority:number;
+  subGoals?: GoalDocument[];
+  weight: number
   reward?: {
     type: string;
     value: any;
   };
-  // ggf. weitere Felder
 }
 
+export interface subGoals {
+  _id: string; // Falls du MongoDB verwendest, kannst du hier `ObjectId` statt `string` setzen
+  title: string;
+  description?: string;
+  progress: number; // Fortschritt von 0-100%
+  parentGoalId?: string; // Referenz zum Hauptziel
+  tasks: string[]; // Liste von Task-IDs als string
+  createdAt: string;
+  updatedAt: string;
+}
 /* -------------------------------------
  *         APP/Frontend INTERFACES
  * ------------------------------------- */
@@ -74,6 +90,7 @@ export interface Task {
   };
   dependencies?: string[];  // Abhängigkeiten zwischen Tasks
   subTasks?: SubTask[];
+  weight?: number;
 }
 
 /**
@@ -148,4 +165,16 @@ export interface Completion {
   taskId: string;
   date: string;
   status: "completed" | "incomplete" | "in-progress" | "on-hold";
+}
+
+export interface CreateGoalBody {
+  title: string;
+  description?: string;
+  startDate: string;  // Datum kommt als String aus dem Request
+  endDate: string;
+  type: "daily" | "weekly" | "monthly" | "yearly";
+  tasks?: TaskDocument[];
+  subGoals?: GoalDocument[];
+  weight?: number;
+  priority?: number;
 }
