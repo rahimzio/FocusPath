@@ -25,6 +25,8 @@ export interface TaskDocument {
   goalId?: string;
   createdAt: string;
   updatedAt: string;
+  color?: string;
+  duration?:string;
   excludedDates?:string[];
   subTasks?: SubTask[];
   // ggf. weitere Felder
@@ -67,8 +69,9 @@ export interface Task {
   progress: number;         // 0-100%
   createdAt: string;
   updatedAt: string;
-  duration:string;
+  duration?:string;
   goalId?: string;
+  color?: string;
   excludedDates?:string[];
   reward?: {
     type: string;           // "badge" | "points" | ...
@@ -130,6 +133,8 @@ export interface CreateTaskBody {
   time?: string;
   goalId?: string;
   subTasks?: SubTask[];
+  color?:string;
+  duration?:string; 
 }
 export interface SubTask {
   _id?: string;

@@ -99,19 +99,19 @@ export default function SheetWithCreateTask({ onTaskCreated }: Props) {
   // Beim Absenden der Formulardaten wird die Aufgabe inkl. Subtasks erstellt
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-  
+
     const payload = {
       ...task,
       goalId: selectedGoalId || undefined,
       subTasks,
     };
-  
+
     const response = await fetch("/api/task/createTask", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-  
+
     if (response.ok) {
       const jsonData = await response.json();
       const insertedTask: Task = {
@@ -119,15 +119,15 @@ export default function SheetWithCreateTask({ onTaskCreated }: Props) {
         ...task,
         subTasks,
       };
-  
+
       // ✅ Callback aufrufen, wenn vorhanden
       if (onTaskCreated) {
         await onTaskCreated(insertedTask);
       }
-  
+
       alert("Aufgabe erfolgreich erstellt!");
       setTasks((prev) => [...prev, insertedTask]);
-  
+
       // Formular zurücksetzen
       setTask({
         id: "",
@@ -152,7 +152,7 @@ export default function SheetWithCreateTask({ onTaskCreated }: Props) {
       alert("Fehler beim Erstellen der Aufgabe");
     }
   };
-  
+
 
   // Aktualisierung der Hauptaufgabenfelder
   const handleChange = (
@@ -257,6 +257,21 @@ export default function SheetWithCreateTask({ onTaskCreated }: Props) {
             </div>
 
             <div className="mb-4">
+              <label htmlFor="color" className="block text-sm font-medium text-gray-700">
+                Farbe der Aufgabe
+              </label>
+              <input
+                type="color"
+                id="color"
+                name="color"
+                value={task.color ?? "#3B82F6"} // Standardfarbe (z. B. blau)
+                onChange={(e) => setTask((prev) => ({ ...prev, color: e.target.value }))}
+                className="mt-1 block w-full h-10 cursor-pointer"
+              />
+            </div>
+
+
+            <div className="mb-4">
               <label htmlFor="dueDate" className="block text-sm font-medium text-gray-700">
                 Fälligkeitsdatum
               </label>
@@ -342,21 +357,6 @@ export default function SheetWithCreateTask({ onTaskCreated }: Props) {
               />
             </div>
 
-            <div className="mb-4">
-              <label htmlFor="time" className="block text-sm font-medium text-gray-700">
-                Uhrzeit (optional)
-              </label>
-              <input
-                type="time"
-                id="time"
-                name="time"
-                value={task.time}
-                onChange={handleChange}
-                disabled={!task.timebased}
-                className="mt-1 block w-full rounded-md border-gray-300"
-              />
-            </div>
-
             <div className="mb-4 flex items-center gap-2">
               <label htmlFor="timebased" className="block text-sm font-medium text-gray-700">
                 Zeitbasiert
@@ -371,6 +371,28 @@ export default function SheetWithCreateTask({ onTaskCreated }: Props) {
                 }
               />
             </div>
+            
+            {task.timebased && (
+              <>
+                <label className="block font-medium text-sm text-gray-700">Uhrzeit</label>
+                <input
+                  type="time"
+                  value={task.time}
+                  onChange={(e) => setTask({ ...task, time: e.target.value })}
+                  className="p-2 border border-gray-300 rounded-md w-full mb-4"
+                />
+
+                <label className="block font-medium text-sm text-gray-700">Dauer (HH:MM)</label>
+                <input
+                  type="time"
+                  step="60"
+                  value={task.duration || "00:30"} // default: 30 Minuten
+                  onChange={(e) => setTask({ ...task, duration: e.target.value })}
+                  className="p-2 border border-gray-300 rounded-md w-full mb-4"
+                />
+              </>
+            )}
+
 
             {/* Subtasks-Bereich */}
             <div className="mb-4 border-t pt-4">

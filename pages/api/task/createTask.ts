@@ -31,10 +31,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     timebased,
     time,
     goalId,
-    subTasks
+    subTasks,
+    color,
+    duration 
   } = req.body as CreateTaskBody;
 
-  console.log("Extrahierte Felder:", { name, description, points, dueDate, frequency, category, goalId, subTasks });
+  console.log("Extrahierte Felder:", { name, description, points, dueDate, frequency, category, goalId, subTasks,color,duration });
 
   if (!name || !description || !points || !dueDate || !frequency || !category) {
     console.log("Validierungsfehler: Nicht alle erforderlichen Felder wurden übergeben.");
@@ -81,6 +83,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       subTasks: formattedSubTasks,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      color,
+      duration
     };
     console.log("Neues Task-Dokument (für DB):", newTaskForDB);
 

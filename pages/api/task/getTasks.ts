@@ -19,9 +19,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const completionsColl = db.collection<Completion>("completions");
 
     // 1) Lade nur relevante Felder der Tasks
-    const allTasks = await tasksColl.find({}, { projection: { _id: 1, name: 1, points:1, dueDate: 1, frequency: 1, timebased: 1, time: 1,category: 1,subTasks: 1,excludedDates: 1, } }).toArray();
+    const allTasks = await tasksColl.find({}, { projection: { _id: 1, name: 1, points:1, dueDate: 1, frequency: 1, timebased: 1, time: 1,category: 1,subTasks: 1,excludedDates: 1,color:1,   duration:1
+    } }).toArray();
     console.log("📌 Geladene Tasks:", allTasks.length);
-
     // 2) Lade Completions für dieses Datum
     const allCompletions = await completionsColl.find({ date }).toArray();
     console.log("📌 Geladene Completions:", allCompletions.length);

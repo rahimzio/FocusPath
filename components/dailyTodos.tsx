@@ -38,9 +38,9 @@ const DailyTaskList = () => {
   const [editedGoal, setEditedGoal] = useState<GoalWithProgress | null>(null);
   const [isGoalEditDialogOpen, setIsGoalEditDialogOpen] = useState(false);
 
-  
-const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
+
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
   // ------------------------------------------------
   // 1) fetchTasks => holt gefilterte Tasks vom Server
   // ------------------------------------------------
@@ -154,7 +154,7 @@ const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
           status: allSubTasksCompleted ? "completed" : selectedTask.status,
         });
       }
-      
+
       // Optionale Aktualisierung der Gesamt-Taskliste und Ziele
       await fetchTasks(date);
       //await fetchGoals();
@@ -177,7 +177,7 @@ const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
   2 = Gesamte Serie
   Gib 1 oder 2 ein:`
       );
-  
+
       if (userChoice === "1") {
         await deleteSingleInstance(task._id, selectedDate);
       } else if (userChoice === "2") {
@@ -189,38 +189,38 @@ const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
       if (!confirm("Willst du diese Aufgabe wirklich löschen?")) return;
       await deleteEntireSeries(task._id);
     }
-  
+
     await fetchTasks(selectedDate);
   }
   // Nur diese Instanz "ausschließen" (nicht löschen, aber nicht anzeigen)
-async function deleteSingleInstance(taskId: string, date: string) {
-  try {
-    const response = await fetch("/api/task/deleteInstance", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ taskId, date }),
-    });
-    if (!response.ok) throw new Error(await response.text());
-    toast.success("Instanz erfolgreich ausgeblendet.");
-  } catch (err) {
-    console.error(err);
-    toast.error("Fehler beim Ausblenden der Instanz.");
+  async function deleteSingleInstance(taskId: string, date: string) {
+    try {
+      const response = await fetch("/api/task/deleteInstance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taskId, date }),
+      });
+      if (!response.ok) throw new Error(await response.text());
+      toast.success("Instanz erfolgreich ausgeblendet.");
+    } catch (err) {
+      console.error(err);
+      toast.error("Fehler beim Ausblenden der Instanz.");
+    }
   }
-}
 
-// Ganze Serie löschen
-async function deleteEntireSeries(taskId: string) {
-  try {
-    const response = await fetch(`/api/task/deleteTask?taskId=${taskId}`, {
-      method: "DELETE",
-    });
-    if (!response.ok) throw new Error(await response.text());
-    toast.success("Aufgabenserie gelöscht.");
-  } catch (err) {
-    console.error(err);
-    toast.error("Fehler beim Löschen der Aufgabenserie.");
+  // Ganze Serie löschen
+  async function deleteEntireSeries(taskId: string) {
+    try {
+      const response = await fetch(`/api/task/deleteTask?taskId=${taskId}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) throw new Error(await response.text());
+      toast.success("Aufgabenserie gelöscht.");
+    } catch (err) {
+      console.error(err);
+      toast.error("Fehler beim Löschen der Aufgabenserie.");
+    }
   }
-}
 
 
   // ------------------------------------------------
@@ -266,6 +266,8 @@ async function deleteEntireSeries(taskId: string) {
           time: editedTask.time,
           frequency: editedTask.frequency,
           category: editedTask.category,
+          color: editedTask.color,
+          duration:editedTask.duration,
         }),
       });
       console.log("Response von updateTask:", response);
@@ -278,7 +280,7 @@ async function deleteEntireSeries(taskId: string) {
       setEditedTask(null);
       setSelectedTask(null);
       await fetchTasks(selectedDate);
-     // await fetchGoals();
+      // await fetchGoals();
       toast.success("Aufgabe erfolgreich bearbeitet!");
     } catch (error) {
       console.error("Fehler beim Bearbeiten:", error);
@@ -386,7 +388,7 @@ async function deleteEntireSeries(taskId: string) {
   async function handleTaskCreated(newTask: Task) {
     const isToday =
       new Date(newTask.dueDate).toDateString() === new Date(selectedDate).toDateString();
-  
+
     if (isToday) {
       console.log("🟢 Neue Aufgabe für heute erstellt → Aktualisiere Tasks");
       await fetchTasks(selectedDate);
@@ -404,7 +406,7 @@ async function deleteEntireSeries(taskId: string) {
     setDeleteDialogOpen(false);
     await fetchTasks(date);
   }
-  
+
   async function handleDeleteSeries(taskId: string) {
     await fetch(`/api/task/deleteTask?taskId=${taskId}`, {
       method: "DELETE",
@@ -412,18 +414,33 @@ async function deleteEntireSeries(taskId: string) {
     setDeleteDialogOpen(false);
     await fetchTasks(selectedDate);
   }
-  
-// Beim Klick auf "Löschen"
-function confirmDelete(task: Task) {
-  if (task.frequency !== "once") {
-    setTaskToDelete(task);
-    setDeleteDialogOpen(true);
-  } else {
-    handleDeleteSeries(task._id); // normale Aufgaben sofort löschen
-  }
-}
 
-  
+  // Beim Klick auf "Löschen"
+  function confirmDelete(task: Task) {
+    if (task.frequency !== "once") {
+      setTaskToDelete(task);
+      setDeleteDialogOpen(true);
+    } else {
+      handleDeleteSeries(task._id); // normale Aufgaben sofort löschen
+    }
+  }
+
+  function getHeightFromDuration(duration: string | undefined): number {
+    if (!duration) return 40; // Standardhöhe
+
+    const [hoursStr, minutesStr] = duration.split(":");
+    const totalMinutes = parseInt(hoursStr) * 60 + parseInt(minutesStr);
+
+    const minHeight = 40;
+    const maxHeight = 200;
+    const clampedMinutes = Math.min(Math.max(totalMinutes, 1), 150);
+
+    const height =
+      minHeight + ((clampedMinutes - 1) / (150 - 1)) * (maxHeight - minHeight);
+
+    return Math.round(height);
+  }
+
   // ------------------------------------------------
   // RENDER
   // ------------------------------------------------
@@ -475,136 +492,142 @@ function confirmDelete(task: Task) {
       {/* Fortschrittsanzeige für Ziele */}
       {renderGoalsWithProgress()}
 
-{/* Aufgaben ohne Uhrzeit */}
-<div className="bg-gray-100 p-4 rounded-lg shadow-md mb-10 text-black">
-  <h2 className="text-xl font-semibold mb-4 text-gray-700">
-    Aufgaben ohne Uhrzeit
-  </h2>
-  {tasks.filter((task) => !task.timebased).length === 0 ? (
-    <p className="text-gray-600">Keine Aufgaben ohne Uhrzeit vorhanden.</p>
-  ) : (
-    <div className="space-y-4 overflow-y-auto max-h-[300px]">
-      {tasks.filter((task) => !task.timebased).map((task) => (
-        <div
-          key={task._id}
-          className={`p-3 border rounded flex items-center ${
-            task.status === "completed" ? "completed" : ""
-          }`}
-        >
-          <div className="flex-grow">
-            <h4 className="font-semibold">{task.name}</h4>
-            <p>{task.description}</p>
+      {/* Aufgaben ohne Uhrzeit */}
+      <div className="bg-gray-100 p-4 rounded-lg shadow-md mb-10 text-black">
+        <h2 className="text-xl font-semibold mb-4 text-gray-700">
+          Aufgaben ohne Uhrzeit
+        </h2>
+        {tasks.filter((task) => !task.timebased).length === 0 ? (
+          <p className="text-gray-600">Keine Aufgaben ohne Uhrzeit vorhanden.</p>
+        ) : (
+          <div className="space-y-4 overflow-y-auto max-h-[300px]">
+            {tasks.filter((task) => !task.timebased).map((task) => (
+              <div
+                key={task._id}
+                style={{ borderLeft: `8px solid ${task.color || "#3B82F6"}` }}
+                className={`p-3 border rounded flex items-center ${task.status === "completed" ? "completed" : ""
+                  }`}
+              >
+                <div className="flex-grow">
+                  <h4 className="font-semibold">{task.name}</h4>
+                  <p>{task.description}</p>
+                </div>
+                {task.status === "completed" && (
+                  <FaCheckCircle className="text-green-500 ml-2" />
+                )}
+                <div className="mt-2 flex items-center">
+                  <input
+                    id={`taskCheck-${task._id}`}
+                    type="checkbox"
+                    checked={task.status === "completed"}
+                    onChange={(e) =>
+                      handleCheckTask(task._id, selectedDate, e.target.checked)
+                    }
+                  />
+                  <label htmlFor={`taskCheck-${task._id}`} className="ml-2 select-none">
+                    {task.status === "completed" ? "Abgeschlossen" : "Offen"}
+                  </label>
+                </div>
+                <div className="mt-2 flex gap-2">
+                  <button
+                    onClick={() => openTaskDetails(task)}
+                    className="bg-blue-500 text-white px-2 py-1 rounded"
+                  >
+                    Details
+                  </button>
+                  <button
+                    onClick={() => openEditDialog(task)}
+                    className="bg-green-500 text-white px-2 py-1 rounded"
+                  >
+                    Editieren
+                  </button>
+                  <button
+                    onClick={() => confirmDelete(task)}
+                    className="bg-red-500 text-white px-2 py-1 rounded"
+                  >
+                    Löschen
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
-          {task.status === "completed" && (
-            <FaCheckCircle className="text-green-500 ml-2" />
-          )}
-          <div className="mt-2 flex items-center">
-            <input
-              id={`taskCheck-${task._id}`}
-              type="checkbox"
-              checked={task.status === "completed"}
-              onChange={(e) =>
-                handleCheckTask(task._id, selectedDate, e.target.checked)
-              }
-            />
-            <label htmlFor={`taskCheck-${task._id}`} className="ml-2 select-none">
-              {task.status === "completed" ? "Abgeschlossen" : "Offen"}
-            </label>
-          </div>
-          <div className="mt-2 flex gap-2">
-            <button
-              onClick={() => openTaskDetails(task)}
-              className="bg-blue-500 text-white px-2 py-1 rounded"
-            >
-              Details
-            </button>
-            <button
-              onClick={() => openEditDialog(task)}
-              className="bg-green-500 text-white px-2 py-1 rounded"
-            >
-              Editieren
-            </button>
-            <button
-              onClick={() => confirmDelete(task)}
-              className="bg-red-500 text-white px-2 py-1 rounded"
-            >
-              Löschen
-            </button>
-          </div>
-        </div>
-      ))}
-    </div>
-  )}
-</div>
+        )}
+      </div>
 
-{/* Aufgaben mit Uhrzeit */}
-<div className="bg-white p-4 rounded-lg shadow-md mb-10 text-black">
-  <h2 className="text-xl font-semibold mb-4 text-gray-700">
-    Aufgaben mit Uhrzeit
-  </h2>
-  {tasks.filter((task) => task.timebased).length === 0 ? (
-    <p className="text-gray-600">
-      Keine zeitbasierten Aufgaben vorhanden.
-    </p>
-  ) : (
-    <div className="space-y-4 overflow-y-auto max-h-[300px]">
-      {tasks.filter((task) => task.timebased).map((task) => (
-        <div
-          key={task._id}
-          className={`p-3 border rounded flex items-center ${
-            task.status === "completed" ? "completed" : ""
-          }`}
-        >
-          <div className="flex-grow">
-            <h4 className="font-semibold">{task.name}</h4>
-            <p>{task.description}</p>
-            {task.time && (
-              <p className="text-sm">
-                <span className="font-medium">Uhrzeit:</span> {task.time}
-              </p>
-            )}
+      {/* Aufgaben mit Uhrzeit */}
+      <div className="bg-white p-4 rounded-lg shadow-md mb-10 text-black">
+        <h2 className="text-xl font-semibold mb-4 text-gray-700">
+          Aufgaben mit Uhrzeit
+        </h2>
+        {tasks.filter((task) => task.timebased).length === 0 ? (
+          <p className="text-gray-600">
+            Keine zeitbasierten Aufgaben vorhanden.
+          </p>
+        ) : (
+          <div className="space-y-4 overflow-y-auto max-h-[300px]">
+            {tasks
+              .filter((task) => task.timebased)
+              .sort((a, b) => a.time.localeCompare(b.time)) // ⏰ Sortierung nach Uhrzeit
+              .map((task) => (
+                <div
+                  style={{
+                    borderLeft: `8px solid ${task.color || "#3B82F6"}`,
+                    height: `${getHeightFromDuration(task.duration)}px`,
+                    minHeight: "40px",
+                  }}
+                  className={`p-3 border rounded flex items-center ${task.status === "completed" ? "completed" : ""
+                    }`}
+                >
+                  <div className="flex-grow">
+                    <h4 className="font-semibold">{task.name}</h4>
+                    <p>{task.description}</p>
+                    {task.time && (
+                      <p className="text-sm">
+                        <span className="font-medium">Uhrzeit:</span> {task.time}
+                      </p>
+                    )}
+                  </div>
+                  {task.status === "completed" && (
+                    <FaCheckCircle className="text-green-500 ml-2" />
+                  )}
+                  <div className="mt-2 flex items-center">
+                    <input
+                      id={`timeTaskCheck-${task._id}`}
+                      type="checkbox"
+                      checked={task.status === "completed"}
+                      onChange={(e) =>
+                        handleCheckTask(task._id, selectedDate, e.target.checked)
+                      }
+                    />
+                    <label htmlFor={`timeTaskCheck-${task._id}`} className="ml-2 select-none">
+                      {task.status === "completed" ? "Abgeschlossen" : "Offen"}
+                    </label>
+                  </div>
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      onClick={() => openTaskDetails(task)}
+                      className="bg-blue-500 text-white px-2 py-1 rounded"
+                    >
+                      Details
+                    </button>
+                    <button
+                      onClick={() => openEditDialog(task)}
+                      className="bg-green-500 text-white px-2 py-1 rounded"
+                    >
+                      Editieren
+                    </button>
+                    <button
+                      onClick={() => confirmDelete(task)}
+                      className="bg-red-500 text-white px-2 py-1 rounded"
+                    >
+                      Löschen
+                    </button>
+                  </div>
+                </div>
+              ))}
           </div>
-          {task.status === "completed" && (
-            <FaCheckCircle className="text-green-500 ml-2" />
-          )}
-          <div className="mt-2 flex items-center">
-            <input
-              id={`timeTaskCheck-${task._id}`}
-              type="checkbox"
-              checked={task.status === "completed"}
-              onChange={(e) =>
-                handleCheckTask(task._id, selectedDate, e.target.checked)
-              }
-            />
-            <label htmlFor={`timeTaskCheck-${task._id}`} className="ml-2 select-none">
-              {task.status === "completed" ? "Abgeschlossen" : "Offen"}
-            </label>
-          </div>
-          <div className="mt-2 flex gap-2">
-            <button
-              onClick={() => openTaskDetails(task)}
-              className="bg-blue-500 text-white px-2 py-1 rounded"
-            >
-              Details
-            </button>
-            <button
-              onClick={() => openEditDialog(task)}
-              className="bg-green-500 text-white px-2 py-1 rounded"
-            >
-              Editieren
-            </button>
-            <button
-              onClick={() => confirmDelete(task)}
-              className="bg-red-500 text-white px-2 py-1 rounded"
-            >
-              Löschen
-            </button>
-          </div>
-        </div>
-      ))}
-    </div>
-  )}
-</div>
+        )}
+      </div>
 
 
       {/* Fortschrittsanzeige für Ziele */}
@@ -634,6 +657,11 @@ function confirmDelete(task: Task) {
               {selectedTask.time && (
                 <p>
                   <span className="font-semibold">Uhrzeit:</span> {selectedTask.time}
+                </p>
+              )}
+              {selectedTask.duration && (
+                <p>
+                  <span className="font-semibold">Länge:</span> {selectedTask.duration}
                 </p>
               )}
               <p>
@@ -739,6 +767,26 @@ function confirmDelete(task: Task) {
                 required
               />
               <input
+                type="color"
+                value={editedTask.color}
+                onChange={(e) =>
+                  setEditedTask({
+                    ...editedTask,
+                    color: e.target.value,
+                  })
+                }
+                className="p-2 border border-gray-300 rounded-md w-full"
+                required
+              />
+              <input
+                type="time"
+                value={editedTask.duration}
+                onChange={(e) =>
+                  setEditedTask({ ...editedTask, duration: e.target.value })
+                }
+                className="p-2 border border-gray-300 rounded-md w-full"
+              />
+              <input
                 type="date"
                 value={editedTask.dueDate}
                 onChange={(e) =>
@@ -832,21 +880,21 @@ function confirmDelete(task: Task) {
           </DialogContent>
         </Dialog>
       )}
-  {/* Wiederkehrende Aufgabe löschen: Dialog */}
-<DeleteRecurringTaskDialog
-  open={deleteDialogOpen}
-  onClose={() => setDeleteDialogOpen(false)}
-  onDeleteInstance={() =>
-    taskToDelete && handleDeleteInstance(taskToDelete._id, selectedDate)
-  }
-  onDeleteSeries={() =>
-    taskToDelete && handleDeleteSeries(taskToDelete._id)
-  }
-/>
+      {/* Wiederkehrende Aufgabe löschen: Dialog */}
+      <DeleteRecurringTaskDialog
+        open={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+        onDeleteInstance={() =>
+          taskToDelete && handleDeleteInstance(taskToDelete._id, selectedDate)
+        }
+        onDeleteSeries={() =>
+          taskToDelete && handleDeleteSeries(taskToDelete._id)
+        }
+      />
 
       {/* Button zum Erstellen einer neuen Aufgabe */}
-      <SheetWithCreateTask onTaskCreated ={handleTaskCreated} /> 
-      </div>
+      <SheetWithCreateTask onTaskCreated={handleTaskCreated} />
+    </div>
   );
 };
 
