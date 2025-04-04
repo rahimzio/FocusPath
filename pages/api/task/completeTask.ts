@@ -4,12 +4,10 @@ import { connectToDatabase } from "../db/mongo";
 import { ObjectId } from "mongodb";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // Nur POST-Requests erlauben
   if (req.method !== "POST") {
     return res.status(405).json({ message: "Method not allowed. Use POST." });
   }
 
-  // Auslesen der benötigten Parameter aus dem Request-Body
   const { taskId, subTaskId, date } = req.body;
   if (!taskId || !date) {
     return res.status(400).json({ message: "Missing taskId or date." });
@@ -17,49 +15,45 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const { db } = await connectToDatabase();
-    // Verwende die Collection, in der deine Tasks gespeichert werden
     const tasksColl = db.collection("tasks");
+    const completionsColl = db.collection("completions");
 
-    // ────────────────────────────────────────────────
-    // Fall 1: Es wurde eine subTaskId mitgegeben
-    // ────────────────────────────────────────────────
+    // 🔹 Subtask-Komplettierung
     if (subTaskId) {
-      // Update: Setze den Status der angegebenen Subtask auf "completed"
       const updateSubTaskResult = await tasksColl.updateOne(
         { _id: new ObjectId(taskId), "subTasks._id": subTaskId },
         { $set: { "subTasks.$.status": "completed" } }
       );
-      console.log("Subtask update result:", updateSubTaskResult);
+      console.log("✅ Subtask update result:", updateSubTaskResult);
 
-      // Lade die aktualisierte Hauptaufgabe, um zu prüfen, ob alle Subtasks abgeschlossen sind
       const taskDoc = await tasksColl.findOne({ _id: new ObjectId(taskId) });
-      if (taskDoc && taskDoc.subTasks && Array.isArray(taskDoc.subTasks)) {
-        const allSubTasksCompleted = taskDoc.subTasks.every((subTask: any) => subTask.status === "completed");
-        if (allSubTasksCompleted) {
-          // Falls alle Subtasks abgeschlossen sind, setze auch die Hauptaufgabe auf "completed"
-          const updateTaskResult = await tasksColl.updateOne(
-            { _id: new ObjectId(taskId) },
-            { $set: { status: "completed" } }
-          );
-          console.log("Main task update result (all subtasks completed):", updateTaskResult);
-        }
+      const allCompleted = taskDoc?.subTasks?.every((st: any) => st.status === "completed");
+
+      if (allCompleted) {
+        // Wenn alle Subtasks erledigt sind → Completion schreiben
+        await completionsColl.updateOne(
+          { taskId, date },
+          { $set: { status: "completed" } },
+          { upsert: true }
+        );
+        console.log("✅ Completion eingetragen für vollständige Subtasks");
       }
-      return res.status(200).json({ 
-        message: "Subtask completed; main task updated if all subtasks are completed." 
-      });
+
+      return res.status(200).json({ message: "Subtask abgeschlossen." });
     }
 
-    // ────────────────────────────────────────────────
-    // Fall 2: Es wurde keine subTaskId mitgegeben → Hauptaufgabe abschließen
-    // ────────────────────────────────────────────────
-    const updateTaskResult = await tasksColl.updateOne(
-      { _id: new ObjectId(taskId) },
-      { $set: { status: "completed" } }
+    // 🔹 Hauptaufgabe ohne Subtasks abschließen
+    // → Speichere den Status nur in completions, nicht mehr direkt im Task-Dokument
+    const completionResult = await completionsColl.updateOne(
+      { taskId, date },
+      { $set: { status: "completed" } },
+      { upsert: true }
     );
-    console.log("Main task update result:", updateTaskResult);
-    return res.status(200).json({ message: "Main task completed." });
+    console.log("✅ Completion für Hauptaufgabe gespeichert:", completionResult);
+
+    return res.status(200).json({ message: "Task completion gespeichert." });
   } catch (error) {
-    console.error("Fehler in completeTask:", error);
+    console.error("❌ Fehler in completeTask:", error);
     return res.status(500).json({ message: "Serverfehler in completeTask" });
   }
 }

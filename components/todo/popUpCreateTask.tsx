@@ -11,7 +11,9 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { v4 as uuidv4 } from "uuid"; // Für die Erzeugung eindeutiger IDs
-
+type Props = {
+  onTaskCreated?: (newTask: Task) => Promise<void>;
+};
 // Beispiel: Vordefinierte Goals
 const predefinedGoals: Goal[] = [
   {
@@ -44,7 +46,7 @@ const predefinedGoals: Goal[] = [
   // ... weitere Ziele
 ];
 
-export default function SheetWithCreateTask() {
+export default function SheetWithCreateTask({ onTaskCreated }: Props) {
   // Hauptaufgaben-Objekt (ohne _id und subTasks)
   const [task, setTask] = useState<Omit<Task, "_id" | "subTasks">>({
     id: "",
@@ -97,29 +99,35 @@ export default function SheetWithCreateTask() {
   // Beim Absenden der Formulardaten wird die Aufgabe inkl. Subtasks erstellt
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-
+  
     const payload = {
       ...task,
       goalId: selectedGoalId || undefined,
-      subTasks, // Hier werden die Subtasks hinzugefügt
+      subTasks,
     };
-
+  
     const response = await fetch("/api/task/createTask", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-
+  
     if (response.ok) {
-      alert("Aufgabe erfolgreich erstellt!");
       const jsonData = await response.json();
       const insertedTask: Task = {
         _id: jsonData.taskId,
         ...task,
         subTasks,
       };
+  
+      // ✅ Callback aufrufen, wenn vorhanden
+      if (onTaskCreated) {
+        await onTaskCreated(insertedTask);
+      }
+  
+      alert("Aufgabe erfolgreich erstellt!");
       setTasks((prev) => [...prev, insertedTask]);
-
+  
       // Formular zurücksetzen
       setTask({
         id: "",
@@ -144,6 +152,7 @@ export default function SheetWithCreateTask() {
       alert("Fehler beim Erstellen der Aufgabe");
     }
   };
+  
 
   // Aktualisierung der Hauptaufgabenfelder
   const handleChange = (

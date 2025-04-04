@@ -19,7 +19,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const completionsColl = db.collection<Completion>("completions");
 
     // 1) Lade nur relevante Felder der Tasks
-    const allTasks = await tasksColl.find({}, { projection: { _id: 1, name: 1, dueDate: 1, frequency: 1 } }).toArray();
+    const allTasks = await tasksColl.find({}, { projection: { _id: 1, name: 1, points:1, dueDate: 1, frequency: 1, timebased: 1, time: 1,category: 1,subTasks: 1,excludedDates: 1, } }).toArray();
     console.log("📌 Geladene Tasks:", allTasks.length);
 
     // 2) Lade Completions für dieses Datum
@@ -30,9 +30,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const selectedDate = new Date(date);
     const relevantTasks = allTasks.filter((task) => {
       const isRelevant = checkFrequency(task, selectedDate);
-      console.log(`🔍 Prüfung Task ${task.name}:`, isRelevant);
+    
+      // 🔹 Falls excludedDates gesetzt ist → ausschließen
+      if (isRelevant && Array.isArray(task.excludedDates)) {
+        const selectedDateStr = selectedDate.toISOString().slice(0, 10); // YYYY-MM-DD
+        const isExcluded = task.excludedDates.includes(selectedDateStr);
+        if (isExcluded) {
+          console.log(`🚫 Aufgabe "${task.name}" ist für ${selectedDateStr} ausgeschlossen.`);
+          return false;
+        }
+      }
+    
       return isRelevant;
     });
+    
 
     console.log("📌 Relevante Tasks für", date, ":", relevantTasks.length);
 

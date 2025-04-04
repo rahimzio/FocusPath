@@ -25,6 +25,7 @@ export interface TaskDocument {
   goalId?: string;
   createdAt: string;
   updatedAt: string;
+  excludedDates?:string[];
   subTasks?: SubTask[];
   // ggf. weitere Felder
 }
@@ -68,6 +69,7 @@ export interface Task {
   updatedAt: string;
   duration:string;
   goalId?: string;
+  excludedDates?:string[];
   reward?: {
     type: string;           // "badge" | "points" | ...
     value: any;             // "Gold-Badge" | 50 | ...
