@@ -38,7 +38,7 @@ export interface GoalDocument {
   description: string;
   dueDate: string;
   progress: number;      // 0-100%
-  tasks: string[];       // Liste von Task-IDs als string
+  tasks?: string[];       // Liste von Task-IDs als string
   createdAt: string;
   parentGoalId?: string;
   updatedAt: Date;
@@ -115,7 +115,7 @@ export interface GoalWithProgress extends Goal {
   // Im Basis-Goal ist progress/dueDate/tasks optional.
   // Hier kannst du sie auf Pflicht setzen, wenn du möchtest:
   dueDate: string;
-  tasks: [];
+  tasks?: [];
 }
 
 

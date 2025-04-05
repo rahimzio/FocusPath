@@ -267,7 +267,7 @@ const DailyTaskList = () => {
           frequency: editedTask.frequency,
           category: editedTask.category,
           color: editedTask.color,
-          duration:editedTask.duration,
+          duration: editedTask.duration,
         }),
       });
       console.log("Response von updateTask:", response);
@@ -425,21 +425,56 @@ const DailyTaskList = () => {
     }
   }
 
-  function getHeightFromDuration(duration: string | undefined): number {
-    if (!duration) return 40; // Standardhöhe
-
+  function getHeightFromDuration(duration: string | any): number {
     const [hoursStr, minutesStr] = duration.split(":");
-    const totalMinutes = parseInt(hoursStr) * 60 + parseInt(minutesStr);
+    const hours = parseInt(hoursStr || "0", 10);
+    const minutes = parseInt(minutesStr || "0", 10);
+    const totalMinutes = hours * 60 + minutes;
 
-    const minHeight = 40;
-    const maxHeight = 200;
-    const clampedMinutes = Math.min(Math.max(totalMinutes, 1), 150);
+    // Min/Max Grenzen setzen
+    const minHeight = 48; // z.B. 48px (für 1 Minute)
+    const maxHeight = 200; // z.B. 200px (für 2.5 Stunden = 150 Min)
 
-    const height =
-      minHeight + ((clampedMinutes - 1) / (150 - 1)) * (maxHeight - minHeight);
-
-    return Math.round(height);
+    const clampedMinutes = Math.max(1, Math.min(totalMinutes, 150)); // max. 2,5h
+    const scale = (clampedMinutes - 1) / (150 - 1); // 0–1
+    return minHeight + scale * (maxHeight - minHeight); // linear interpoliert
   }
+
+
+  function getEndTime(start: string, duration: string): string {
+    const [startHour, startMinute] = start.split(":").map(Number);
+    const [durHour, durMinute] = duration.split(":").map(Number);
+
+    const startDate = new Date();
+    startDate.setHours(startHour, startMinute, 0, 0);
+
+    const endDate = new Date(startDate);
+    endDate.setHours(endDate.getHours() + durHour);
+    endDate.setMinutes(endDate.getMinutes() + durMinute);
+
+    const endHours = endDate.getHours().toString().padStart(2, "0");
+    const endMinutes = endDate.getMinutes().toString().padStart(2, "0");
+
+    return `${endHours}:${endMinutes}`;
+  }
+
+  function checkOverlappingTasks(taskA: Task, taskB: Task): boolean {
+    if (!taskA.time || !taskA.duration || !taskB.time || !taskB.duration) return false;
+
+    const startA = convertToMinutes(taskA.time);
+    const endA = startA + convertToMinutes(taskA.duration);
+
+    const startB = convertToMinutes(taskB.time);
+    const endB = startB + convertToMinutes(taskB.duration);
+
+    return startA < endB && startB < endA;
+  }
+
+  function convertToMinutes(time: string): number {
+    const [hour, minute] = time.split(":").map(Number);
+    return hour * 60 + minute;
+  }
+
 
   // ------------------------------------------------
   // RENDER
@@ -554,80 +589,104 @@ const DailyTaskList = () => {
         )}
       </div>
 
-      {/* Aufgaben mit Uhrzeit */}
-      <div className="bg-white p-4 rounded-lg shadow-md mb-10 text-black">
-        <h2 className="text-xl font-semibold mb-4 text-gray-700">
-          Aufgaben mit Uhrzeit
-        </h2>
-        {tasks.filter((task) => task.timebased).length === 0 ? (
-          <p className="text-gray-600">
-            Keine zeitbasierten Aufgaben vorhanden.
-          </p>
-        ) : (
-          <div className="space-y-4 overflow-y-auto max-h-[300px]">
-            {tasks
-              .filter((task) => task.timebased)
-              .sort((a, b) => a.time.localeCompare(b.time)) // ⏰ Sortierung nach Uhrzeit
-              .map((task) => (
-                <div
-                  style={{
-                    borderLeft: `8px solid ${task.color || "#3B82F6"}`,
-                    height: `${getHeightFromDuration(task.duration)}px`,
-                    minHeight: "40px",
-                  }}
-                  className={`p-3 border rounded flex items-center ${task.status === "completed" ? "completed" : ""
-                    }`}
+{/* Aufgaben mit Uhrzeit */}
+<div className="bg-white p-4 rounded-lg shadow-md mb-10 text-black">
+  <h2 className="text-xl font-semibold mb-4 text-gray-700">
+    Aufgaben mit Uhrzeit
+  </h2>
+  {tasks.filter((task) => task.timebased).length === 0 ? (
+    <p className="text-gray-600">Keine zeitbasierten Aufgaben vorhanden.</p>
+  ) : (
+    <div className="space-y-4 overflow-y-auto max-h-[300px]">
+      {tasks
+        .filter((task) => task.timebased)
+        .sort((a, b) => convertToMinutes(a.time) - convertToMinutes(b.time))
+        .map((task, index, array) => {
+          const overlaps = array.some(
+            (otherTask, i) =>
+              i !== index && checkOverlappingTasks(task, otherTask)
+          );
+          return (
+            <div
+              key={task._id}
+              style={{
+                borderLeft: `8px solid ${task.color || "#3B82F6"}`,
+                backgroundColor: overlaps ? "#FFF3F3" : "white",
+                height: task.duration
+                  ? `${getHeightFromDuration(task.duration)}px`
+                  : "auto",
+                minHeight: "40px",
+              }}
+              className={`p-3 border rounded flex items-center ${
+                task.status === "completed" ? "completed" : ""
+              }`}
+            >
+              <div className="flex-grow">
+                <h4 className="font-semibold">{task.name}</h4>
+                <p>{task.description}</p>
+                {task.time && (
+                  <p className="text-sm">
+                    <span className="font-medium">Start:</span> {task.time}
+                  </p>
+                )}
+                {task.time && task.duration && (
+                  <p className="text-sm text-gray-600">
+                    <span className="font-medium">Ende:</span>{" "}
+                    {getEndTime(task.time, task.duration)}
+                  </p>
+                )}
+                {overlaps && (
+                  <p className="text-sm text-red-600 font-medium">
+                    ⚠️ Überschneidet sich mit anderer Aufgabe
+                  </p>
+                )}
+              </div>
+              {task.status === "completed" && (
+                <FaCheckCircle className="text-green-500 ml-2" />
+              )}
+              <div className="mt-2 flex items-center">
+                <input
+                  id={`timeTaskCheck-${task._id}`}
+                  type="checkbox"
+                  checked={task.status === "completed"}
+                  onChange={(e) =>
+                    handleCheckTask(task._id, selectedDate, e.target.checked)
+                  }
+                />
+                <label
+                  htmlFor={`timeTaskCheck-${task._id}`}
+                  className="ml-2 select-none"
                 >
-                  <div className="flex-grow">
-                    <h4 className="font-semibold">{task.name}</h4>
-                    <p>{task.description}</p>
-                    {task.time && (
-                      <p className="text-sm">
-                        <span className="font-medium">Uhrzeit:</span> {task.time}
-                      </p>
-                    )}
-                  </div>
-                  {task.status === "completed" && (
-                    <FaCheckCircle className="text-green-500 ml-2" />
-                  )}
-                  <div className="mt-2 flex items-center">
-                    <input
-                      id={`timeTaskCheck-${task._id}`}
-                      type="checkbox"
-                      checked={task.status === "completed"}
-                      onChange={(e) =>
-                        handleCheckTask(task._id, selectedDate, e.target.checked)
-                      }
-                    />
-                    <label htmlFor={`timeTaskCheck-${task._id}`} className="ml-2 select-none">
-                      {task.status === "completed" ? "Abgeschlossen" : "Offen"}
-                    </label>
-                  </div>
-                  <div className="mt-2 flex gap-2">
-                    <button
-                      onClick={() => openTaskDetails(task)}
-                      className="bg-blue-500 text-white px-2 py-1 rounded"
-                    >
-                      Details
-                    </button>
-                    <button
-                      onClick={() => openEditDialog(task)}
-                      className="bg-green-500 text-white px-2 py-1 rounded"
-                    >
-                      Editieren
-                    </button>
-                    <button
-                      onClick={() => confirmDelete(task)}
-                      className="bg-red-500 text-white px-2 py-1 rounded"
-                    >
-                      Löschen
-                    </button>
-                  </div>
-                </div>
-              ))}
-          </div>
-        )}
-      </div>
+                  {task.status === "completed" ? "Abgeschlossen" : "Offen"}
+                </label>
+              </div>
+              <div className="mt-2 flex gap-2">
+                <button
+                  onClick={() => openTaskDetails(task)}
+                  className="bg-blue-500 text-white px-2 py-1 rounded"
+                >
+                  Details
+                </button>
+                <button
+                  onClick={() => openEditDialog(task)}
+                  className="bg-green-500 text-white px-2 py-1 rounded"
+                >
+                  Editieren
+                </button>
+                <button
+                  onClick={() => confirmDelete(task)}
+                  className="bg-red-500 text-white px-2 py-1 rounded"
+                >
+                  Löschen
+                </button>
+              </div>
+            </div>
+          );
+        })}
+    </div>
+  )}
+</div>
+
 
 
       {/* Fortschrittsanzeige für Ziele */}

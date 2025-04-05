@@ -40,69 +40,78 @@ const NewGoalForm: React.FC = () => {
     }
   };
 
-  return (
-    <form onSubmit={handleSubmit} className="bg-white shadow p-4 rounded-lg">
-      <h2 className="text-xl font-semibold mb-4">Neues Ziel erstellen</h2>
-      <div className="mb-4">
-        <label className="block text-sm font-medium mb-1" htmlFor="title">Titel *</label>
-        <input
-          id="title"
-          type="text"
-          className="w-full border rounded p-2"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          required
-        />
-      </div>
-      <div className="mb-4">
-        <label className="block text-sm font-medium mb-1" htmlFor="description">Beschreibung</label>
-        <textarea
-          id="description"
-          className="w-full border rounded p-2"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-        />
-      </div>
-      <div className="mb-4">
-        <label className="block text-sm font-medium mb-1" htmlFor="startDate">Startdatum *</label>
-        <input
-          id="startDate"
-          type="date"
-          className="w-full border rounded p-2"
-          value={startDate}
-          onChange={(e) => setStartDate(e.target.value)}
-          required
-        />
-      </div>
-      <div className="mb-4">
-        <label className="block text-sm font-medium mb-1" htmlFor="endDate">Enddatum *</label>
-        <input
-          id="endDate"
-          type="date"
-          className="w-full border rounded p-2"
-          value={endDate}
-          onChange={(e) => setEndDate(e.target.value)}
-          required
-        />
-      </div>
-      <div className="mb-4">
-        <label className="block text-sm font-medium mb-1" htmlFor="type">Typ</label>
-        <select
-          id="type"
-          className="w-full border rounded p-2"
-          value={type}
-          onChange={(e) => setType(e.target.value as typeof type)}
-        >
-          <option value="daily">Täglich</option>
-          <option value="weekly">Wöchentlich</option>
-          <option value="monthly">Monatlich</option>
-          <option value="yearly">Jährlich</option>
-        </select>
-      </div>
-      <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
-        Ziel erstellen
-      </button>
-    </form>
+  return (<form onSubmit={handleSubmit} className="bg-gray-50 shadow p-6 rounded-lg text-black font-normal">
+    <h2 className="text-xl font-semibold mb-4">Neues Ziel erstellen</h2>
+
+    <div className="mb-4">
+      <label className="block text-sm font-medium text-gray-800 mb-1" htmlFor="title">Titel *</label>
+      <input
+        id="title"
+        type="text"
+        className="w-full border border-gray-300 rounded p-2 bg-white text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        required
+      />
+    </div>
+
+    <div className="mb-4">
+      <label className="block text-sm font-medium text-gray-800 mb-1" htmlFor="description">Beschreibung</label>
+      <textarea
+        id="description"
+        className="w-full border border-gray-300 rounded p-2 bg-white text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+      />
+    </div>
+
+    <div className="mb-4">
+      <label className="block text-sm font-medium text-gray-800 mb-1" htmlFor="startDate">Startdatum *</label>
+      <input
+        id="startDate"
+        type="date"
+        className="w-full border border-gray-300 rounded p-2 bg-white text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
+        value={startDate}
+        onChange={(e) => setStartDate(e.target.value)}
+        required
+      />
+    </div>
+
+    <div className="mb-4">
+      <label className="block text-sm font-medium text-gray-800 mb-1" htmlFor="endDate">Enddatum *</label>
+      <input
+        id="endDate"
+        type="date"
+        className="w-full border border-gray-300 rounded p-2 bg-white text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
+        value={endDate}
+        onChange={(e) => setEndDate(e.target.value)}
+        required
+      />
+    </div>
+
+    <div className="mb-4">
+      <label className="block text-sm font-medium text-gray-800 mb-1" htmlFor="type">Typ</label>
+      <select
+        id="type"
+        className="w-full border border-gray-300 rounded p-2 bg-white text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
+        value={type}
+        onChange={(e) => setType(e.target.value as typeof type)}
+      >
+        <option value="daily">Täglich</option>
+        <option value="weekly">Wöchentlich</option>
+        <option value="monthly">Monatlich</option>
+        <option value="yearly">Jährlich</option>
+      </select>
+    </div>
+
+    <button
+      type="submit"
+      className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition"
+    >
+      Ziel erstellen
+    </button>
+  </form>
+
   );
 };
 

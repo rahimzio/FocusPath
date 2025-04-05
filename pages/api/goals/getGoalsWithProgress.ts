@@ -1,7 +1,7 @@
 // pages/api/goal/getGoalsWithProgress.ts
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { connectToDatabase } from '../db/mongo'; // Stelle sicher, dass dieser Pfad korrekt ist
+import { connectToDatabase } from '../db/mongo';
 import { GoalWithProgress } from '@/utils/interface';
 import { ObjectId } from 'mongodb';
 
@@ -13,6 +13,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const { db } = await connectToDatabase();
+
+    // 🛡️ Collection-Existenz prüfen (CosmosDB-sicher)
+    const collections = await db.listCollections({}, { nameOnly: true }).toArray();
+    const collectionExists = collections.some((col) => col.name === "goals");
+
+    if (!collectionExists) {
+      return res.status(500).json({
+        message: "Collection 'goals' existiert nicht. Bitte manuell anlegen.",
+        goals: [],
+      });
+    }
+
     const goalsCollection = db.collection('goals');
 
     const rawGoals = await goalsCollection.aggregate([
@@ -51,12 +63,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       },
       {
         $project: {
-          tasks: 0, // Entferne das tasks-Feld, falls nicht benötigt
+          tasks: 0, // Aufgaben entfernen (Performance & RU-Schutz)
         },
       },
     ]).toArray();
 
-    // Mapping der Rohdaten zu GoalWithProgress, dabei werden die fehlenden Felder ergänzt:
     const goalsWithProgress: GoalWithProgress[] = rawGoals.map(goal => ({
       _id: (goal._id as ObjectId).toString(),
       title: goal.title,
@@ -67,17 +78,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       completedTasks: goal.completedTasks,
       progress: goal.progress,
       dueDate: goal.dueDate ? new Date(goal.dueDate).toISOString() : "",
-      tasks: goal.tasks || [],
-      // Hier die fehlenden Felder mit den Werten aus der DB oder Standardwerten
       endDate: goal.endDate ? new Date(goal.endDate).toISOString() : "",
       startDate: goal.startDate ? new Date(goal.startDate).toISOString() : "",
-      type: goal.type || "daily", // Standard: "daily" falls kein Wert vorhanden
-      subGoals: goal.subGoals || [] // Standard: leeres Array
+      type: goal.type || "daily",
+      subGoals: goal.subGoals || [],
     }));
 
     res.status(200).json({ goals: goalsWithProgress });
   } catch (error) {
-    console.error('Fehler bei getGoalsWithProgress:', error);
+    console.error('❌ Fehler bei getGoalsWithProgress:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 }

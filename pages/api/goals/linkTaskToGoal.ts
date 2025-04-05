@@ -1,7 +1,7 @@
-// pages/api/linkTaskToGoal.ts
 import { NextApiRequest, NextApiResponse } from "next";
 import { ObjectId } from "mongodb";
-import { connectToDatabase, disconnectFromDatabase } from "../db/mongo";
+import { connectToDatabase } from "../db/mongo";
+import { GoalDocument } from "@/utils/interface"; // wichtig!
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
@@ -10,54 +10,50 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const { taskId, goalId } = req.body;
 
-  // Validierung
   if (!taskId || !goalId) {
-    return res
-      .status(400)
-      .json({ message: "Ungültige Anfrage: taskId und goalId benötigt" });
+    return res.status(400).json({
+      message: "Ungültige Anfrage: taskId und goalId benötigt",
+    });
   }
 
   try {
     const { db } = await connectToDatabase();
     const tasksCollection = db.collection("tasks");
-    const goalsCollection = db.collection("goals");
+    const goalsCollection = db.collection<GoalDocument>("goals");
 
-    // 1. Ziel checken
-    const goal = await goalsCollection.findOne({ _id: new ObjectId(goalId) });
+    const goalObjectId = new ObjectId(goalId);
+    const taskObjectId = new ObjectId(taskId);
+
+    const goal = await goalsCollection.findOne({ _id: goalObjectId });
     if (!goal) {
       return res.status(404).json({ message: "Ziel nicht gefunden" });
     }
 
-    // 2. Aufgabe checken
-    const task = await tasksCollection.findOne({ _id: new ObjectId(taskId) });
+    const task = await tasksCollection.findOne({ _id: taskObjectId });
     if (!task) {
       return res.status(404).json({ message: "Aufgabe nicht gefunden" });
     }
 
-    // 3. goalId in der Aufgabe setzen
+    // goalId in der Aufgabe speichern
     await tasksCollection.updateOne(
-      { _id: new ObjectId(taskId) },
-      {
-        $set: { goalId, updatedAt: new Date().toISOString() }
-      }
+      { _id: taskObjectId },
+      { $set: { goalId, updatedAt: new Date().toISOString() } }
     );
 
-    // 4. TaskId ins Ziel pushen (falls noch nicht vorhanden)
-    if (!goal.tasks?.includes(taskId)) {
+    const alreadyLinked = Array.isArray(goal.tasks) && goal.tasks.includes(taskId);
+    if (!alreadyLinked) {
       await goalsCollection.updateOne(
-        { _id: new ObjectId(goalId) },
+        { _id: goalObjectId },
         {
           $push: { tasks: taskId },
-          $currentDate: { updatedAt: true }
+          $currentDate: { updatedAt: true },
         }
       );
     }
 
     return res.status(200).json({ message: "Aufgabe erfolgreich mit Ziel verknüpft" });
   } catch (error) {
-    console.error("Fehler beim Verknüpfen von Aufgabe und Ziel:", error);
+    console.error("❌ Fehler beim Verknüpfen von Aufgabe und Ziel:", error);
     return res.status(500).json({ message: "Interner Serverfehler" });
-  } finally {
-    await disconnectFromDatabase();
   }
 }

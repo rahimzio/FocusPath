@@ -1,8 +1,8 @@
 // pages/api/goal/createGoals.ts
 
 import { NextApiRequest, NextApiResponse } from "next";
-import { connectToDatabase, disconnectFromDatabase } from "../db/mongo";
-import { Goal } from "@/utils/interface"; 
+import { connectToDatabase } from "../db/mongo"; // disconnectFromDatabase entfernt
+import { Goal } from "@/utils/interface";
 import { ObjectId } from "mongodb";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -12,7 +12,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const { title, description, type, startDate, endDate } = req.body;
 
-  // Grundlegende Validierung
   if (!title || !type || !startDate || !endDate) {
     return res.status(400).json({
       message: "Missing required fields: 'title', 'type', 'startDate', or 'endDate'.",
@@ -21,9 +20,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const { db } = await connectToDatabase();
+    const collectionNames = await db.listCollections({}, { nameOnly: true }).toArray();
+    const collectionExists = collectionNames.some((col) => col.name === "goals");
+
+    if (!collectionExists) {
+      return res.status(500).json({
+        message:
+          "Die Collection 'goals' existiert nicht. Bitte manuell in CosmosDB anlegen, um Throughput-Probleme zu vermeiden.",
+      });
+    }
+
     const goalsColl = db.collection<Goal>("goals");
 
-    // Neues Ziel-Objekt
     const newGoal: Goal = {
       _id: new ObjectId().toHexString(),
       title,
@@ -38,18 +46,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       updatedAt: new Date().toISOString(),
     };
 
-    // Ziel in der Datenbank einfügen
     const result = await goalsColl.insertOne(newGoal);
 
     if (result.acknowledged) {
-      console.log(`Neues Ziel erstellt: ${result.insertedId}`);
-      await disconnectFromDatabase();
-      return res.status(201).json({ message: "Ziel erfolgreich erstellt", goalId: result.insertedId });
+      console.log(`✅ Neues Ziel erstellt: ${result.insertedId}`);
+      return res
+        .status(201)
+        .json({ message: "Ziel erfolgreich erstellt", goalId: result.insertedId });
     } else {
       throw new Error("Ziel konnte nicht eingefügt werden");
     }
-  } catch (error) {
-    console.error("Fehler beim Erstellen des Ziels:", error);
+  } catch (error: any) {
+    console.error("❌ Fehler beim Erstellen des Ziels:", error);
+    if (
+      typeof error.message === "string" &&
+      error.message.includes("throughput")
+    ) {
+      return res.status(429).json({
+        message: "Throughput-Limit erreicht. Bitte manuell Collection erstellen oder RU erhöhen.",
+      });
+    }
     return res.status(500).json({ message: "Internal server error" });
   }
 }
