@@ -154,5 +154,5 @@ export interface Completion {
   _id?: ObjectId;
   taskId: string;
   date: string;
-  status: "completed" | "incomplete" | "in-progress" | "on-hold";
+  status: "completed" | "incomplete";
 }

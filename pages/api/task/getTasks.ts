@@ -1,5 +1,7 @@
+// pages/api/tasks/getTasks.ts
+
 import { NextApiRequest, NextApiResponse } from "next";
-import { connectToDatabase } from "../db/mongo"; // ❌ disconnectFromDatabase entfernt
+import { connectToDatabase } from "../db/mongo";
 import { Task, Completion } from "@/utils/interface";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -18,54 +20,60 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const tasksColl = db.collection<Task>("tasks");
     const completionsColl = db.collection<Completion>("completions");
 
-    // 1) Lade nur relevante Felder der Tasks
-    const allTasks = await tasksColl.find({}, { projection: { _id: 1, name: 1, points:1, dueDate: 1, frequency: 1, timebased: 1, time: 1,category: 1,subTasks: 1,excludedDates: 1,color:1,   duration:1
-    } }).toArray();
-    console.log("📌 Geladene Tasks:", allTasks.length);
-    // 2) Lade Completions für dieses Datum
-    const allCompletions = await completionsColl.find({ date }).toArray();
-    console.log("📌 Geladene Completions:", allCompletions.length);
+    // 1) Nur relevante Felder laden
+    const allTasks = await tasksColl.find({}, {
+      projection: {
+        _id: 1,
+        name: 1,
+        points: 1,
+        dueDate: 1,
+        frequency: 1,
+        timebased: 1,
+        time: 1,
+        category: 1,
+        subTasks: 1,
+        excludedDates: 1,
+        color: 1,
+        duration: 1,
+        goalId: 1,
+      }
+    }).toArray();
 
-    // 3) Frequenz-Filter: Welche Tasks sind heute "relevant"?
+    const allCompletions = await completionsColl.find({ date }).toArray();
+
     const selectedDate = new Date(date);
     const relevantTasks = allTasks.filter((task) => {
       const isRelevant = checkFrequency(task, selectedDate);
-    
-      // 🔹 Falls excludedDates gesetzt ist → ausschließen
-      if (isRelevant && Array.isArray(task.excludedDates)) {
-        const selectedDateStr = selectedDate.toISOString().slice(0, 10); // YYYY-MM-DD
-        const isExcluded = task.excludedDates.includes(selectedDateStr);
-        if (isExcluded) {
-          console.log(`🚫 Aufgabe "${task.name}" ist für ${selectedDateStr} ausgeschlossen.`);
-          return false;
-        }
-      }
-    
-      return isRelevant;
+      const isExcluded = task.excludedDates?.includes(selectedDate.toISOString().slice(0, 10));
+      return isRelevant && !isExcluded;
     });
-    
 
-    console.log("📌 Relevante Tasks für", date, ":", relevantTasks.length);
-
-    // 4) Completions mit Tasks verknüpfen
     const tasksWithStatus = relevantTasks.map((task) => {
-      const taskIdStr = task._id?.toString();
-      const completion = allCompletions.find((c) => c.taskId === taskIdStr);
+      const completion = allCompletions.find((c) => c.taskId === task._id?.toString());
       const status = completion?.status === "completed" ? "completed" : "incomplete";
       return { ...task, status };
     });
 
-    console.log("✅ Tasks mit Status geladen:", tasksWithStatus.length);
-    
-    return res.status(200).json({ tasks: tasksWithStatus });
+    // 5) Gruppieren
+    const goalTasks = tasksWithStatus.filter((t) => !!t.goalId);
+    const otherTasks = tasksWithStatus.filter((t) => !t.goalId);
+
+    console.log(`📌 Aufgaben total: ${tasksWithStatus.length}, Ziel-gebunden: ${goalTasks.length}, sonstige: ${otherTasks.length}`);
+
+    return res.status(200).json({
+      groupedTasks: {
+        goalTasks,
+        otherTasks,
+      }
+    });
 
   } catch (error) {
     console.error("❌ Fehler beim Abrufen der Aufgaben:", error);
-    return res.status(500).json({ message: "Fehler beim Abrufen der Aufgaben", error: error });
+    return res.status(500).json({ message: "Fehler beim Abrufen der Aufgaben", error });
   }
 }
 
-// Wiederholungslogik (unverändert)
+// Wiederholungslogik
 function checkFrequency(task: Task, selectedDate: Date): boolean {
   const dueDate = new Date(task.dueDate);
   const diff = dayDiff(dueDate, selectedDate);
@@ -82,11 +90,13 @@ function checkFrequency(task: Task, selectedDate: Date): boolean {
 }
 
 function dayDiff(a: Date, b: Date): number {
-  return Math.floor((Date.UTC(b.getFullYear(), b.getMonth(), b.getDate()) - 
-                     Date.UTC(a.getFullYear(), a.getMonth(), a.getDate())) / 
-                     (24 * 60 * 60 * 1000));
+  return Math.floor((Date.UTC(b.getFullYear(), b.getMonth(), b.getDate()) -
+    Date.UTC(a.getFullYear(), a.getMonth(), a.getDate())) /
+    (24 * 60 * 60 * 1000));
 }
 
 function isSameDay(a: Date, b: Date): boolean {
-  return a.getDate() === b.getDate() && a.getMonth() === b.getMonth() && a.getFullYear() === b.getFullYear();
+  return a.getDate() === b.getDate() &&
+    a.getMonth() === b.getMonth() &&
+    a.getFullYear() === b.getFullYear();
 }

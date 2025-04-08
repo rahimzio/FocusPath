@@ -2,8 +2,8 @@
 import dynamic from "next/dynamic";
 import React from "react";
 
-const FinanceOverview = dynamic(
-  () => import("@/components/finance/financeOverviews"),
+const GoalsOverview = dynamic(
+  () => import("@/components/goal/goalsOverview"),
   {
     loading: () => <p>Loading...</p>,
     ssr: false, // Optional: Deaktiviert die serverseitige Darstellung
@@ -12,7 +12,7 @@ const FinanceOverview = dynamic(
 
 const FinancePage = () => (
   <React.Suspense fallback={<div>Loading...</div>}>
-    <FinanceOverview />
+    <GoalsOverview />
   </React.Suspense>
 );
 

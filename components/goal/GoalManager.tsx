@@ -1,6 +1,6 @@
 // pages/goal/index.tsx
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Task, SubTask, Goal } from "@/utils/interface";
 
 // Du kannst diese 2 Interfaces auch aus @/utils/interface importieren,
@@ -25,6 +25,23 @@ export default function GoalManager() {
     progress: 0,
   });
 
+  useEffect(() => {
+    async function loadGoals() {
+      try {
+        const res = await fetch("/api/goals/getGoals");
+        const data = await res.json();
+        if (res.ok) {
+          setGoals(data.goals);
+        } else {
+          console.error("Fehler beim Laden:", data.message);
+        }
+      } catch (err) {
+        console.error("Netzwerkfehler:", err);
+      }
+    }
+
+    loadGoals();
+  }, []);
   // Modal State für Subtasks
   const [subTaskModalOpen, setSubTaskModalOpen] = useState(false);
   // aktuelle Task, für die wir Subtasks verwalten

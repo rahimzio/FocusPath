@@ -29,7 +29,7 @@ const items = [
   },
   {
     title: "Goals",
-    url: "/goals",
+    url: "/overview/goals",
     icon: Calendar,
   },
   {
