@@ -1,64 +1,65 @@
-// pages/api/task/updateTaskAndGoalProgress.ts
 import { NextApiRequest, NextApiResponse } from "next";
 import { ObjectId } from "mongodb";
 import { connectToDatabase } from "../db/mongo";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const { taskId, status } = req.body;
+  const { taskId, status, userId } = req.body;
 
-  if (!taskId || !status) {
-    return res.status(400).json({ message: "Fehlende taskId oder Status" });
+  if (!taskId || !status || !userId) {
+    return res.status(400).json({ message: "taskId, status und userId sind erforderlich" });
   }
 
   try {
     const { db } = await connectToDatabase();
-    const tasksCollection = db.collection("tasks");
-    const goalsCollection = db.collection("goals");
+    const appData = db.collection("appData");
 
-    const objectTaskId = typeof taskId === "string" ? new ObjectId(taskId) : taskId;
+    const objectTaskId = new ObjectId(taskId);
 
     // 1. Aufgabe aktualisieren
-    const updateResult = await tasksCollection.updateOne(
-      { _id: objectTaskId },
+    const updateResult = await appData.updateOne(
+      { _id: objectTaskId, userId, type: "task" },
       { $set: { status, updatedAt: new Date().toISOString() } }
     );
 
     if (updateResult.modifiedCount !== 1) {
-      return res.status(404).json({ message: "Aufgabe nicht gefunden oder nicht geändert" });
+      return res.status(404).json({ message: "Aufgabe nicht gefunden oder nicht aktualisiert" });
     }
 
     // 2. Aktualisierte Aufgabe abrufen
-    const updatedTask = await tasksCollection.findOne({ _id: objectTaskId });
+    const updatedTask = await appData.findOne({ _id: objectTaskId, userId, type: "task" });
     if (!updatedTask) {
-      return res.status(404).json({ message: "Aufgabe nicht gefunden (nach Update)" });
+      return res.status(404).json({ message: "Aufgabe nach Update nicht gefunden" });
     }
 
-    // 3. Wenn mit Ziel verknüpft → Fortschritt neu berechnen
+    // 3. Falls Aufgabe mit Ziel verknüpft ist, berechne Fortschritt neu
     if (updatedTask.goalId) {
-      const goalObjectId = new ObjectId(updatedTask.goalId);
-      const goalDoc = await goalsCollection.findOne({ _id: goalObjectId });
+      const goal = await appData.findOne({
+        _id: new ObjectId(updatedTask.goalId),
+        userId,
+        type: "goal",
+      });
 
-      if (goalDoc) {
-        const tasksForGoal = await tasksCollection
-          .find({ goalId: updatedTask.goalId })
+      if (goal) {
+        const tasksForGoal = await appData
+          .find({ goalId: updatedTask.goalId, userId, type: "task" })
           .toArray();
 
         const total = tasksForGoal.length;
         const completed = tasksForGoal.filter((t) => t.status === "completed").length;
         const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
 
-        await goalsCollection.updateOne(
-          { _id: goalObjectId },
+        await appData.updateOne(
+          { _id: new ObjectId(updatedTask.goalId), userId, type: "goal" },
           { $set: { progress }, $currentDate: { updatedAt: true } }
         );
       }
     }
 
     return res.status(200).json({
-      message: "Aufgabe aktualisiert und Fortschritt des Ziels neu berechnet",
+      message: "Aufgabe aktualisiert und Ziel-Fortschritt neu berechnet",
     });
   } catch (error) {
-    console.error("❌ Fehler beim Aktualisieren der Aufgabe:", error);
-    return res.status(500).json({ message: "Fehler beim Aktualisieren der Aufgabe" });
+    console.error("❌ Fehler bei updateTaskAndGoalProgress:", error);
+    return res.status(500).json({ message: "Serverfehler beim Aktualisieren der Aufgabe" });
   }
 }

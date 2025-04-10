@@ -7,35 +7,40 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ message: "Method not allowed. Use POST." });
   }
 
-  const { taskId, subTaskId, date } = req.body;
-  if (!taskId || !date) {
-    return res.status(400).json({ message: "Missing taskId or date." });
+  const { taskId, subTaskId, date, userId } = req.body;
+
+  if (!taskId || !date || !userId) {
+    return res.status(400).json({ message: "Missing taskId, date or userId." });
   }
 
   try {
     const { db } = await connectToDatabase();
-    const tasksColl = db.collection("tasks");
-    const completionsColl = db.collection("completions");
+    const appData = db.collection("appData");
 
     // 🔹 Ein einzelner Subtask wird zurückgesetzt
     if (subTaskId) {
-      const updateSubTaskResult = await tasksColl.updateOne(
-        { _id: new ObjectId(taskId), "subTasks._id": subTaskId },
+      const updateSubTaskResult = await appData.updateOne(
+        { _id: new ObjectId(taskId), type: "task", userId, "subTasks._id": subTaskId },
         { $set: { "subTasks.$.status": "incomplete" } }
       );
       console.log("🔄 Subtask wieder offen:", updateSubTaskResult);
     } else {
       // 🔹 Hauptaufgabe wird zurückgesetzt
-      //    → auch alle Subtasks (falls vorhanden) werden auf "incomplete" gesetzt
-      await completionsColl.deleteOne({ taskId, date });
-      console.log("🗑️ Completion-Eintrag gelöscht");
+      // 1) Completion löschen
+      const deleteCompletion = await appData.deleteOne({
+        type: "completion",
+        userId,
+        taskId,
+        date,
+      });
+      console.log("🗑️ Completion-Eintrag gelöscht:", deleteCompletion.deletedCount);
 
-      // Setze Subtasks (falls vorhanden) auf "incomplete"
-      const resetAllSubtasks = await tasksColl.updateOne(
-        { _id: new ObjectId(taskId) },
-        { $set: { "subTasks.$[].status": "incomplete" } } // $[] → alle Elemente im Array
+      // 2) Subtasks (falls vorhanden) auf "incomplete" setzen
+      const resetSubtasks = await appData.updateOne(
+        { _id: new ObjectId(taskId), type: "task", userId },
+        { $set: { "subTasks.$[].status": "incomplete" } }
       );
-      console.log("🔄 Alle Subtasks zurückgesetzt:", resetAllSubtasks);
+      console.log("🔄 Alle Subtasks zurückgesetzt:", resetSubtasks.modifiedCount);
     }
 
     return res.status(200).json({ message: "Task reset successful" });

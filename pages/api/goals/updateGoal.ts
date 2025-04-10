@@ -1,45 +1,39 @@
-// pages/api/goal/updateGoal.ts
 import { NextApiRequest, NextApiResponse } from "next";
 import { connectToDatabase } from "../db/mongo";
 import { ObjectId } from "mongodb";
-import { Goal } from "@/utils/interface";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "PUT") {
     return res.status(405).json({ message: "Method not allowed. Use PUT." });
   }
 
-  const { goalId, title, description } = req.body;
+  const { userId, goalId, title, description } = req.body;
 
-  if (!goalId || !title || !description) {
+  if (!goalId || !title || !description || !userId) {
     return res.status(400).json({
-      message: "Missing 'goalId', 'title' or 'description' in request body.",
+      message: "Missing 'goalId', 'title', 'description' or 'userId' in request body.",
     });
   }
 
   try {
     const { db } = await connectToDatabase();
-    const goalsColl = db.collection<Goal>("goals");
+    const appData = db.collection("appData");
 
-    const objectGoalId = typeof goalId === "string" ? new ObjectId(goalId) : goalId;
+    const objectGoalId = new ObjectId(goalId);
 
-    const updateResult = await goalsColl.updateOne(
-      { _id: objectGoalId },
+    const updateResult = await appData.updateOne(
+      { _id: objectGoalId, userId, type: "goal" },
       {
         $set: {
           title,
           description,
           updatedAt: new Date().toISOString(),
-          // Optional weitere Felder einfügen:
-          // startDate,
-          // endDate,
-          // type,
         },
       }
     );
 
     if (updateResult.matchedCount === 0) {
-      return res.status(404).json({ message: "Ziel nicht gefunden." });
+      return res.status(404).json({ message: "Ziel nicht gefunden oder gehört nicht zum Nutzer." });
     }
 
     console.log(`✅ Ziel ${goalId} erfolgreich aktualisiert.`);

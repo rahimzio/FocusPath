@@ -1,35 +1,41 @@
-// pages/_app.tsx
-import React from "react";
+import { SessionProvider, useSession } from "next-auth/react";
 import { AppProps } from "next/app";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
+import { ToastContainer } from "react-toastify";
+import { AuthWrapper } from "@/components/login/AuthWrapper";
+
+import "react-toastify/dist/ReactToastify.css";
 import "./globals.css";
 
-// Importiere ToastContainer und die CSS-Styles von react-toastify
-import { ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import { useRouter } from "next/router";
+
+function AppContent({ Component, pageProps }: AppProps) {
+  const { data: session } = useSession();
+  const router = useRouter();
+
+  const isAuthPage = router.pathname.startsWith("/login");
+
+  return (
+    <SidebarProvider>
+      {/* Nur anzeigen wenn eingeloggt UND nicht auf Login/Register */}
+      {session && !isAuthPage && <AppSidebar />}
+
+      <AuthWrapper>
+        <main className="Main">
+          <Component {...pageProps} />
+          <ToastContainer position="top-right" autoClose={5000} theme="colored" />
+        </main>
+      </AuthWrapper>
+    </SidebarProvider>
+  );
+}
 
 function MyApp({ Component, pageProps }: AppProps) {
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <main className="Main">
-        <Component {...pageProps} />
-        {/* Füge den ToastContainer hinzu */}
-        <ToastContainer 
-          position="top-right"
-          autoClose={5000}
-          hideProgressBar={false}
-          newestOnTop={false}
-          closeOnClick
-          rtl={false}
-          pauseOnFocusLoss
-          draggable
-          pauseOnHover
-          theme="colored"
-        />
-      </main>
-    </SidebarProvider>
+    <SessionProvider session={pageProps.session}>
+       <Component {...pageProps} />
+    </SessionProvider>
   );
 }
 

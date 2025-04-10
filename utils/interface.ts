@@ -115,7 +115,7 @@ export interface GoalWithProgress extends Goal {
   // Im Basis-Goal ist progress/dueDate/tasks optional.
   // Hier kannst du sie auf Pflicht setzen, wenn du möchtest:
   dueDate: string;
-  tasks?: [];
+  tasks?: Task[];
 }
 
 

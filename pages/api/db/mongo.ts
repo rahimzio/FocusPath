@@ -3,7 +3,7 @@ import { MongoClient, Db } from "mongodb";
 let cachedClient: MongoClient | null = null;
 let cachedDb: Db | null = null;
 
-const DB_NAME = "your-database-name"; // Ggf. anpassen
+const DB_NAME = "focusPath"; // Ggf. anpassen
 
 export async function connectToDatabase() {
   if (cachedClient && cachedDb) {

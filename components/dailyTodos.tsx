@@ -51,6 +51,7 @@ const DailyTaskList = () => {
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
+  const [dayScore, setDayScore] = useState<string>("-");
 
   async function fetchTasks(dateParam?: string) {
     const dateToUse = dateParam || formatDate(new Date());
@@ -59,6 +60,9 @@ const DailyTaskList = () => {
       if (!response.ok) throw new Error(await response.text());
       const data = await response.json();
       setTasks([...data.groupedTasks.goalTasks, ...data.groupedTasks.otherTasks]);
+      const allTasks = [...data.groupedTasks.goalTasks, ...data.groupedTasks.otherTasks];
+      setTasks(allTasks);
+      setDayScore(calculateDayScore(allTasks, goals));
     } catch (error) {
       console.error("Fehler beim Abrufen der Aufgaben:", error);
       toast.error("Fehler beim Abrufen der Aufgaben.");
@@ -172,20 +176,38 @@ const DailyTaskList = () => {
     setDeleteDialogOpen(false);
     await fetchTasks(date);
   }
-
+  function calculateDayScore(tasks: Task[], goals: GoalWithProgress[]): string {
+    const total = tasks.length;
+    const completed = tasks.filter(t => t.status === "completed").length;
+    const percent = total === 0 ? 0 : (completed / total) * 100;
+    const allGoalTasksDone = tasks.filter(t => t.goalId).every(t => t.status === "completed");
+    const allImportantDone = tasks.filter(t => t.points && t.points > 7).every(t => t.status === "completed");
+  
+    if (percent === 100) return "W+ Day";
+    if (percent >= 85 && allGoalTasksDone && allImportantDone) return "W Day";
+    if (percent >= 50) return "M Day";
+    if (percent < 50) return "L Day";
+    return "-";
+  }
   // ------------------------------------------------
   // RENDER
   // ------------------------------------------------
   return (
     <div className="space-y-6">
-      <CalendarSelector
-        selectedDate={selectedDate}
-        setSelectedDate={setSelectedDate}
-        showCalendar={showCalendar}
-        setShowCalendar={setShowCalendar}
-        tasks={tasks}
-        formatDate={formatDate}
-      />
+      <div>
+        <CalendarSelector
+          selectedDate={selectedDate}
+          setSelectedDate={setSelectedDate}
+          showCalendar={showCalendar}
+          setShowCalendar={setShowCalendar}
+          tasks={tasks}
+          formatDate={formatDate}
+        />
+        <p className="text-xl font-bold text-center text-yellow-600">
+          🏅 Heute ist ein <span className="underline">{dayScore}</span>
+        </p>
+      </div>
+
 
       {renderGoalsWithProgress()}
 

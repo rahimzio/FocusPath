@@ -1,5 +1,3 @@
-// pages/api/goal/getGoalsWithProgress.ts
-
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { connectToDatabase } from '../db/mongo';
 import { GoalWithProgress } from '@/utils/interface';
@@ -11,72 +9,96 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ message: `Method ${req.method} Not Allowed` });
   }
 
+  const { userId } = req.query;
+  if (!userId || typeof userId !== "string") {
+    return res.status(400).json({ message: "Missing or invalid userId." });
+  }
+
   try {
     const { db } = await connectToDatabase();
+    const appData = db.collection("appData");
 
-    // 🛡️ Collection-Existenz prüfen (CosmosDB-sicher)
-    const collections = await db.listCollections({}, { nameOnly: true }).toArray();
-    const collectionExists = collections.some((col) => col.name === "goals");
-
-    if (!collectionExists) {
-      return res.status(500).json({
-        message: "Collection 'goals' existiert nicht. Bitte manuell anlegen.",
-        goals: [],
-      });
-    }
-
-    const goalsCollection = db.collection('goals');
-
-    const rawGoals = await goalsCollection.aggregate([
+    const rawGoals = await appData.aggregate([
+      {
+        $match: {
+          type: "goal",
+          userId,
+        },
+      },
       {
         $lookup: {
-          from: 'tasks',
-          localField: '_id',
-          foreignField: 'goalId',
-          as: 'tasks',
+          from: "appData",
+          let: { goal_id: "$_id", uid: "$userId" },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ["$type", "task"] },
+                    { $eq: ["$goalId", { $toString: "$$goal_id" }] },
+                    { $eq: ["$userId", "$$uid"] }
+                  ],
+                },
+              },
+            },
+          ],
+          as: "tasks",
         },
       },
       {
         $addFields: {
-          totalTasks: { $size: '$tasks' },
+          totalTasks: { $size: "$tasks" },
           completedTasks: {
             $size: {
               $filter: {
-                input: '$tasks',
-                as: 'task',
-                cond: { $eq: ['$$task.status', 'completed'] },
+                input: "$tasks",
+                as: "task",
+                cond: { $eq: ["$$task.status", "completed"] },
               },
             },
           },
-        },
-      },
-      {
-        $addFields: {
           progress: {
             $cond: [
-              { $eq: ['$totalTasks', 0] },
+              { $eq: [{ $size: "$tasks" }, 0] },
               0,
-              { $multiply: [{ $divide: ['$completedTasks', '$totalTasks'] }, 100] },
+              {
+                $multiply: [
+                  { $divide: [
+                    {
+                      $size: {
+                        $filter: {
+                          input: "$tasks",
+                          as: "task",
+                          cond: { $eq: ["$$task.status", "completed"] },
+                        },
+                      },
+                    },
+                    { $size: "$tasks" }
+                  ] },
+                  100,
+                ],
+              },
             ],
           },
         },
       },
       {
         $project: {
-          tasks: 0, // Aufgaben entfernen (Performance & RU-Schutz)
+          tasks: 0,
+          type: 0,
         },
       },
     ]).toArray();
 
     const goalsWithProgress: GoalWithProgress[] = rawGoals.map(goal => ({
-      _id: (goal._id as ObjectId).toString(),
+      _id: goal._id.toString(),
       title: goal.title,
       description: goal.description,
       createdAt: new Date(goal.createdAt).toISOString(),
       updatedAt: new Date(goal.updatedAt).toISOString(),
-      totalTasks: goal.totalTasks,
-      completedTasks: goal.completedTasks,
-      progress: goal.progress,
+      totalTasks: goal.totalTasks || 0,
+      completedTasks: goal.completedTasks || 0,
+      progress: goal.progress || 0,
       dueDate: goal.dueDate ? new Date(goal.dueDate).toISOString() : "",
       endDate: goal.endDate ? new Date(goal.endDate).toISOString() : "",
       startDate: goal.startDate ? new Date(goal.startDate).toISOString() : "",
@@ -84,9 +106,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       subGoals: goal.subGoals || [],
     }));
 
-    res.status(200).json({ goals: goalsWithProgress });
+    return res.status(200).json({ goals: goalsWithProgress });
   } catch (error) {
-    console.error('❌ Fehler bei getGoalsWithProgress:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    console.error("❌ Fehler bei getGoalsWithProgress:", error);
+    return res.status(500).json({ message: "Internal server error" });
   }
 }
