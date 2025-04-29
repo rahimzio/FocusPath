@@ -10,13 +10,38 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const { taskId, userId } = req.query;
+    console.log("📦 Eingehende Daten:", req.body);
 
     if (!taskId || typeof taskId !== "string" || !userId || typeof userId !== "string") {
       return res.status(400).json({ message: "Missing or invalid taskId or userId" });
     }
 
-    const updateFields = req.body as Partial<Omit<TaskDocument, "_id">>;
-    updateFields.updatedAt = new Date().toISOString();
+    const {
+      name,
+      description,
+      points,
+      color,
+      duration,
+      dueDate,
+      time,
+      frequency,
+      category,
+      timebased,
+    } = req.body;
+
+    const updateFields: Partial<TaskDocument> = {
+      name,
+      description,
+      points,
+      color,
+      duration,
+      dueDate,
+      time,
+      frequency,
+      category,
+      timebased,
+      updatedAt: new Date().toISOString(),
+    };
 
     const { db } = await connectToDatabase();
     const tasksColl = db.collection<TaskDocument>("appData");
@@ -31,7 +56,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     return res.status(200).json({ message: "Task updated successfully" });
-
   } catch (error) {
     console.error("❌ Error updating task:", error);
     return res.status(500).json({ message: "Internal server error" });

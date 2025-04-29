@@ -10,6 +10,7 @@ import { ObjectId } from "mongodb";
  * ------------------------------------- */
 
 export interface TaskDocument {
+  userId?:string;
   _id?: ObjectId;
   name: string;
   description: string;
@@ -33,6 +34,7 @@ export interface TaskDocument {
 }
 
 export interface GoalDocument {
+  userId?:string;
   _id: ObjectId;
   title: string;
   description: string;
@@ -54,6 +56,7 @@ export interface GoalDocument {
  * ------------------------------------- */
 
 export interface Task {
+  userId?:string;
   _id: string;
   id?: string;
   name: string;
@@ -86,6 +89,7 @@ export interface Task {
  * Hier kann _id ein string sein.
  */
 export interface Goal {
+  userId?:string;
   _id: string;
   title: string;
   description: string;
@@ -95,7 +99,8 @@ export interface Goal {
   createdAt: string;
   endDate: string;
   startDate: string;  
-  type: "daily" | "weekly" | "monthly" | "yearly";
+  type: "daily" | "weekly" | "monthly" | "yearly" |"none";
+  goalType: "daily" | "weekly" | "monthly" | "yearly"| "none";
   updatedAt: string;
   subGoals:Goal[];
   parentGoalId?: string;
@@ -121,6 +126,7 @@ export interface GoalWithProgress extends Goal {
 
 
 export interface CreateTaskBody {
+  userId?:string;
   name: string;
   description: string;
   points: number;
@@ -137,6 +143,7 @@ export interface CreateTaskBody {
   duration?:string; 
 }
 export interface SubTask {
+  userId?:string;
   _id?: string;
   name: string;
   description?: string;
@@ -155,4 +162,86 @@ export interface Completion {
   taskId: string;
   date: string;
   status: "completed" | "incomplete";
+}
+
+
+// frequencyProfile.ts
+
+export interface FrequencyProfile {
+  userId: string;
+  createdAt: string;
+  updatedAt?: string;
+
+  // 🧠 Mindset & Verhalten
+  responseToFailure: string; // z.B. "Ich nehme es als Lernmöglichkeit."
+  defaultReactionInStress: string; // z.B. "Ich atme tief durch und bleibe ruhig."
+
+  // ❤️ Emotionale Zielzustände
+  coreEmotions: string[]; // z.B. ["Dankbarkeit", "Freude"]
+  additionalEmotionNotes?: string;
+
+  // 🧭 Denkweise
+  viewOnChallenges: number; // Skala 1–5
+  decisionMakingStyle: number; // 1 = rational, 5 = intuitiv
+
+  // 💪 Selbstvertrauen & Überzeugung
+  selfBeliefLevel: number; // 1 = Ich zweifle stark, 5 = Ich weiß, dass ich alles schaffen kann
+  convictionStyle: string; // z. B. „Ich handle entschlossen, egal wie es aussieht von außen“
+
+  // 🌟 Vision & Idealzustand
+  idealDayDescription: string;
+  idealMorningRoutine?: string;
+  idealEveningRoutine?: string;
+
+  // 💃 Körpersprache / Auftreten
+  bodyLanguageTraits: string[]; // z.B. ["aufrecht", "ruhig", "kraftvoll"]
+
+  // 🧱 Werte
+  coreValues: string[]; // z.B. ["Klarheit", "Authentizität", "Liebe"]
+  customValues?: string[];
+
+  // 🧹 Schattenmuster
+  shadowPatterns: string[]; // z.B. ["Perfektionismus", "Vergleichen"]
+  forbiddenBehaviors: string[]; // Liste der Dinge, die der User vermeiden will
+
+  // ✨ Inspiration
+  inspirationPersona?: string; // z.B. "Zuko aus Avatar"
+  inspirationNotes?: string;
+
+
+}
+
+
+export type PostType = "update" | "survey" | "userTopic";
+export type Category = "Bug Report" | "Feature Wunsch" | "Allgemein";
+
+export interface CommunityPost {
+  _id: ObjectId;
+  title: string;
+  content: string;
+  createdAt: string;
+  createdBy: string; // E-Mail-Adresse
+  type: "update" | "survey" | "userTopic";
+  category?: "Bug Report" | "Feature Wunsch" | "Allgemein"; // Nur bei userTopics
+  comments?: Comment[]; // Nur bei userTopics
+}
+
+export interface Comment {
+  _id: ObjectId;
+  userId: string;
+  userEmail: string;
+  comment: string;
+  createdAt: string;
+  updatedAt?: string;
+  upvotes: string[]; // userIds
+  downvotes: string[]; // userIds
+}
+
+export interface Post {
+  id: string;
+  title: string;
+  content: string;
+  type: "update" | "survey" | "userTopic";
+  createdAt: string;
+  category?: string;
 }

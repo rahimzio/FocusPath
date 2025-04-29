@@ -6,6 +6,7 @@ type Props = {
   onClose: () => void;
   onDeleteInstance: () => void;
   onDeleteSeries: () => void;
+  userId:string;
 };
 
 export default function DeleteRecurringTaskDialog({
@@ -13,6 +14,7 @@ export default function DeleteRecurringTaskDialog({
   onClose,
   onDeleteInstance,
   onDeleteSeries,
+  userId
 }: Props) {
   return (
     <Dialog open={open} onOpenChange={onClose}>

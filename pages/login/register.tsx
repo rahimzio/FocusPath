@@ -1,15 +1,17 @@
-// pages/register.tsx
 "use client";
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import { toast } from "react-toastify";
+import { signIn } from "next-auth/react";
 
 export default function Register() {
   const router = useRouter();
   const [email, setEmail] = useState("");
+  const [userName, setuserName] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const savedEmail = localStorage.getItem("rememberedEmail");
@@ -17,25 +19,44 @@ export default function Register() {
     if (savedEmail && savedPassword) {
       setEmail(savedEmail);
       setPassword(savedPassword);
+      setuserName(userName);
       setRememberMe(true);
     }
   }, []);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-
+    setLoading(true);
+  
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      toast.error("Bitte gib eine gültige E-Mail-Adresse ein.");
+      setLoading(false);
+      return;
+    }
+  
     try {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password,userName  }),
       });
-
+  
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Registrierung fehlgeschlagen");
-
+  
+      if (!res.ok) {
+        if (data.message === "Benutzer existiert bereits.") {
+          toast.info("Benutzer existiert bereits. Bitte logge dich ein.");
+          setTimeout(() => {
+            router.push("/login");
+          }, 2000); // 2 Sekunden warten vor dem Redirect
+          return;
+        }
+        throw new Error(data.message || "Registrierung fehlgeschlagen");
+      }
+  
       toast.success("Registrierung erfolgreich!");
-
+  
       if (rememberMe) {
         localStorage.setItem("rememberedEmail", email);
         localStorage.setItem("rememberedPassword", password);
@@ -43,12 +64,26 @@ export default function Register() {
         localStorage.removeItem("rememberedEmail");
         localStorage.removeItem("rememberedPassword");
       }
-
-      router.push("/login");
+  
+      // Automatisch einloggen
+      const signInResult = await signIn("credentials", {
+        email,
+        password,
+        redirect: true,
+        callbackUrl: "/",
+      });
+  
+      if (!signInResult?.ok) {
+        toast.warn("Registriert, aber Login fehlgeschlagen. Bitte manuell einloggen.");
+        router.push("/login");
+      }
     } catch (err: any) {
       toast.error(err.message);
+    } finally {
+      setLoading(false);
     }
   };
+  
 
   return (
     <div className="max-w-md mx-auto mt-20 p-6 border rounded shadow bg-white text-black">
@@ -58,6 +93,14 @@ export default function Register() {
           type="email"
           placeholder="E-Mail"
           value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+          className="w-full p-2 border rounded"
+        />
+         <input
+          type="UserName"
+          placeholder="Benutzer Name"
+          value={userName}
           onChange={(e) => setEmail(e.target.value)}
           required
           className="w-full p-2 border rounded"
@@ -80,8 +123,12 @@ export default function Register() {
           Angemeldet bleiben
         </label>
 
-        <button type="submit" className="w-full p-2 bg-green-500 text-white rounded">
-          Registrieren
+        <button
+          type="submit"
+          className="w-full p-2 bg-green-500 text-white rounded disabled:opacity-50"
+          disabled={loading}
+        >
+          {loading ? "⏳ Registriere..." : "Registrieren"}
         </button>
       </form>
     </div>

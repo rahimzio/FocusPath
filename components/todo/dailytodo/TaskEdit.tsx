@@ -4,11 +4,12 @@ import { Task } from "@/utils/interface";
 
 interface Props {
   editedTask: Task | null;
+  userId:string;
   setEditedTask: (task: Task | null) => void;
   handleEditTask: (event: React.FormEvent) => void;
 }
 
-const TaskEditModal: React.FC<Props> = ({ editedTask, setEditedTask, handleEditTask }) => {
+const TaskEditModal: React.FC<Props> = ({ userId, editedTask, setEditedTask, handleEditTask }) => {
   if (!editedTask) return null;
 
   return (
@@ -27,7 +28,7 @@ const TaskEditModal: React.FC<Props> = ({ editedTask, setEditedTask, handleEditT
           required
         />
         <textarea
-          value={editedTask.description}
+          value={editedTask.description ?? ""}
           onChange={(e) => setEditedTask({ ...editedTask, description: e.target.value })}
           className="p-2 border border-gray-300 rounded-md w-full"
           placeholder="Beschreibung"

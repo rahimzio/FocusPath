@@ -4,15 +4,16 @@
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/router";
 import { useState, useEffect } from "react";
+import { toast } from "react-toastify";
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // Automatisch aus LocalStorage eintragen, falls vorhanden
     const savedEmail = localStorage.getItem("savedEmail");
     const savedPassword = localStorage.getItem("savedPassword");
     if (savedEmail && savedPassword) {
@@ -24,11 +25,15 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
+
     const result = await signIn("credentials", {
       redirect: false,
       email,
       password,
     });
+
+    setLoading(false);
 
     if (result?.ok) {
       if (rememberMe) {
@@ -40,47 +45,65 @@ export default function LoginPage() {
       }
       router.push("/");
     } else {
-      alert("Login fehlgeschlagen");
+      toast.error("Login fehlgeschlagen. Bitte überprüfe deine Eingaben.");
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <form onSubmit={handleSubmit} className="bg-white p-6 rounded shadow-md space-y-4 w-full max-w-sm">
-        <h2 className="text-xl font-semibold mb-2">Login</h2>
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="w-full p-2 border rounded"
-          required
-        />
-        <input
-          type="password"
-          placeholder="Passwort"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="w-full p-2 border rounded"
-          required
-        />
-        <div className="flex items-center gap-2">
+    <div className="w-screen h-screen overflow-hidden bg-gradient-to-br from-blue-50 via-white to-blue-100 flex items-center justify-center px-4">
+      <form
+        onSubmit={handleSubmit}
+        className="bg-white rounded-2xl shadow-xl p-8 space-y-6 w-full max-w-sm border border-gray-200"
+      >
+        <h2 className="text-2xl font-bold text-gray-800 text-center">Willkommen zurück 👋</h2>
+        <p className="text-center text-gray-500 text-sm">Melde dich an, um fortzufahren</p>
+
+        <div className="space-y-3 text-black">
           <input
-            type="checkbox"
-            checked={rememberMe}
-            onChange={(e) => setRememberMe(e.target.checked)}
+            type="email"
+            placeholder="E-Mail"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            className="w-full px-4 text-black py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
           />
-          <label>Angemeldet bleiben</label>
+          <input
+            type="password"
+            placeholder="Passwort"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            className="w-full px-4 text-black py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+          />
         </div>
+
+        <div className="flex items-center justify-between text-sm">
+          <label className="flex items-center gap-2 text-gray-600">
+            <input
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              className="accent-blue-500"
+            />
+            Angemeldet bleiben
+          </label>
+          <a href="#" className="text-blue-500 hover:underline">Passwort vergessen?</a>
+        </div>
+
         <button
           type="submit"
-          className="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded"
+          className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition disabled:opacity-50"
+          disabled={loading}
         >
-          Login
+          {loading ? "Lade..." : "Einloggen"}
         </button>
-        <p className="text-sm mt-2">
-          Noch kein Account? <a className="text-blue-600" href="/auth/register">Jetzt registrieren</a>
-        </p>
+
+        <div className="text-center text-sm text-gray-600 mt-2">
+          Noch kein Account?{" "}
+          <a href="/login/register" className="text-blue-600 hover:underline">
+            Jetzt registrieren
+          </a>
+        </div>
       </form>
     </div>
   );

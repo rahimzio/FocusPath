@@ -54,7 +54,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       type: "task",
       userId,
       name,
-      description,
+      description: description || "",
       points,
       status: status || "incomplete",
       dueDate,

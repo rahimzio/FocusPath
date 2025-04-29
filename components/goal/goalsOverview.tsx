@@ -5,7 +5,7 @@ import NewGoalForm from "./createGoal";
 const goalOverview = () => {
   return (
    <div>
-    <GoalManager></GoalManager>
+   <GoalManager></GoalManager>
     <NewGoalForm></NewGoalForm>
     </div>
   );

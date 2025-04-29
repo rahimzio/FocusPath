@@ -1,3 +1,5 @@
+// 📁 pages/api/goals/createGoals.ts
+
 import { NextApiRequest, NextApiResponse } from "next";
 import { connectToDatabase } from "../db/mongo";
 import { ObjectId } from "mongodb";
@@ -13,6 +15,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({
       message: "Missing required fields: 'title', 'type', 'startDate', 'endDate', or 'userId'.",
     });
+  }
+
+  // 🧩 Optionale Validierung der Tasks
+  if (!Array.isArray(tasks)) {
+    return res.status(400).json({ message: "Tasks müssen ein Array sein." });
+  }
+
+  // Optional: Task-Feldprüfung
+  for (const task of tasks) {
+    if (!task.name || typeof task.name !== "string") {
+      return res.status(400).json({ message: "Jede Aufgabe benötigt einen gültigen Namen." });
+    }
   }
 
   try {
@@ -67,10 +81,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       );
     }
 
-    console.log(`✅ Neues Ziel erstellt: ${goalId}`);
-    return res.status(201).json({ message: "Ziel erfolgreich erstellt", goalId: goalId.toHexString() });
-  } catch (error) {
+    console.log(`✅ Ziel erstellt (ID: ${goalId}) mit ${preparedTasks.length} Aufgaben.`);
+
+    return res.status(201).json({
+      message: "Ziel erfolgreich erstellt",
+      goalId: goalId.toHexString(),
+    });
+
+  } catch (error: any) {
     console.error("❌ Fehler beim Erstellen des Ziels:", error);
-    return res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({
+      message: "Internal server error",
+      error: error.message || error.toString(),
+    });
   }
 }

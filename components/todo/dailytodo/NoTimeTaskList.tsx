@@ -19,7 +19,10 @@ const NoTimeTaskList: React.FC<NoTimeTaskListProps> = ({
   openEditDialog,
   confirmDelete,
 }) => {
-  const filteredTasks = tasks.filter((task) => !task.timebased);
+  // 🔹 Zeitlose Aufgaben filtern und nach Punkten sortieren (höchste zuerst)
+  const filteredTasks = tasks
+    .filter((task) => !task.timebased)
+    .sort((a, b) => (b.points || 0) - (a.points || 0)); // fallback: 0 wenn undefined
 
   return (
     <div className="bg-gray-100 p-4 rounded-lg shadow-md mb-10 text-black">

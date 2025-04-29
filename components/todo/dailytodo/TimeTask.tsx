@@ -3,7 +3,7 @@
 import React from "react";
 import { Task } from "@/utils/interface";
 import { FaCheckCircle } from "react-icons/fa";
-import { getEndTime, getHeightFromDuration } from "@/utils/todo/helper";
+import { getEndTime,getHeightFromDuration } from "@/utils/todo/taskUtils";
 interface Props {
   tasks: Task[];
   selectedDate: string;

@@ -13,6 +13,7 @@ import {
 import { v4 as uuidv4 } from "uuid"; // Für die Erzeugung eindeutiger IDs
 type Props = {
   onTaskCreated?: (newTask: Task) => Promise<void>;
+  userId:string;
 };
 // Beispiel: Vordefinierte Goals
 const predefinedGoals: Goal[] = [
@@ -46,13 +47,14 @@ const predefinedGoals: Goal[] = [
   // ... weitere Ziele
 ];
 
-export default function SheetWithCreateTask({ onTaskCreated }: Props) {
+export default function SheetWithCreateTask({ userId, onTaskCreated }: Props) {
   // Hauptaufgaben-Objekt (ohne _id und subTasks)
   const [task, setTask] = useState<Omit<Task, "_id" | "subTasks">>({
+    userId:userId,
     id: "",
     name: "",
     description: "",
-    points: 0,
+    points: 1,
     status: "incomplete",
     dueDate: "",
     frequency: "daily",
@@ -65,7 +67,7 @@ export default function SheetWithCreateTask({ onTaskCreated }: Props) {
     progress: 0,
     duration: "",
   });
-
+ 
   // Subtasks-Array
   const [subTasks, setSubTasks] = useState<SubTask[]>([]);
 
@@ -130,10 +132,11 @@ export default function SheetWithCreateTask({ onTaskCreated }: Props) {
 
       // Formular zurücksetzen
       setTask({
+        userId:userId,
         id: "",
         name: "",
         description: "",
-        points: 0,
+        points: 1,
         status: "incomplete",
         dueDate: "",
         frequency: "daily",
@@ -251,6 +254,8 @@ export default function SheetWithCreateTask({ onTaskCreated }: Props) {
                 name="points"
                 value={task.points}
                 onChange={handleChange}
+                min={1}
+                max={10}
                 required
                 className="mt-1 block w-full rounded-md border-gray-300"
               />

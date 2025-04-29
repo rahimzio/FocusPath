@@ -13,7 +13,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!taskId || typeof taskId !== "string" || !userId || typeof userId !== "string") {
       return res.status(400).json({ message: "Missing or invalid taskId or userId" });
     }
-
+    console.log("taskId:",taskId,"userId;",userId)
     const { db } = await connectToDatabase();
     const appData = db.collection("appData");
 

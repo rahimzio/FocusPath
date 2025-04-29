@@ -13,11 +13,13 @@ interface Props {
   setIsOpen: (open: boolean) => void;
   setEditedGoal: (goal: GoalWithProgress | null) => void;
   handleEditGoal: (event: React.FormEvent) => Promise<void>;
+  userId:string;
 }
 
 const GoalEditModal: React.FC<Props> = ({
   editedGoal,
   isOpen,
+  userId,
   setIsOpen,
   setEditedGoal,
   handleEditGoal,

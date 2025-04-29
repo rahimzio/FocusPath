@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import { connectToDatabase } from "../db/mongo";
 import { Task, Completion } from "@/utils/interface";
+import { Description } from "@radix-ui/react-dialog";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "GET") {
@@ -28,8 +29,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       { type: "task", userId },
       {
         projection: {
+          userId:1,
           _id: 1,
           name: 1,
+          description: 1,
           points: 1,
           dueDate: 1,
           frequency: 1,

@@ -23,7 +23,7 @@ function AppContent({ Component, pageProps }: AppProps) {
 
       <AuthWrapper>
         <main className="Main">
-          <Component {...pageProps} />
+          <Component {...pageProps} className="px-5"/>
           <ToastContainer position="top-right" autoClose={5000} theme="colored" />
         </main>
       </AuthWrapper>
@@ -31,12 +31,15 @@ function AppContent({ Component, pageProps }: AppProps) {
   );
 }
 
-function MyApp({ Component, pageProps }: AppProps) {
+
+function MyApp(appProps: AppProps) {
   return (
-    <SessionProvider session={pageProps.session}>
-       <Component {...pageProps} />
+    <SessionProvider session={appProps.pageProps.session}>
+      <AppContent {...appProps} />
     </SessionProvider>
   );
 }
+
+
 
 export default MyApp;

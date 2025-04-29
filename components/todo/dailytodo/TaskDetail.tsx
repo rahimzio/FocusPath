@@ -17,9 +17,11 @@ interface Props {
     date: string,
     checked: boolean
   ) => void;
+  userId:string;
 }
 
 const TaskDetailModal: React.FC<Props> = ({
+  userId,
   selectedTask,
   setSelectedTask,
   selectedDate,
@@ -40,9 +42,11 @@ const TaskDetailModal: React.FC<Props> = ({
         </DialogHeader>
 
         <div className="space-y-2 mt-4">
-          <p>{selectedTask.description}</p>
           <p>
             <span className="font-semibold">Punkte:</span> {selectedTask.points}
+          </p>
+          <p>
+            <span className="font-semibold">beschreibung:</span> {selectedTask.description}
           </p>
           <p>
             <span className="font-semibold">Status:</span> {selectedTask.status}
