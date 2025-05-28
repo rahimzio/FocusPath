@@ -5,6 +5,7 @@ import DailyTaskList from "@/components/dailyTodos";
 import { useSession, signIn } from "next-auth/react";
 import { useRouter } from "next/router";
 import { AppSidebar } from "@/components/app-sidebar";
+import AppLayout from "./AppLayout";
 
 export default function Home() {
   const { data: session, status } = useSession();
@@ -49,8 +50,7 @@ export default function Home() {
   }
 
   return (
-    <div>
+    
       <DailyTaskList />
-    </div>
   );
 }

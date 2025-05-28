@@ -101,7 +101,7 @@ export default function Register() {
           type="UserName"
           placeholder="Benutzer Name"
           value={userName}
-          onChange={(e) => setEmail(e.target.value)}
+          onChange={(e) => setuserName(e.target.value)}
           required
           className="w-full p-2 border rounded"
         />

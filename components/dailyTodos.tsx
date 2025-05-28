@@ -11,13 +11,12 @@ import {
 } from "@/components/ui/dialog";
 import Calendar from "react-calendar";
 import { Value } from "react-calendar/dist/esm/shared/types.js";
-import { FaCheckCircle, FaEdit } from "react-icons/fa";
+import { FaCalendarAlt, FaCheckCircle, FaEdit } from "react-icons/fa";
 import { toast } from "react-toastify";
 import ProgressBar from "./todo/ProgressBar";
 import DeleteRecurringTaskDialog from "./todo/DeleteRecurringTask";
 import CalendarSelector from "./todo/dailytodo/CalenderSelector";
 import NoTimeTaskList from "./todo/dailytodo/NoTimeTaskList";
-import TimeTaskList from "./todo/dailytodo/TimeTaskOrder";
 import { checkOverlappingTasks, convertToMinutes, deleteEntireSeries, getEndTime, getHeightFromDuration, handleCheckTask as handleCheckTaskExternal } from "@/utils/todo/taskUtils";
 import TaskListTimeBased from "./todo/dailytodo/TimeTaskOrder";
 import TaskDetailModal from "./todo/dailytodo/TaskDetail";
@@ -28,14 +27,13 @@ import { handleCheckSubTask as handleCheckSubTaskExternal, useSubtaskCompletion 
 import { getSession } from "next-auth/react";
 
 function formatDate(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return local.toISOString().split("T")[0];
 }
 
+
 const DailyTaskList = () => {
-  const [userId, setUserId] = useState<string>("");
+  const [userId, setUserId] = useState("");
   const [tasks, setTasks] = useState<Task[]>([]);
   const [goals, setGoals] = useState<GoalWithProgress[]>([]);
   const [showCalendar, setShowCalendar] = useState(false);
@@ -49,36 +47,23 @@ const DailyTaskList = () => {
   const [dayScore, setDayScore] = useState<string>("-");
 
   useEffect(() => {
-    const fetchUserId = async () => {
-      const session = await getSession();
-      if (session?.user?.id) {
-        setUserId(session.user.id);
-      } else {
-        console.warn("⚠️ Keine Benutzer-Session vorhanden");
-      }
-    };
-    fetchUserId();
+    getSession().then((session) => {
+      if (session?.user?.id) setUserId(session.user.id);
+      else toast.error("Fehlende Benutzer-Session.");
+    });
   }, []);
 
-  async function fetchTasks(dateParam?: string): Promise<void> {
+  async function fetchTasks(dateParam?: string) {
     const dateToUse = dateParam || formatDate(new Date());
-    if (!userId) {
-      console.warn("⚠️ Kein userId vorhanden!");
-      toast.error("Fehlende Benutzer-Session.");
-      return;
-    }
-
+    if (!userId) return;
     try {
       const response = await fetch(`/api/task/getTasks?date=${dateToUse}&userId=${userId}`);
-      if (!response.ok) throw new Error(await response.text());
-
       const data = await response.json();
       const allTasks = [...data.groupedTasks.goalTasks, ...data.groupedTasks.otherTasks];
       setTasks(allTasks);
       setDayScore(calculateDayScore(allTasks, goals));
     } catch (error) {
-      console.error("Fehler beim Abrufen der Aufgaben:", error);
-      toast.error("Fehler beim Abrufen der Aufgaben.");
+      toast.error("Fehler beim Laden der Aufgaben.");
     }
   }
 
@@ -89,78 +74,54 @@ const DailyTaskList = () => {
     if (userId) fetchTasks(selectedDate);
   }, [selectedDate, userId]);
 
-  async function handleEditTask(e: React.FormEvent) {
-    e.preventDefault();
-    if (!editedTask || !editedTask._id) return toast.error("Keine Aufgabe ausgewählt zum Bearbeiten.");
-
-    try {
-      const response = await fetch(`/api/task/updateTask?taskId=${editedTask._id}&userId=${userId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(editedTask)
-      });
-
-      if (!response.ok) throw new Error(await response.text());
-      setEditedTask(null); setSelectedTask(null);
-      await fetchTasks(selectedDate);
-      toast.success("Aufgabe erfolgreich bearbeitet!");
-    } catch (error) {
-      console.error("Fehler beim Bearbeiten:", error);
-      toast.error("Ein unerwarteter Fehler ist aufgetreten.");
-    }
-  }
-
-
   function openTaskDetails(task: Task) { setSelectedTask(task); }
   function openEditDialog(task: Task) { setEditedTask(task); }
 
-  async function handleEditGoal(event: React.FormEvent) {
-    event.preventDefault();
-    if (!editedGoal || !editedGoal._id) {
-      console.error("Kein Ziel ausgewählt");
-      toast.error("Kein Ziel ausgewählt zum Bearbeiten.");
-      return;
-    }
-    console.log("handleEditGoal aufgerufen mit:", editedGoal);
-    try {
-      const response = await fetch(`/api/goal/updateGoal?goalId=${editedGoal._id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: editedGoal.title, description: editedGoal.description }),
-      });
-      if (!response.ok) {
-        const errorMessage = await response.text();
-        console.error("Fehler beim Bearbeiten des Ziels:", errorMessage);
-        toast.error("Fehler beim Bearbeiten des Ziels.");
-        return;
-      }
-      setEditedGoal(null);
-      setIsGoalEditDialogOpen(false);
-      toast.success("Ziel erfolgreich bearbeitet!");
-    } catch (error) {
-      console.error("Fehler beim Bearbeiten des Ziels:", error);
-      toast.error("Ein unerwarteter Fehler ist aufgetreten.");
-    }
+  async function handleEditTask(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editedTask) return;
+    await fetch(`/api/task/updateTask?taskId=${editedTask._id}&userId=${userId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(editedTask),
+    });
+    setEditedTask(null);
+    setSelectedTask(null);
+    await fetchTasks(selectedDate);
+    toast.success("Aufgabe aktualisiert.");
+  }
+
+  async function handleEditGoal(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editedGoal) return;
+    await fetch(`/api/goal/updateGoal?goalId=${editedGoal._id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: editedGoal.title, description: editedGoal.description }),
+    });
+    setEditedGoal(null);
+    setIsGoalEditDialogOpen(false);
+    toast.success("Ziel aktualisiert.");
   }
 
   function renderGoalsWithProgress() {
-    if (goals.length === 0) return <p className="text-gray-600">Keine Ziele vorhanden.</p>;
+    if (!goals.length) return null;
     return (
-      <div className="bg-green-100 p-4 rounded-lg shadow-md mb-10 text-black">
-        <h2 className="text-xl font-semibold mb-4 text-gray-700">Ziele mit Fortschritt</h2>
-        <div className="space-y-4 overflow-y-auto max-h-[400px]">
+      <div className="bg-white rounded-xl shadow p-4 mb-6">
+        <h2 className="text-lg font-semibold text-[#1c1c1e] mb-3">🎯 Deine Ziele</h2>
+        <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
           {goals.map((goal) => (
-            <div key={goal._id} className="p-3 border rounded-lg bg-white">
-              <div className="flex justify-between items-center">
-                <h3 className="font-semibold text-lg">{goal.title}</h3>
-                <button onClick={() => { setEditedGoal(goal); setIsGoalEditDialogOpen(true); }} className="text-blue-500 hover:text-blue-700">
+            <div key={goal._id} className="p-3 rounded-lg border border-[#e5e5ea]">
+              <div className="flex justify-between items-center mb-1">
+                <h3 className="font-medium text-[#1c1c1e]">{goal.title}</h3>
+                <button onClick={() => { setEditedGoal(goal); setIsGoalEditDialogOpen(true); }} className="text-[#007AFF] hover:underline text-sm">
                   <FaEdit />
                 </button>
               </div>
-              <p className="text-gray-600 mb-2">{goal.description}</p>
+              <p className="text-sm text-gray-500 mb-2">{goal.description}</p>
               <ProgressBar progress={goal.progress} />
-              <p className="mt-1 text-sm text-gray-700">
-                {goal.completedTasks} von {goal.totalTasks} Aufgaben abgeschlossen ({goal.progress}%)
+              <p className="text-xs text-gray-600 mt-1">
+                {goal.completedTasks} von {goal.totalTasks} abgeschlossen ({goal.progress}%)
               </p>
             </div>
           ))}
@@ -188,36 +149,61 @@ const DailyTaskList = () => {
   function calculateDayScore(tasks: Task[], goals: GoalWithProgress[]): string {
     const total = tasks.length;
     const completed = tasks.filter(t => t.status === "completed").length;
-    const percent = total === 0 ? 0 : (completed / total) * 100;
+    const percent = tasks.length ? (completed / tasks.length) * 100 : 0;
     const allGoalTasksDone = tasks.filter(t => t.goalId).every(t => t.status === "completed");
     const allImportantDone = tasks.filter(t => t.points && t.points > 7).every(t => t.status === "completed");
-
     if (percent === 100) return "W+ Day";
     if (percent >= 85 && allGoalTasksDone && allImportantDone) return "W Day";
     if (percent >= 50) return "M Day";
-    if (percent < 50) return "L Day";
-    return "-";
+    return "L Day";
   }
 
-
-  // ------------------------------------------------
-  // RENDER
-  // ------------------------------------------------
   return (
-    <div className="space-y-6 p-px">
-      <div>
-        <CalendarSelector
-          selectedDate={selectedDate}
-          setSelectedDate={setSelectedDate}
-          showCalendar={showCalendar}
-          setShowCalendar={setShowCalendar}
-          tasks={tasks}
-          formatDate={formatDate}
-        />
-        <p className="text-xl font-bold text-center text-yellow-600">
-          🏅 Heute ist ein <span className="underline">{dayScore}</span>
-        </p>
+    <div className="space-y-6 px-4 sm:px-6 md:px-8 pt-4 pb-8 overflow-x-hidden">
+      <div className="flex items-center justify-between bg-white border border-[#e5e5ea] rounded-xl px-4 py-3 shadow hover:shadow-md cursor-pointer transition" onClick={() => setShowCalendar(!showCalendar)}>
+        <div className="flex items-center gap-2 text-sm font-medium text-[#1c1c1e]">
+          <FaCalendarAlt className="text-[#007AFF]" />
+          {selectedDate ? new Date(selectedDate).toLocaleDateString("de-DE") : "Heute"}
+        </div>
+        {selectedDate !== formatDate(new Date()) && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setSelectedDate(formatDate(new Date()));
+            }}
+            className="text-xs bg-[#34C759] text-white px-3 py-1 rounded hover:brightness-110"
+          >
+            Heute
+          </button>
+        )}
       </div>
+
+      {showCalendar && (
+        <div className="bg-white p-3 rounded-xl shadow">
+          <Calendar
+            onChange={(value) => {
+              if (value instanceof Date) {
+                const formattedDate = formatDate(value);
+                setSelectedDate(formattedDate);
+                setShowCalendar(false);
+              }
+            }}
+            value={new Date(selectedDate)}
+            tileClassName={({ date, view }) => {
+              if (view === "month") {
+                const formattedDate = formatDate(date);
+                const hasTasks = tasks.some((task) => task.dueDate === formattedDate);
+                return hasTasks ? "bg-blue-100 text-black rounded-full" : undefined;
+              }
+              return undefined;
+            }}
+          />
+        </div>
+      )}
+
+      <p className="text-center text-sm text-[#20253b] font-medium rounded-xl shadow border-[#e5e5ea] font-wweight-600 py-2">
+         Bisheriges Tages Rating <span className="underline">{dayScore}</span>
+      </p>
 
       {renderGoalsWithProgress()}
 
@@ -232,6 +218,15 @@ const DailyTaskList = () => {
         confirmDelete={confirmDelete}
       />
 
+
+
+      <TaskDetailModal
+        userId={userId}
+        selectedTask={selectedTask}
+        setSelectedTask={setSelectedTask}
+        selectedDate={selectedDate}
+        handleCheckSubTask={handleCheckSubTask}
+      />
       <TaskListTimeBased
         UserId={userId}
         tasks={tasks}
@@ -248,15 +243,6 @@ const DailyTaskList = () => {
         convertToMinutes={convertToMinutes}
         checkOverlappingTasks={checkOverlappingTasks}
       />
-
-      <TaskDetailModal
-        userId={userId}
-        selectedTask={selectedTask}
-        setSelectedTask={setSelectedTask}
-        selectedDate={selectedDate}
-        handleCheckSubTask={handleCheckSubTask}
-      />
-
       <TaskEditModal
         userId={userId}
         editedTask={editedTask}
@@ -278,9 +264,7 @@ const DailyTaskList = () => {
         open={deleteDialogOpen}
         onClose={() => setDeleteDialogOpen(false)}
         onDeleteSeries={() => {
-          if (taskToDelete) {
-            handleDeleteSeries(userId, taskToDelete._id, fetchTasks, selectedDate, setDeleteDialogOpen);
-          }
+          if (taskToDelete) handleDeleteSeries(userId, taskToDelete._id, fetchTasks, selectedDate, setDeleteDialogOpen);
         }}
         onDeleteInstance={() => {
           if (taskToDelete) {
@@ -291,19 +275,9 @@ const DailyTaskList = () => {
         }}
       />
 
-
-
-
-
-      {userId && (
-        <SheetWithCreateTask userId={userId} onTaskCreated={handleTaskCreated} />
-      )}
+      {userId && <SheetWithCreateTask userId={userId} onTaskCreated={handleTaskCreated} />}
     </div>
   );
 };
 
 export default DailyTaskList;
-function updatedTaskFromServer(tasks: Task[], _id: string) {
-  throw new Error("Function not implemented.");
-}
-

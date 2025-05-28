@@ -6,6 +6,9 @@ import { toast } from "react-toastify";
  * Konvertiert eine Dauer (HH:MM) in eine visuelle Höhe (z. B. für Kalenderansicht)
  */
 export function getHeightFromDuration(duration: string): number {
+  if (!duration || !duration.includes(":")) {
+    duration = "00:15"; // fallback auf 15 Minuten
+  }
   const [hoursStr, minutesStr] = duration.split(":");
   const hours = parseInt(hoursStr || "0", 10);
   const minutes = parseInt(minutesStr || "0", 10);
@@ -17,29 +20,32 @@ export function getHeightFromDuration(duration: string): number {
   return minHeight + scale * (maxHeight - minHeight);
 }
 
+
 /**
  * Gibt das Endzeitformat basierend auf Startzeit + Dauer zurück
  */
 export function getEndTime(start: string, duration: string): string {
-  const [sh, sm] = start.split(":").map(Number);
-  const [dh, dm] = duration.split(":").map(Number);
-  const startDate = new Date();
-  startDate.setHours(sh, sm, 0, 0);
-  const endDate = new Date(startDate);
-  endDate.setHours(endDate.getHours() + dh);
-  endDate.setMinutes(endDate.getMinutes() + dm);
-  return `${endDate.getHours().toString().padStart(2, "0")}:${endDate.getMinutes().toString().padStart(2, "0")}`;
+  const startMinutes = convertToMinutes(start);
+const durationMinutes = convertToMinutes(duration || "00:15");
+  const totalMinutes = startMinutes + durationMinutes;
+  const hours = Math.floor(totalMinutes / 60).toString().padStart(2, "0");
+  const minutes = (totalMinutes % 60).toString().padStart(2, "0");
+  return `${hours}:${minutes}`;
 }
 
 /**
  * Wandelt Uhrzeit in Minuten um
  */
 
-export function convertToMinutes(time: string | null | undefined): number {
-  if (!time || typeof time !== "string") return 0;
-  const [hour, minute] = time.split(":").map(Number);
-  return hour * 60 + minute;
+export function convertToMinutes(time: string | undefined | null): number {
+  if (!time || typeof time !== "string" || !time.includes(":")) return 0;
+  const [h, m] = time.split(":");
+  const hours = parseInt(h, 10);
+  const minutes = parseInt(m, 10);
+  if (isNaN(hours) || isNaN(minutes)) return 0;
+  return hours * 60 + minutes;
 }
+
 
 
 /**
