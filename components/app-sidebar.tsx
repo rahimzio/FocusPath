@@ -27,7 +27,7 @@ const defaultItems = [
   { title: "Home", url: "/", icon: Home },
   { title: "Finanzen", url: "/overview/finance", icon: Calendar },
   { title: "Community", url: "/overview/community", icon: Inbox },
-  { title: "Settings", url: "/overview/Settings", icon: Settings },
+  { title: "Settings", url: "/Settings", icon: Settings },
 ];
 
 const defaultItemsOriginal = [
