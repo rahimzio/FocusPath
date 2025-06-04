@@ -61,7 +61,8 @@ const NewGoalForm: React.FC<Props> = ({ onGoalCreated }) => {
           goalType: type,
           tasks: [],
           subGoals: [],
-          type: "daily"
+          type: "daily",
+          completedAt: ""
         });
 
         // Felder leeren
@@ -132,6 +133,7 @@ const NewGoalForm: React.FC<Props> = ({ onGoalCreated }) => {
       <div className="mb-4">
         <label htmlFor="type" className="block text-sm font-medium text-gray-800 mb-1">Typ</label>
         <select id="type" className="w-full border border-gray-300 rounded p-2 bg-white text-black" value={type} onChange={(e) => setType(e.target.value as typeof type)}>
+          <option value="once">Einmalig</option>
           <option value="daily">Täglich</option>
           <option value="weekly">Wöchentlich</option>
           <option value="monthly">Monatlich</option>

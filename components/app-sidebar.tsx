@@ -25,7 +25,8 @@ import { useEffect, useState, Dispatch, SetStateAction } from "react";
 
 const defaultItems = [
   { title: "Home", url: "/", icon: Home },
-  { title: "Finanzen", url: "/overview/finance", icon: Calendar },
+  { title: "Goals", url: "/overview/goals", icon: Calendar },
+  { title: "stats", url: "/overview/stats", icon: Calendar },
   { title: "Community", url: "/overview/community", icon: Inbox },
   { title: "Settings", url: "/Settings", icon: Settings },
 ];

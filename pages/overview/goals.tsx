@@ -1,19 +1,19 @@
-// pages/finance.tsx
+// pages/Goal.tsx
 import dynamic from "next/dynamic";
 import React from "react";
 
-const GoalsOverview = dynamic(
-  () => import("@/components/goal/goalsOverview"),
+const GoalOverviewDashboard = dynamic(
+  () => import("@/components/goal/GoalOverviewDashboard"),
   {
     loading: () => <p>Loading...</p>,
-    ssr: false, // Optional: Deaktiviert die serverseitige Darstellung
+    ssr: false,
   }
 );
 
-const FinancePage = () => (
+const GoalPage = () => (
   <React.Suspense fallback={<div>Loading...</div>}>
-    <GoalsOverview />
+    <GoalOverviewDashboard />
   </React.Suspense>
 );
 
-export default FinancePage;
+export default GoalPage;

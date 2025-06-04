@@ -25,6 +25,7 @@
     "chart.js": "^4.4.6",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
+    "date-fns": "^4.1.0",
     "dotenv": "^16.4.7",
     "lucide-react": "^0.454.0",
     "mongodb": "^5.9.2",
@@ -48,6 +49,7 @@
     "victory": "^37.3.2"
   },
   "devDependencies": {
+    "@types/date-fns": "^2.6.3",
     "@types/mongodb": "^4.0.6",
     "@types/next": "^8.0.7",
     "@types/node": "^20",

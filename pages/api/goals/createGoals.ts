@@ -9,9 +9,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ message: "Method not allowed. Use POST." });
   }
 
-  const { title, description, type, startDate, endDate, tasks = [], userId } = req.body;
+  const { title, description, goalType, startDate, endDate, tasks = [], userId } = req.body;
 
-  if (!title || !type || !startDate || !endDate || !userId) {
+  if (!title || !goalType || !startDate || !endDate || !userId) {
     return res.status(400).json({
       message: "Missing required fields: 'title', 'type', 'startDate', 'endDate', or 'userId'.",
     });

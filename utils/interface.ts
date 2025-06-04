@@ -99,8 +99,9 @@ export interface Goal {
   createdAt: string;
   endDate: string;
   startDate: string;  
-  type: "daily" | "weekly" | "monthly" | "yearly" |"none";
-  goalType: "daily" | "weekly" | "monthly" | "yearly"| "none";
+  type: "once"|"daily" | "weekly" | "monthly" | "yearly" |"none";
+  goalType: "once"|"daily" | "weekly" | "monthly" | "yearly"| "none";
+  completedAt?:string;
   updatedAt: string;
   subGoals:Goal[];
   parentGoalId?: string;
