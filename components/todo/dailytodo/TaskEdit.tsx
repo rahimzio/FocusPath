@@ -14,7 +14,7 @@ const TaskEditModal: React.FC<Props> = ({ userId, editedTask, setEditedTask, han
 
   return (
     <Dialog open={!!editedTask} onOpenChange={(open) => setEditedTask(open ? editedTask : null)}>
-      <DialogContent className="text-white bg-neutral-900">
+      <DialogContent className="text-white bg-neutral-900 max-h-[90vh] overflow-y-auto sm:w-[90vw] md:w-[600px]">
         <DialogHeader>
           <DialogTitle className="text-white">Aufgabe bearbeiten</DialogTitle>
         </DialogHeader>

@@ -27,7 +27,7 @@ const CommunityOverviews = () => {
   const isAdmin = session?.user?.email === "Rahimzio@gmail.com";
 
   return (
-    <div className="p-6">
+    <div className="bg-white text-black p-4 rounded-lg shadow">
       <h1 className="text-2xl font-bold mb-6">Community</h1>
       <Tabs defaultValue="updates" className="w-full">
         <TabsList className="grid w-full grid-cols-2 mb-4">
@@ -36,9 +36,10 @@ const CommunityOverviews = () => {
         </TabsList>
 
         <TabsContent value="updates">
-          <div className="flex justify-end mb-4">
-            {isAdmin && <CreatePostModal onPostCreated={fetchPosts} />}
+          <div className={`mb-4 flex ${isAdmin ? "justify-end" : "justify-center"}`}>
+            <CreateUserTopicModal onPostCreated={fetchPosts} />
           </div>
+
           <PostList posts={posts.filter(post => post.type === "update" || post.type === "survey")} />
         </TabsContent>
 

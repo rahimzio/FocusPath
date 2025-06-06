@@ -2,6 +2,12 @@ import React, { useEffect, useState } from "react";
 import { CreateTaskBody, Goal } from "@/utils/interface";
 import { getSession } from "next-auth/react";
 
+interface SubGoalInput {
+  title: string;
+  startDate: string;
+  endDate: string;
+}
+
 interface Props {
   onGoalCreated: (goal: Goal) => void;
 }
@@ -14,12 +20,18 @@ const NewGoalForm: React.FC<Props> = ({ onGoalCreated }) => {
   const [endDate, setEndDate] = useState('');
   const [type, setType] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>('monthly');
   const [tasks, setTasks] = useState<CreateTaskBody[]>([]);
+  const [subGoals, setSubGoals] = useState<SubGoalInput[]>([]);
+  const [parentGoalId, setParentGoalId] = useState<string>('');
+  const [allGoals, setAllGoals] = useState<Goal[]>([]);
 
   useEffect(() => {
     const fetchUserId = async () => {
       const session = await getSession();
       if (session?.user?.id) {
         setUserId(session.user.id);
+        const res = await fetch(`/api/goals/getGoals?userId=${session.user.id}`);
+        const data = await res.json();
+        setAllGoals(data.goals || []);
       } else {
         console.warn("⚠️ Keine Benutzer-Session vorhanden");
       }
@@ -34,7 +46,7 @@ const NewGoalForm: React.FC<Props> = ({ onGoalCreated }) => {
       return;
     }
 
-    const newGoal = { title, description, startDate, endDate, goalType: type, tasks, userId };
+    const newGoal = { title, description, startDate, endDate, goalType: type, tasks, userId, subGoals, parentGoalId };
 
     try {
       const response = await fetch('/api/goals/createGoals', {
@@ -47,7 +59,6 @@ const NewGoalForm: React.FC<Props> = ({ onGoalCreated }) => {
         const data = await response.json();
         alert('Ziel erfolgreich erstellt!');
 
-        // ✅ Neues Ziel an Parent-Komponente übergeben
         onGoalCreated({
           _id: data.goalId,
           userId,
@@ -65,13 +76,14 @@ const NewGoalForm: React.FC<Props> = ({ onGoalCreated }) => {
           completedAt: ""
         });
 
-        // Felder leeren
         setTitle('');
         setDescription('');
         setStartDate('');
         setEndDate('');
         setType('monthly');
         setTasks([]);
+        setSubGoals([]);
+        setParentGoalId('');
       } else {
         const errorData = await response.json();
         alert(`Fehler beim Erstellen des Ziels: ${errorData.message}`);
@@ -83,16 +95,7 @@ const NewGoalForm: React.FC<Props> = ({ onGoalCreated }) => {
 
   const handleAddTask = () => {
     setTasks([...tasks, {
-      name: '',
-      description: '',
-      points: 0,
-      dueDate: '',
-      frequency: 'once',
-      category: '',
-      timebased: false,
-      time: '',
-      color: '',
-      duration: '',
+      name: '', description: '', points: 0, dueDate: '', frequency: 'once', category: '', timebased: false, time: '', color: '', duration: '',
     }]);
   };
 
@@ -104,6 +107,16 @@ const NewGoalForm: React.FC<Props> = ({ onGoalCreated }) => {
 
   const handleRemoveTask = (index: number) => {
     setTasks(tasks.filter((_, i) => i !== index));
+  };
+
+  const handleAddSubGoal = () => {
+    setSubGoals([...subGoals, { title: '', startDate: '', endDate: '' }]);
+  };
+
+  const handleSubGoalChange = (index: number, field: keyof SubGoalInput, value: any) => {
+    const updated = [...subGoals];
+    updated[index] = { ...updated[index], [field]: value };
+    setSubGoals(updated);
   };
 
   return (
@@ -140,6 +153,32 @@ const NewGoalForm: React.FC<Props> = ({ onGoalCreated }) => {
           <option value="yearly">Jährlich</option>
         </select>
       </div>
+
+      {['weekly', 'monthly'].includes(type) && (
+        <div className="mb-4">
+          <label htmlFor="parentGoal" className="block text-sm font-medium text-gray-800 mb-1">Teil von Ziel (optional)</label>
+          <select id="parentGoal" className="w-full border border-gray-300 rounded p-2 bg-white text-black" value={parentGoalId} onChange={(e) => setParentGoalId(e.target.value)}>
+            <option value="">Keins</option>
+            {allGoals.filter(g => g.goalType === 'monthly' || g.goalType === 'yearly').map((g) => (
+              <option key={g._id} value={g._id}>{g.title}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {['monthly', 'yearly'].includes(type) && (
+        <div className="mb-6">
+          <h3 className="text-md font-semibold mb-2">Unterziele hinzufügen</h3>
+          {subGoals.map((sub, idx) => (
+            <div key={idx} className="border p-3 rounded mb-2 bg-white">
+              <input type="text" placeholder="Titel" value={sub.title} onChange={(e) => handleSubGoalChange(idx, 'title', e.target.value)} className="w-full mb-2 p-1 border text-black" />
+              <input type="date" value={sub.startDate} onChange={(e) => handleSubGoalChange(idx, 'startDate', e.target.value)} className="w-full mb-2 p-1 border text-black" />
+              <input type="date" value={sub.endDate} onChange={(e) => handleSubGoalChange(idx, 'endDate', e.target.value)} className="w-full mb-2 p-1 border text-black" />
+            </div>
+          ))}
+          <button type="button" onClick={handleAddSubGoal} className="bg-gray-600 text-white px-3 py-1 rounded text-sm mt-1">+ Unterziel hinzufügen</button>
+        </div>
+      )}
 
       {/* Aufgabenbereich */}
       <div className="mb-6">

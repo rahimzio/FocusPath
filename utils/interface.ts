@@ -105,6 +105,7 @@ export interface Goal {
   updatedAt: string;
   subGoals:Goal[];
   parentGoalId?: string;
+  parentGoalTitle?:string;
   reward?: {
     type: string;
     value: any;
