@@ -17,33 +17,6 @@ type Props = {
 };
 // Beispiel: Vordefinierte Goals
 const predefinedGoals: Goal[] = [
-  {
-    _id: "sport",
-    title: "Sport",
-    description: "Fitnessziele und sportliche Aktivitäten",
-    progress: 0,
-    tasks: [],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    endDate: "",
-    startDate: "",
-    type: "daily",
-    subGoals: [],
-  },
-  {
-    _id: "finanzen",
-    title: "Finanzen",
-    description: "Verwaltung und Organisation der Finanzen",
-    dueDate: "",
-    progress: 0,
-    tasks: [],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    endDate: "",
-    startDate: "",
-    type: "daily",
-    subGoals: [],
-  },
   // ... weitere Ziele
 ];
 

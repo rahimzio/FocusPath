@@ -62,7 +62,7 @@ const NewGoalForm: React.FC<Props> = ({ onGoalCreated }) => {
           tasks: [],
           subGoals: [],
           type: "daily",
-          completedAt: ""
+          completedAt: "",
         });
 
         // Felder leeren

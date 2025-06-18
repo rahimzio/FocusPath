@@ -12,6 +12,13 @@ import {
 } from "date-fns";
 import { isNextMonth } from "@/utils/goals/helper";
 import GoalManager from "./GoalManager";
+import GoalEditModal from "./GoalEditModal";
+import GoalCategoryManager from "./GoalCategoryManager";
+
+interface Category {
+    _id: string;
+    name: string;
+}
 
 export default function GoalOverviewDashboard() {
     const [goals, setGoals] = useState<Goal[]>([]);
