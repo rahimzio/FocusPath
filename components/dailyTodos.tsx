@@ -25,7 +25,13 @@ import GoalEditModal from "./todo/dailytodo/GoalEdit";
 import useTaskDeletion, { handleDeleteSeries, confirmDeleteWithSeries, deleteSingleInstance } from "@/utils/todo/TaskDeletion";
 import { handleCheckSubTask as handleCheckSubTaskExternal, useSubtaskCompletion } from "@/utils/todo/taskStatus";
 import { getSession } from "next-auth/react";
-
+import { BudgetEntry } from "@/utils/interface";
+function getWeekString(date: Date) {
+  const firstDay = new Date(date.getFullYear(), 0, 1);
+  const pastDays = Math.floor((+date - +firstDay) / 86400000);
+  const week = Math.ceil((pastDays + firstDay.getDay() + 1) / 7);
+  return `${date.getFullYear()}-${String(week).padStart(2, "0")}`;
+}
 function formatDate(date: Date): string {
   const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
   return local.toISOString().split("T")[0];
@@ -45,7 +51,7 @@ const DailyTaskList = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
   const [dayScore, setDayScore] = useState<string>("-");
-
+ const [budgetInfo, setBudgetInfo] = useState<string>("");
   useEffect(() => {
     getSession().then((session) => {
       if (session?.user?.id) setUserId(session.user.id);
@@ -66,12 +72,28 @@ const DailyTaskList = () => {
       toast.error("Fehler beim Laden der Aufgaben.");
     }
   }
-
+  async function fetchBudget() {
+    if (!userId) return;
+    const week = getWeekString(new Date());
+    try {
+      const res = await fetch(`/api/finance/getWeeklyBudget?userId=${userId}&week=${week}`);
+      const data = await res.json();
+      if (data.budget) {
+        const left = data.budget.budget - data.budget.spent;
+        setBudgetInfo(`\u2705 Du hast noch ${left} \u20ac für diese Woche übrig`);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
   const { handleCheckSubTask } = useSubtaskCompletion({ selectedTask, setSelectedTask, fetchTasks, userId });
   const { handleDeleteTask, confirmDelete } = useTaskDeletion({ selectedDate, fetchTasks, setDeleteDialogOpen, setTaskToDelete });
 
   useEffect(() => {
-    if (userId) fetchTasks(selectedDate);
+    if (userId) {
+      fetchTasks(selectedDate);
+      fetchBudget();
+    }
   }, [selectedDate, userId]);
 
   function openTaskDetails(task: Task) { setSelectedTask(task); }
@@ -199,6 +221,11 @@ const DailyTaskList = () => {
             }}
           />
         </div>
+      )}
+ {budgetInfo && (
+        <p className="text-center text-sm text-green-700 font-medium">
+          {budgetInfo}
+        </p>
       )}
 
       <p className="text-center text-sm text-[#20253b] font-medium rounded-xl shadow border-[#e5e5ea] font-wweight-600 py-2">

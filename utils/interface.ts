@@ -246,3 +246,65 @@ export interface Post {
   createdAt: string;
   category?: string;
 }
+
+export interface TradeEntry {
+  _id?: string;
+  userId: string;
+  date: string; // Format: YYYY-MM-DD
+  symbol: string;
+  setup: string;
+  entry: number;
+  exit: number;
+  stopLoss: number;
+  positionSize: number;
+  result: "win" | "loss" | "BE";
+  pnl: number;
+  rating: number; // 1–10
+  screenshotUrl?: string;
+  notes?: string;
+  tags?: string[];
+  ruleViolations?: string[];
+  emotions?: string;
+  entryTime?: string;
+  exitTime?: string;
+  linkedGoalId?: string;
+}
+
+
+export interface TradeEntryVectorReady extends TradeEntry {
+  tradeSummaryText: string;
+  reflectionNotes: string;
+  ruleViolationsVector: string[];
+  tagsVector: string[];
+  setupVector: string;
+  embeddingSourceText: string;
+}
+// --------------------
+// Online-Studium Module
+// --------------------
+
+export interface Unit {
+  _id: string;
+  title: string;
+  status: "not-started" | "in-progress" | "completed";
+  note?: string;
+}
+
+export interface Chapter {
+  _id: string;
+  title: string;
+  units: Unit[];
+}
+
+export interface OnlineModule {
+  _id: string;
+  userId: string;
+  title: string;
+  description?: string;
+  totalUnits: number;
+  completedUnits: number;
+  chapters: Chapter[];
+  startDate?: string;
+  endDate?: string;
+  linkedTasks?: string[];
+}

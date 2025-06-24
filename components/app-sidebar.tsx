@@ -34,7 +34,7 @@ const defaultItems = [
 const defaultItemsOriginal = [
   { title: "Home", url: "/", icon: Home },
   { title: "To-dos", url: "/overview/todos", icon: Inbox },
-  { title: "Finanzen", url: "/overview/finance", icon: Calendar },
+{ title: "Finanzen", url: "/finance", icon: Calendar },
   { title: "Goals", url: "/overview/goals", icon: Calendar },
   { title: "Trading", url: "/overview/trading", icon: Search },
   { title: "sport", url: "/overview/sport", icon: Settings },

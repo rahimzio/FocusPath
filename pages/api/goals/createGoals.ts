@@ -39,6 +39,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const goalDoc = {
       _id: goalId, // Mongo ObjectId für DB
       type: "goal",
+      goalType,             
       userId,
       title,
       description,

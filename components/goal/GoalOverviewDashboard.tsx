@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import { Goal } from "@/utils/interface";
 import {
     format,
-    isThisMonth,
     parseISO,
     getMonth,
     isWithinInterval,
@@ -12,19 +11,26 @@ import {
 } from "date-fns";
 import { isNextMonth } from "@/utils/goals/helper";
 import GoalManager from "./GoalManager";
-import GoalEditModal from "./GoalEditModal";
-import GoalCategoryManager from "./GoalCategoryManager";
-
-interface Category {
-    _id: string;
-    name: string;
-}
+import MonthlyGoalOverview from "./MonthlyGoalOverview";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 export default function GoalOverviewDashboard() {
     const [goals, setGoals] = useState<Goal[]>([]);
     const [loading, setLoading] = useState(true);
     const [showGoalManager, setShowGoalManager] = useState(false);
     const [showMonthlyOverview, setShowMonthlyOverview] = useState(false);
+    const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
+    const [editMode, setEditMode] = useState(false);
+    const [moveMode, setMoveMode] = useState(false);
+    const [editedGoal, setEditedGoal] = useState<Partial<Goal>>({});
+    const [newStartDate, setNewStartDate] = useState("");
+    const [newEndDate, setNewEndDate] = useState("");
 
     useEffect(() => {
         const fetchGoals = async () => {
@@ -71,16 +77,65 @@ export default function GoalOverviewDashboard() {
                         ? {
                             ...g,
                             progress: newProgress,
-                            completedAt: completedAt ?? undefined, // <- entfernt null!
+                            completedAt: completedAt ?? undefined,
                         }
                         : g
                 )
             );
 
-
         } catch (err) {
             console.error(err);
         }
+    };
+
+    const openEditDialog = (goal: Goal) => {
+        setSelectedGoal(goal);
+        setEditMode(true);
+        setMoveMode(false);
+        setEditedGoal({ title: goal.title, description: goal.description });
+    };
+
+    const openMoveDialog = (goal: Goal) => {
+        setSelectedGoal(goal);
+        setMoveMode(true);
+        setEditMode(false);
+        setNewStartDate(goal.startDate);
+        setNewEndDate(goal.endDate);
+    };
+
+    const handleSave = async () => {
+        if (!selectedGoal) return;
+
+        await fetch(`/api/goals/updateGoal`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                goalId: selectedGoal._id,
+                ...editedGoal,
+            }),
+        });
+
+        alert("Ziel aktualisiert. Änderungen werden beim nächsten Laden sichtbar.");
+        setSelectedGoal(null);
+        setEditMode(false);
+    };
+
+    const handleMove = async () => {
+        if (!selectedGoal) return;
+
+        await fetch(`/api/goals/updateGoal`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                goalId: selectedGoal._id,
+                startDate: newStartDate,
+                endDate: newEndDate,
+            }),
+        });
+
+        alert("Ziel wurde verschoben.");
+        setSelectedGoal(null);
+        setMoveMode(false);
     };
 
     const categorizeGoals = (goals: Goal[]) => {
@@ -99,7 +154,7 @@ export default function GoalOverviewDashboard() {
         goals.forEach((goal) => {
             const start = parseISO(goal.startDate);
             const end = parseISO(goal.endDate);
-            const goalType = goal.type || goal.goalType || "";
+            const goalType = goal.goalType ?? goal.type ?? "";
 
             if (
                 isWithinInterval(start, { start: thisWeekStart, end: thisWeekEnd }) ||
@@ -114,8 +169,16 @@ export default function GoalOverviewDashboard() {
             }
 
             if (goalType === "monthly") {
-                if (isThisMonth(start)) currentMonth.push(goal);
-                else if (isNextMonth(start)) nextMonth.push(goal);
+                const now = new Date();
+                const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+                const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+                if (
+                    isWithinInterval(start, { start: currentMonthStart, end: currentMonthEnd }) ||
+                    isWithinInterval(end, { start: currentMonthStart, end: currentMonthEnd })
+                ) {
+                    currentMonth.push(goal);
+                } else if (isNextMonth(start)) nextMonth.push(goal);
 
                 const month = getMonth(start);
                 if (!monthlyByMonth[month]) monthlyByMonth[month] = [];
@@ -152,14 +215,8 @@ export default function GoalOverviewDashboard() {
                 </p>
             )}
             <div className="mt-2 flex flex-wrap gap-2">
-                <button className="text-sm bg-gray-200 hover:bg-gray-300 text-gray-900 px-2 py-1 rounded" onClick={() => alert("Bearbeiten: " + goal.title)}>✏️ Bearbeiten</button>
-                <button className="text-sm bg-gray-200 hover:bg-gray-300 text-gray-900 px-2 py-1 rounded" onClick={() => alert("Verschieben: " + goal.title)}>📤 Verschieben</button>
-                <button className="text-sm bg-gray-200 hover:bg-gray-300 text-gray-900 px-2 py-1 rounded" onClick={() => alert("Vorlage: " + goal.title)}>✅ Als Vorlage</button>
-                {isFuture && goal.progress !== 100 && (
-                    <button className="text-sm bg-orange-100 hover:bg-orange-200 text-orange-800 px-2 py-1 rounded" onClick={() => alert("In aktuelle Woche übernehmen: " + goal.title)}>
-                        ➕ In aktuelle Woche
-                    </button>
-                )}
+                <button className="text-sm bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700" onClick={() => openEditDialog(goal)}>✏️ Bearbeiten</button>
+                <button className="text-sm bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700" onClick={() => openMoveDialog(goal)}>📤 Verschieben</button>
             </div>
         </div>
     );
@@ -192,21 +249,16 @@ export default function GoalOverviewDashboard() {
                 <h2 className="text-xl font-bold text-gray-800 mb-2">📅 Monatsübersicht (alle Monatsziele)</h2>
                 <button
                     className="mb-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-                    onClick={() => setShowMonthlyOverview(!showMonthlyOverview)}
+                    onClick={() => setShowMonthlyOverview(true)}
                 >
-                    {showMonthlyOverview ? "Verbergen" : "Monatsübersicht anzeigen"}
+                    Monatsübersicht anzeigen
                 </button>
+
                 {showMonthlyOverview && (
-                    <div className="mt-4">
-                        {Object.entries(monthlyByMonth).map(([month, goals]) => (
-                            <div key={month} className="mb-6">
-                                <h3 className="text-lg font-semibold text-gray-700 mb-2">
-                                    {new Date(2025, Number(month)).toLocaleString("de-DE", { month: "long" })}
-                                </h3>
-                                {goals.map(g => renderGoal(g))}
-                            </div>
-                        ))}
-                    </div>
+                    <MonthlyGoalOverview
+                        goals={goals.filter((g) => g.goalType === "monthly")}
+                        onClose={() => setShowMonthlyOverview(false)}
+                    />
                 )}
             </section>
 
@@ -220,6 +272,76 @@ export default function GoalOverviewDashboard() {
                 </button>
                 {showGoalManager && <GoalManager />}
             </section>
+
+            {selectedGoal && (
+                <Dialog open={!!selectedGoal} onOpenChange={() => setSelectedGoal(null)}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>
+                                {editMode ? "Ziel bearbeiten" : moveMode ? "Ziel verschieben" : "Ziel"}
+                            </DialogTitle>
+                        </DialogHeader>
+                        <>
+                            {editMode && (
+                                <>
+                                    <label className="block text-sm font-medium mb-1">Titel</label>
+                                    <input
+                                        type="text"
+                                        value={editedGoal.title || ""}
+                                        onChange={(e) =>
+                                            setEditedGoal((prev) => ({ ...prev, title: e.target.value }))
+                                        }
+                                        className="border p-2 w-full rounded mb-3"
+                                    />
+
+                                    <label className="block text-sm font-medium mb-1">Beschreibung</label>
+                                    <textarea
+                                        value={editedGoal.description || ""}
+                                        onChange={(e) =>
+                                            setEditedGoal((prev) => ({ ...prev, description: e.target.value }))
+                                        }
+                                        className="border p-2 w-full rounded mb-4"
+                                    />
+
+                                    <div className="flex justify-end gap-2">
+                                        <Button variant="outline" onClick={() => setSelectedGoal(null)}>
+                                            Abbrechen
+                                        </Button>
+                                        <Button onClick={handleSave}>Speichern</Button>
+                                    </div>
+                                </>
+                            )}
+
+                            {moveMode && (
+                                <>
+                                    <label className="block text-sm font-medium mb-1">Neues Startdatum</label>
+                                    <input
+                                        type="date"
+                                        value={newStartDate}
+                                        onChange={(e) => setNewStartDate(e.target.value)}
+                                        className="border p-2 w-full rounded mb-3"
+                                    />
+
+                                    <label className="block text-sm font-medium mb-1">Neues Enddatum</label>
+                                    <input
+                                        type="date"
+                                        value={newEndDate}
+                                        onChange={(e) => setNewEndDate(e.target.value)}
+                                        className="border p-2 w-full rounded mb-4"
+                                    />
+
+                                    <div className="flex justify-end gap-2">
+                                        <Button variant="outline" onClick={() => setSelectedGoal(null)}>
+                                            Abbrechen
+                                        </Button>
+                                        <Button onClick={handleMove}>Speichern</Button>
+                                    </div>
+                                </>
+                            )}
+                        </>
+                    </DialogContent>
+                </Dialog>
+            )}
         </div>
     );
 }

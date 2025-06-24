@@ -21,7 +21,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // 1. Lade alle Goals
     const rawGoals = await appData
       .find({ type: "goal", userId })
-      .project({ type: 0 })
       .toArray();
 
     // 2. Falls Tasks vorhanden, einzeln nachladen
