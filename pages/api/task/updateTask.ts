@@ -27,6 +27,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       frequency,
       category,
       timebased,
+       daysOfWeek,
+      interval,
     } = req.body;
 
     const updateFields: Partial<TaskDocument> = {
@@ -41,6 +43,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       category,
       timebased,
       updatedAt: new Date().toISOString(),
+       daysOfWeek,
+      interval,
     };
 
     const { db } = await connectToDatabase();

@@ -44,6 +44,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           color: 1,
           duration: 1,
           goalId: 1,
+          daysOfWeek: 1,
+          interval: 1,
         }
       }
     ).toArray() as unknown as Task[];
@@ -91,6 +93,13 @@ function checkFrequency(task: Task, selectedDate: Date): boolean {
   const dueDate = new Date(task.dueDate);
   const diff = dayDiff(dueDate, selectedDate);
   if (diff < 0) return false;
+if (task.daysOfWeek && task.daysOfWeek.length > 0) {
+    if (!task.daysOfWeek.includes(selectedDate.getDay())) return false;
+  }
+
+  if (task.interval && task.interval > 1) {
+    return diff % task.interval === 0;
+  }
 
   switch (task.frequency) {
     case "once": return isSameDay(dueDate, selectedDate);

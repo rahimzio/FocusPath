@@ -39,6 +39,8 @@ export default function SheetWithCreateTask({ userId, onTaskCreated }: Props) {
     time: "",
     progress: 0,
     duration: "",
+    daysOfWeek: [],
+    interval: 1,
   });
  
   // Subtasks-Array
@@ -121,6 +123,8 @@ export default function SheetWithCreateTask({ userId, onTaskCreated }: Props) {
         time: "",
         progress: 0,
         duration: "",
+        daysOfWeek: [],
+        interval: 1,
       });
       setSubTasks([]);
       setSelectedGoalId("");
@@ -139,10 +143,19 @@ export default function SheetWithCreateTask({ userId, onTaskCreated }: Props) {
     const { name, value } = e.target;
     setTask((prev) => ({
       ...prev,
-      [name]: name === "points" ? parseInt(value, 10) || 0 : value,
+      [name]: name === "points" || name === "interval" ? parseInt(value, 10) || 0 : value,
     }));
   };
 
+   const toggleDayOfWeek = (day: number) => {
+    setTask((prev) => {
+      const current = prev.daysOfWeek || [];
+      const updated = current.includes(day)
+        ? current.filter((d) => d !== day)
+        : [...current, day];
+      return { ...prev, daysOfWeek: updated };
+    });
+  };
   // Funktion zum Hinzufügen eines leeren Subtasks mit eindeutiger ID
   const addSubTask = () => {
     setSubTasks((prev) => [
@@ -283,6 +296,41 @@ export default function SheetWithCreateTask({ userId, onTaskCreated }: Props) {
               </select>
             </div>
 
+{task.frequency === "weekly" && (
+              <div className="mb-4">
+                <span className="block text-sm font-medium text-gray-700">Wochentage</span>
+                <div className="flex flex-wrap gap-2 mt-1">
+                  {['So','Mo','Di','Mi','Do','Fr','Sa'].map((label, idx) => (
+                    <label key={idx} className="flex items-center text-sm gap-1">
+                      <input
+                        type="checkbox"
+                        checked={task.daysOfWeek?.includes(idx) || false}
+                        onChange={() => toggleDayOfWeek(idx)}
+                      />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {task.frequency === "daily" && (
+              <div className="mb-4">
+                <label htmlFor="interval" className="block text-sm font-medium text-gray-700">
+                  Alle X Tage
+                </label>
+                <input
+                  type="number"
+                  id="interval"
+                  name="interval"
+                  min={1}
+                  value={task.interval}
+                  onChange={handleChange}
+                  className="mt-1 block w-full rounded-md border-gray-300"
+                />
+              </div>
+            )}
+            
             <div className="mb-4">
               <label htmlFor="goalId" className="block text-sm font-medium text-gray-700">
                 Ziel

@@ -26,7 +26,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     goalId,
     subTasks,
     color,
-    duration
+    duration,
+    daysOfWeek,
+    interval
   } = req.body as CreateTaskBody & { userId: string };
 
   if (!userId || !name || !description || !points || !dueDate || !frequency || !category) {
@@ -70,6 +72,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       updatedAt: new Date().toISOString(),
       color,
       duration,
+      daysOfWeek,
+      interval,
     };
 
     const result = await appData.insertOne(newTaskDoc);

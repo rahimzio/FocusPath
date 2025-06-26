@@ -11,10 +11,15 @@ interface Props {
 
 const TaskEditModal: React.FC<Props> = ({ userId, editedTask, setEditedTask, handleEditTask }) => {
   if (!editedTask) return null;
-
+  const toggleDay = (day: number) => {
+    if (!editedTask) return;
+    const current = editedTask.daysOfWeek || [];
+    const updated = current.includes(day) ? current.filter((d) => d !== day) : [...current, day];
+    setEditedTask({ ...editedTask, daysOfWeek: updated });
+  };
   return (
     <Dialog open={!!editedTask} onOpenChange={(open) => setEditedTask(open ? editedTask : null)}>
-      <DialogContent className="text-white bg-neutral-900">
+      <DialogContent className="text-white bg-neutral-900 max-h-[90vh] overflow-y-auto py-6 px-4">
         <DialogHeader>
           <DialogTitle className="text-white">Aufgabe bearbeiten</DialogTitle>
         </DialogHeader>
@@ -94,6 +99,35 @@ const TaskEditModal: React.FC<Props> = ({ userId, editedTask, setEditedTask, han
               <option value="monthly">Monatlich</option>
               <option value="yearly">Jährlich</option>
             </select>
+
+            {editedTask.frequency === "weekly" && (
+              <div className="flex flex-wrap gap-2 mt-2 text-xs">
+                {['So','Mo','Di','Mi','Do','Fr','Sa'].map((label, idx) => (
+                  <label key={idx} className="flex items-center gap-1">
+                    <input
+                      type="checkbox"
+                      checked={editedTask.daysOfWeek?.includes(idx) || false}
+                      onChange={() => toggleDay(idx)}
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            )}
+
+            {editedTask.frequency === "daily" && (
+              <div className="mt-2">
+                <label className="text-xs text-neutral-300">Alle X Tage</label>
+                <input
+                  type="number"
+                  name="interval"
+                  min={1}
+                  value={editedTask.interval || 1}
+                  onChange={(e) => setEditedTask({ ...editedTask, interval: parseInt(e.target.value, 10) || 1 })}
+                  className="p-2 border border-gray-700 rounded-md w-full bg-neutral-800 text-white"
+                />
+              </div>
+            )}
           </div>
 
           {/* 🎯 Bewertung & Farbe */}

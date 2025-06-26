@@ -30,6 +30,10 @@ export interface TaskDocument {
   duration?:string;
   excludedDates?:string[];
   subTasks?: SubTask[];
+   /** Wochentage, an denen die Aufgabe erscheinen soll (0=Sonntag) */
+  daysOfWeek?: number[];
+  /** Intervall für Wiederholungen in Tagen */
+  interval?: number;
   // ggf. weitere Felder
 }
 
@@ -82,6 +86,10 @@ export interface Task {
   };
   dependencies?: string[];  // Abhängigkeiten zwischen Tasks
   subTasks?: SubTask[];
+  /** Wochentage, an denen die Aufgabe erscheinen soll (0=Sonntag) */
+  daysOfWeek?: number[];
+  /** Intervall für Wiederholungen in Tagen */
+  interval?: number;
 }
 
 /**
@@ -141,7 +149,9 @@ export interface CreateTaskBody {
   goalId?: string;
   subTasks?: SubTask[];
   color?:string;
-  duration?:string; 
+   duration?:string;
+  daysOfWeek?: number[];
+  interval?: number;
 }
 export interface SubTask {
   userId?:string;
