@@ -14,7 +14,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const { db } = await connectToDatabase();
-    const appData = db.collection("appData");
+    const appData = db.collection("trading");
 
     const trades = await appData
       .find({ type: "tradeEntry", userId, date })

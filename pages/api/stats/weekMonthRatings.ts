@@ -39,21 +39,25 @@ function getMonthRating(weekRatings: string[]): string {
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { userId } = req.query;
+  console.log("🔍 API CALL: /api/stats/weekMonthRatings", userId);
+
   if (!userId || typeof userId !== "string") return res.status(400).json({ error: "Missing userId" });
 
   const { db } = await connectToDatabase();
   const taskCollection = db.collection("task");
 
-  const allTasksRaw = await taskCollection.find({ userId }).toArray();
-  const allTasks = allTasksRaw as unknown as Task[];
+  const allTasks = await taskCollection.find({ userId }).toArray();
+  const typedTasks = allTasks as unknown as Task[];
+  console.log("📦 Total Tasks fetched:", typedTasks.length);
 
   const byDate: { [date: string]: Task[] } = {};
-  allTasks.forEach((t) => {
+  typedTasks.forEach((t) => {
     if (!t.dueDate) return;
     if (!byDate[t.dueDate]) byDate[t.dueDate] = [];
     byDate[t.dueDate].push(t);
   });
 
+  // Datumshilfe
   const today = new Date();
   const getPastDates = (days: number) => {
     const arr = [];
@@ -72,16 +76,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const dayPoints = weekDates.map((d) => getDayScore(byDate[d] || []));
     const weekTotal = dayPoints.reduce((sum, p) => sum + p, 0);
     const weekStart = weekDates[0];
-    weekRatings.unshift({ weekStart, score: weekTotal, rating: getWeekRating(weekTotal) });
+    const rating = getWeekRating(weekTotal);
+    weekRatings.unshift({ weekStart, score: weekTotal, rating });
+    console.log(`📊 Woche ab ${weekStart}: Punkte = ${weekTotal}, Bewertung = ${rating}`);
   }
 
   const recentMonthRatings = [
     weekRatings.slice(0, 4),
     weekRatings.slice(4, 8),
     weekRatings.slice(8, 12),
-  ].map((weeks) => {
+  ].map((weeks, index) => {
     const rating = getMonthRating(weeks.map((w) => w.rating));
-    return { weeks: weeks.map((w) => w.weekStart), rating };
+    const weeksInfo = weeks.map((w) => w.weekStart);
+    console.log(`🗓️ Monat ${index + 1}: Wochen =`, weeksInfo, "→ Bewertung:", rating);
+    return { weeks: weeksInfo, rating };
   });
 
   res.status(200).json({ weekRatings, recentMonthRatings });

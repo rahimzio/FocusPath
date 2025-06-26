@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { Task, GoalWithProgress, SubTask } from "@/utils/interface";
-import SheetWithCreateTask from "@/components/todo/PopUpCreateTask";
+import SheetWithCreateTask from "./todo/popUpCreateTask";
+import { useDailyRatingAutoSave } from "@/hooks/useDailyRatingAutoSave";
 import {
   Dialog,
   DialogContent,
@@ -25,7 +26,6 @@ import GoalEditModal from "./todo/dailytodo/GoalEdit";
 import useTaskDeletion, { handleDeleteSeries, confirmDeleteWithSeries, deleteSingleInstance } from "@/utils/todo/TaskDeletion";
 import { handleCheckSubTask as handleCheckSubTaskExternal, useSubtaskCompletion } from "@/utils/todo/taskStatus";
 import { getSession } from "next-auth/react";
-import { BudgetEntry } from "@/utils/interface";
 function getWeekString(date: Date) {
   const firstDay = new Date(date.getFullYear(), 0, 1);
   const pastDays = Math.floor((+date - +firstDay) / 86400000);
@@ -88,6 +88,7 @@ const DailyTaskList = () => {
   }
   const { handleCheckSubTask } = useSubtaskCompletion({ selectedTask, setSelectedTask, fetchTasks, userId });
   const { handleDeleteTask, confirmDelete } = useTaskDeletion({ selectedDate, fetchTasks, setDeleteDialogOpen, setTaskToDelete });
+  useDailyRatingAutoSave({ userId, tasks, goals });
 
   useEffect(() => {
     if (userId) {
