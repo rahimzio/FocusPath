@@ -318,3 +318,12 @@ export interface OnlineModule {
   endDate?: string;
   linkedTasks?: string[];
 }
+
+export interface SavingEntry {
+  userId: string;
+  month: string;           // z. B. "2025-07"
+  amount: number;
+  note?: string;
+  createdAt: string;       // ISO-DateTime-String
+  updatedAt: string;       // ISO-DateTime-String
+}
