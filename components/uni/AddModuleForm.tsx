@@ -6,6 +6,7 @@ interface Props {
   module: OnlineModule | null;
   onBack: () => void;
   onUpdated?: (m: OnlineModule) => void;
+   onCreated: () => void;
 }
 
 const ModuleDetail: React.FC<Props> = ({ module, onBack, onUpdated }) => {

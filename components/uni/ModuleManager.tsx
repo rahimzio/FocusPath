@@ -20,7 +20,11 @@ const ModuleManager: React.FC = () => {
         />
       ) : (
         <>
-          <AddModuleForm onCreated={handleCreated} />
+         <AddModuleForm
+           onCreated={handleCreated}
+           module={null}
+           onBack={() => setSelected(null)}
+         />
           <ModuleOverview key={String(triggerReload)} onSelect={setSelected} />
         </>
       )}
