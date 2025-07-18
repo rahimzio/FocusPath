@@ -30,7 +30,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     daysOfWeek,
     interval
   } = req.body as CreateTaskBody & { userId: string };
-
+  console.log("📝 createTask payload", req.body);
   if (!userId || !name || !description || !points || !dueDate || !frequency || !category) {
     return res.status(400).json({ message: "Pflichtfelder fehlen (inkl. userId)." });
   }
@@ -77,7 +77,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     };
 
     const result = await appData.insertOne(newTaskDoc);
-
+    console.log("✅ task inserted", {
+      insertedId: result.insertedId,
+      daysOfWeek,
+      interval,
+    });
     if (result.insertedId && validGoalId) {
       await appData.updateOne(
         { _id: new ObjectId(validGoalId), type: "goal", userId },
@@ -87,7 +91,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           } as any, // ← hier wird TypeScript umgangen, weil du es garantiert weißt
           $currentDate: { updatedAt: true }
         }
-      );      
+      );
     }
 
     return res.status(201).json({

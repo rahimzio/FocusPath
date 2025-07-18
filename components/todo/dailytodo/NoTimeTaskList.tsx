@@ -46,7 +46,7 @@ const NoTimeTaskList: React.FC<NoTimeTaskListProps> = ({
               onClick={() => openTaskDetails(task)}
             >
               <div className="flex justify-between items-start">
-                <h3 className="text-sm font-semibold text-[#1c1c1e] break-words">
+                <h3 className="text-sm font-semibold text-[#1c1c1e] break-words overflow-hidden">
                   {task.name}
                 </h3>
                 <input

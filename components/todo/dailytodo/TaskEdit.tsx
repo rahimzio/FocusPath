@@ -11,7 +11,7 @@ interface Props {
 
 const TaskEditModal: React.FC<Props> = ({ userId, editedTask, setEditedTask, handleEditTask }) => {
   if (!editedTask) return null;
-  const toggleDay = (day: number) => {
+ const toggleDay = (day: number) => {
     if (!editedTask) return;
     const current = editedTask.daysOfWeek || [];
     const updated = current.includes(day) ? current.filter((d) => d !== day) : [...current, day];

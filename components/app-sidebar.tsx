@@ -34,7 +34,7 @@ const defaultItems = [
 const defaultItemsOriginal = [
   { title: "Home", url: "/", icon: Home },
   { title: "To-dos", url: "/overview/todos", icon: Inbox },
-{ title: "Finanzen", url: "/finance", icon: Calendar },
+  { title: "Finanzen", url: "/finance", icon: Calendar },
   { title: "Goals", url: "/overview/goals", icon: Calendar },
   { title: "Trading", url: "/overview/trading", icon: Search },
   { title: "sport", url: "/overview/sport", icon: Settings },
@@ -116,7 +116,7 @@ export function AppSidebar({ mobileOpen, setMobileOpen }: AppSidebarProps) {
             <div className="flex flex-col gap-2 mt-8">
               <button
                 onClick={handleCustomizeSidebar}
-                className="w-full px-4 py-2 bg-[#007AFF] text-white rounded hover:brightness-110 transition"
+                className=" hidden w-full px-4 py-2 bg-[#007AFF] text-white rounded hover:brightness-110 transition"
               >
                 Sidebar anpassen
               </button>
@@ -152,14 +152,22 @@ export function AppSidebar({ mobileOpen, setMobileOpen }: AppSidebarProps) {
         <div className="mt-auto flex flex-col gap-2 py-4">
           <button
             onClick={handleCustomizeSidebar}
-            className="w-10 h-10 bg-[#007AFF] rounded-full hover:brightness-110 text-white flex items-center justify-center"
+            className="hidden w-10 h-10 bg-[#007AFF] rounded-full hover:brightness-110 text-white flex items-center justify-center"
+            title="Sidebar anpassen"
+          >
+            ✏️
+          </button>
+
+          <button
+            onClick={handleCustomizeSidebar}
+            className=" w-10 h-10 bg-[#007AFF] rounded-full hover:brightness-110 text-white flex items-center justify-center"
             title="Sidebar anpassen"
           >
             ✏️
           </button>
           <button
             onClick={() => signOut({ callbackUrl: "/login/login" })}
-            className="w-10 h-10 bg-[#FF3B30] rounded-full hover:brightness-110 text-white flex items-center justify-center"
+            className=" w-10 h-10 bg-[#FF3B30] rounded-full hover:brightness-110 text-white flex items-center justify-center"
             title="Abmelden"
           >
             🚪

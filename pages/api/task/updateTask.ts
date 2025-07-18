@@ -50,10 +50,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { db } = await connectToDatabase();
     const tasksColl = db.collection<TaskDocument>("appData");
 
-    const result = await tasksColl.updateOne(
-      { _id: new ObjectId(taskId), userId, type: "task" },
-      { $set: updateFields }
-    );
+     const result = await tasksColl.updateOne(
+    { _id: new ObjectId(taskId), userId, type: "task" },
+    { $set: updateFields }
+  );
+  console.log("📤 update result", {
+    modifiedCount: result.modifiedCount,
+    updateFields,
+  });
+
 
     if (result.modifiedCount === 0) {
       return res.status(404).json({ message: "Task not found or not updated" });

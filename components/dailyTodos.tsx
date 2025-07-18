@@ -62,7 +62,8 @@ const DailyTaskList = () => {
   async function fetchTasks(dateParam?: string) {
     const dateToUse = dateParam || formatDate(new Date());
     if (!userId) return;
-    try {
+    try { 
+      console.log("📥 fetchTasks", { dateToUse, userId });
       const response = await fetch(`/api/task/getTasks?date=${dateToUse}&userId=${userId}`);
       const data = await response.json();
       const allTasks = [...data.groupedTasks.goalTasks, ...data.groupedTasks.otherTasks];

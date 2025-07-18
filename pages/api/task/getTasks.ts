@@ -92,7 +92,38 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 function checkFrequency(task: Task, selectedDate: Date): boolean {
   const dueDate = new Date(task.dueDate);
   const diff = dayDiff(dueDate, selectedDate);
-  if (diff < 0) return false;
+    console.log("🔎 checkFrequency", {
+    taskId: task._id,
+    name: task.name,
+    frequency: task.frequency,
+    dueDate: task.dueDate,
+    selected: selectedDate.toISOString().slice(0, 10),
+    diff,
+    daysOfWeek: task.daysOfWeek,
+    interval: task.interval,
+  });
+
+  if (diff < 0) {
+    console.log("⛔ diff < 0");
+    return false;
+  }
+
+  if (isSameDay(dueDate, selectedDate)) {
+    console.log("✅ selected date is due date");
+    return true;
+  }
+
+  if (task.frequency === "weekly" && task.daysOfWeek && task.daysOfWeek.length > 0) {
+    const dayMatch = task.daysOfWeek.includes(selectedDate.getDay());
+    console.log("📅 weekly day check", { dayMatch });
+    return dayMatch;
+  }
+
+  if (task.interval && task.interval > 1) {
+    const byInterval = diff % task.interval === 0;
+    console.log("ℹ️ interval check", { byInterval });
+    return byInterval;
+  }
 if (task.daysOfWeek && task.daysOfWeek.length > 0) {
     if (!task.daysOfWeek.includes(selectedDate.getDay())) return false;
   }

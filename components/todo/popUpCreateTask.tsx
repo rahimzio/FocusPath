@@ -82,7 +82,7 @@ export default function SheetWithCreateTask({ userId, onTaskCreated }: Props) {
       goalId: selectedGoalId || undefined,
       subTasks,
     };
-
+ console.log("📤 create task payload", payload);
     const response = await fetch("/api/task/createTask", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -330,7 +330,7 @@ export default function SheetWithCreateTask({ userId, onTaskCreated }: Props) {
                 />
               </div>
             )}
-            
+
             <div className="mb-4">
               <label htmlFor="goalId" className="block text-sm font-medium text-gray-700">
                 Ziel
