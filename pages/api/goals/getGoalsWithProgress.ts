@@ -104,6 +104,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       startDate: goal.startDate ? new Date(goal.startDate).toISOString() : "",
       type: goal.type || "daily",
       subGoals: goal.subGoals || [],
+      goalType: goal.goalType || "", // Add this line to include goalType
     }));
 
     return res.status(200).json({ goals: goalsWithProgress });

@@ -15,8 +15,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { db } = await connectToDatabase();
     const appData = db.collection("trading");
 
+    // Remove _id if present to avoid type conflict with MongoDB's ObjectId
+    const { _id, ...tradeWithoutId } = trade;
     const result = await appData.insertOne({
-      ...trade,
+      ...tradeWithoutId,
       type: "tradeEntry",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),

@@ -339,3 +339,32 @@ export interface SavingGoal {
   updatedAt: string;
   _id?: string; // falls von MongoDB mitgeliefert
 }
+
+export interface expense {
+  _id?: string;
+  userId?: string; // Optional falls später ergänzt
+  name: string;
+  amount: number;
+  category: string;
+  frequency: "daily" | "weekly" | "monthly" | "yearly" | string; // Erweiterbar
+  dueDate: string; // Format: "YYYY-MM-DD"
+  createdAt: string; // ISO-Format
+  updatedAt: string; // ISO-Format
+}
+
+
+export interface BudgetCategoryEntry {
+  name: string;
+  amount: number;
+}
+
+export interface BudgetEntry {
+  _id?: string;
+  userId: string;
+  week: string; // z. B. "2025-29"
+  budget: number;
+  spent: number;
+  categories: BudgetCategoryEntry[];
+  createdAt: string;
+  updatedAt: string;
+}

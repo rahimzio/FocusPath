@@ -1,31 +1,29 @@
-// /api/expense/monthly.ts
 import { NextApiRequest, NextApiResponse } from 'next';
-import MongoDB from '../db/mongo';
+import { connectToDatabase } from '../db/mongo';
+import { expense } from '@/utils/interface';
 
 const getMonthlyExpenses = async (req: NextApiRequest, res: NextApiResponse) => {
-  const mongoDB = new MongoDB(process.env.AZURE_COSMOS_CONNECTION_STRING as string, 'your-database-name');
-
   try {
-    await mongoDB.getDbConnectionPromise();
-    const collection = mongoDB.db?.collection('expenses'); // Access the 'expenses' collection
+    const { db } = await connectToDatabase();
+    const collection = db.collection<expense>('expenses');
 
-    // Get expenses for the current month
-    const currentMonth = new Date().getMonth();
-    const expenses = await collection?.find({
-      dueDate: {
-        $gte: new Date(new Date().getFullYear(), currentMonth, 1).toISOString(),
-        $lt: new Date(new Date().getFullYear(), currentMonth + 1, 1).toISOString(),
-      },
-    }).toArray();
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const start = new Date(now.getFullYear(), currentMonth, 1).toISOString();
+    const end = new Date(now.getFullYear(), currentMonth + 1, 1).toISOString();
 
-    const totalExpenses = expenses?.reduce((acc, expense) => acc + expense.amount, 0);
+    const expenses = await collection
+      .find({
+        dueDate: { $gte: start, $lt: end },
+      })
+      .toArray();
 
-    res.status(200).json({ expenses, totalExpenses }); // Return the expenses and total amount
+    const totalExpenses = expenses.reduce((acc, e) => acc + e.amount, 0);
+
+    return res.status(200).json({ expenses, totalExpenses });
   } catch (error) {
     console.error('Error retrieving monthly expenses:', error);
-    res.status(500).json({ message: 'Error retrieving expenses' });
-  } finally {
-    await mongoDB.disconnect();
+    return res.status(500).json({ message: 'Error retrieving expenses' });
   }
 };
 
