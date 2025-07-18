@@ -327,3 +327,15 @@ export interface SavingEntry {
   createdAt: string;       // ISO-DateTime-String
   updatedAt: string;       // ISO-DateTime-String
 }
+
+export interface SavingGoal {
+  userId: string;
+  title: string;
+  targetAmount: number;
+  currentAmount: number;
+  monthlyContribution?: number;
+  deadline?: string; // ISO-Date oder leerer String
+  createdAt: string;
+  updatedAt: string;
+  _id?: string; // falls von MongoDB mitgeliefert
+}
