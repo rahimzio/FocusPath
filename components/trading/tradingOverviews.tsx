@@ -3,18 +3,17 @@ import MarketChart from "./marketChart";
 import OrderBook from "./orderBooks";
 import TradeHistory from "./tradeHistory";
 import styled from "styled-components";
-import styles from "@/pages/TradingOverview.module.css";
 // ... restlicher Importcode
 
 const TradingOverview = () => {
   return (
-    <div className={styles.container}>
-      <h1 className={styles.header}>Trading Dashboard</h1>
-      <div className={styles.content}>
-        <div className={styles.main}>
+    <div className="">
+      <h1 className="">Trading Dashboard</h1>
+      <div className="">
+        <div className="">
           <MarketChart />
         </div>
-        <div className={styles.sidebar}>
+        <div className="">
           <OrderBook />
         </div>
       </div>
