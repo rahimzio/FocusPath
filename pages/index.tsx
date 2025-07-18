@@ -1,28 +1,23 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import DailyTaskList from "@/components/dailyTodos";
 import { useSession, signIn } from "next-auth/react";
-import { useRouter } from "next/router";
-import { AppSidebar } from "@/components/app-sidebar";
-import AppLayout from "./AppLayout";
+import DailyTaskList from "@/components/dailyTodos";
+import Link from "next/link";
 
 export default function Home() {
   const { data: session, status } = useSession();
   const [localLoading, setLocalLoading] = useState(true);
   const [autoLoginAttempted, setAutoLoginAttempted] = useState(false);
-  const router = useRouter();
 
   useEffect(() => {
     if (status === "loading") return;
 
-    // Session vorhanden → nichts tun
     if (session) {
       setLocalLoading(false);
       return;
     }
 
-    // Falls localStorage-Daten vorhanden → Auto-Login versuchen
     const email = localStorage.getItem("email");
     const password = localStorage.getItem("password");
 
@@ -33,12 +28,7 @@ export default function Home() {
         password,
         redirect: false,
       }).then((res) => {
-        if (!res?.error) {
-          setLocalLoading(false);
-        } else {
-          console.warn("Auto-Login fehlgeschlagen");
-          setLocalLoading(false);
-        }
+        setLocalLoading(false);
       });
     } else {
       setLocalLoading(false);
@@ -46,11 +36,20 @@ export default function Home() {
   }, [session, status, autoLoginAttempted]);
 
   if (status === "loading" || localLoading) {
-    return <div className="p-4 text-gray-700">⏳ Lade...</div>;
+    return <div className="p-8 text-gray-600 text-center">⏳ Lade FokusPath…</div>;
   }
 
-  return (
-    
-      <DailyTaskList />
-  );
+  if (!session) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen gap-4 text-center">
+        <h1 className="text-2xl font-semibold text-gray-800">Willkommen bei FokusPath</h1>
+        <p className="text-gray-600">Bitte logge dich ein, um deine Aufgaben zu sehen.</p>
+        <Link href="/login" className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+          🔐 Zur Login-Seite
+        </Link>
+      </div>
+    );
+  }
+
+  return <DailyTaskList />;
 }

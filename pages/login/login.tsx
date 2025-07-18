@@ -1,4 +1,3 @@
-// pages/auth/login.tsx
 "use client";
 
 import { signIn } from "next-auth/react";
@@ -20,6 +19,7 @@ export default function LoginPage() {
       setEmail(savedEmail);
       setPassword(savedPassword);
       setRememberMe(true);
+      toast.info("Automatisch vorausgefüllt");
     }
   }, []);
 
@@ -43,6 +43,7 @@ export default function LoginPage() {
         localStorage.removeItem("savedEmail");
         localStorage.removeItem("savedPassword");
       }
+      toast.success("Login erfolgreich!");
       router.push("/");
     } else {
       toast.error("Login fehlgeschlagen. Bitte überprüfe deine Eingaben.");
@@ -95,7 +96,7 @@ export default function LoginPage() {
           className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition disabled:opacity-50"
           disabled={loading}
         >
-          {loading ? "Lade..." : "Einloggen"}
+          {loading ? "Wird geprüft..." : "Einloggen"}
         </button>
 
         <div className="text-center text-sm text-gray-600 mt-2">
