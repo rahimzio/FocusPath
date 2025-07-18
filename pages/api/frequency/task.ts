@@ -41,7 +41,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       progress: 0,
     };
 
-    const result = await taskCollection.insertOne(newTask);
+    const result = await taskCollection.insertOne(newTask as any);
 
     return res.status(201).json({ message: "Aufgabe erfolgreich erstellt", taskId: result.insertedId });
   } catch (error) {

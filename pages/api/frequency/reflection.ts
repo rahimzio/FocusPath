@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { connectDB } from "@/utils/db"; // deine bestehende DB-Verbindung
 import { ObjectId } from "mongodb";
+import { connectToDatabase } from "../db/mongo";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
@@ -14,7 +14,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const db = await connectDB();
+    const { db } = await connectToDatabase();
     const reflections = db.collection("frequencyReflections");
 
     const doc = {
@@ -29,8 +29,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     await reflections.insertOne(doc);
 
     return res.status(201).json({ message: "Reflexion gespeichert" });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Fehler beim Speichern der Reflexion:", error);
-    return res.status(500).json({ message: "Serverfehler" });
+    return res.status(500).json({ message: "Serverfehler", error: error.message });
   }
 }

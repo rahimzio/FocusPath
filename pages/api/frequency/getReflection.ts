@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { connectDB } from "@/utils/db";
+import { connectToDatabase } from "../db/mongo";
 import { ObjectId } from "mongodb";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -10,7 +10,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const db = await connectDB();
+    const { db } = await connectToDatabase();
     const reflections = await db
       .collection("frequencyReflections")
       .find({ userId: new ObjectId(userId) })
