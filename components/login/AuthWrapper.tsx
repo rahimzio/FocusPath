@@ -14,10 +14,14 @@ export const AuthWrapper = ({ children }: Props) => {
   const [autoLoginAttempted, setAutoLoginAttempted] = useState(false);
   const router = useRouter();
 
+  const publicPaths = ["/", "/login", "/login/login", "/login/register"];
+
+  const isPublicPath = publicPaths.includes(router.pathname);
+
   useEffect(() => {
     if (status === "loading") return;
 
-    if (session) {
+    if (session || isPublicPath) {
       setLocalLoading(false);
       return;
     }
@@ -42,15 +46,13 @@ export const AuthWrapper = ({ children }: Props) => {
     } else {
       setLocalLoading(false);
     }
-  }, [session, status, autoLoginAttempted]);
+  }, [session, status, autoLoginAttempted, isPublicPath]);
 
   if (status === "loading" || localLoading) {
     return <div className="p-4 text-gray-700">⏳ Lade...</div>;
   }
-  
-  const isOnAuthPage = router.pathname.includes("/login");
-  
-  if (!session && !isOnAuthPage) {
+
+  if (!session && !isPublicPath) {
     return (
       <div className="flex flex-col items-center justify-center h-screen text-center p-6 w-full">
         <h1 className="text-2xl font-semibold mb-4">Du bist nicht eingeloggt</h1>
@@ -72,7 +74,6 @@ export const AuthWrapper = ({ children }: Props) => {
       </div>
     );
   }
-  
 
   return <>{children}</>;
 };
