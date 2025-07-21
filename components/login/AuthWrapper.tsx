@@ -14,7 +14,7 @@ export const AuthWrapper = ({ children }: Props) => {
   const [autoLoginAttempted, setAutoLoginAttempted] = useState(false);
   const router = useRouter();
 
-  const publicPaths = ["/", "/login", "/login/login", "/login/register"];
+  const publicPaths = ["/login", "/login/login", "/login/register"];
 
   const isPublicPath = publicPaths.includes(router.pathname);
 
@@ -25,10 +25,9 @@ export const AuthWrapper = ({ children }: Props) => {
       setLocalLoading(false);
       return;
     }
-
-    const email = localStorage.getItem("email");
-    const password = localStorage.getItem("password");
-
+    const email = localStorage.getItem("authEmail");
+    const password = localStorage.getItem("authPassword");
+    
     if (email && password && !autoLoginAttempted) {
       setAutoLoginAttempted(true);
       signIn("credentials", {

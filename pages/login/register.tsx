@@ -14,8 +14,8 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const savedEmail = localStorage.getItem("rememberedEmail");
-    const savedPassword = localStorage.getItem("rememberedPassword");
+    const savedEmail = localStorage.getItem("authEmail");
+    const savedPassword = localStorage.getItem("authPassword");
     if (savedEmail && savedPassword) {
       setEmail(savedEmail);
       setPassword(savedPassword);
@@ -54,15 +54,15 @@ export default function Register() {
         }
         throw new Error(data.message || "Registrierung fehlgeschlagen");
       }
-  
+   console.log("✅ Registrierung erfolgreich", email);
       toast.success("Registrierung erfolgreich!");
   
       if (rememberMe) {
-        localStorage.setItem("rememberedEmail", email);
-        localStorage.setItem("rememberedPassword", password);
+                localStorage.setItem("authEmail", email);
+        localStorage.setItem("authPassword", password);
       } else {
-        localStorage.removeItem("rememberedEmail");
-        localStorage.removeItem("rememberedPassword");
+               localStorage.removeItem("authEmail");
+        localStorage.removeItem("authPassword");
       }
   
       // Automatisch einloggen
@@ -74,10 +74,12 @@ export default function Register() {
       });
   
       if (!signInResult?.ok) {
+        console.warn("❌ Auto-Login nach Registrierung fehlgeschlagen", signInResult?.error);
         toast.warn("Registriert, aber Login fehlgeschlagen. Bitte manuell einloggen.");
         router.push("/login");
       }
     } catch (err: any) {
+       console.error("❌ Fehler bei der Registrierung", err);
       toast.error(err.message);
     } finally {
       setLoading(false);

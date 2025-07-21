@@ -13,8 +13,8 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const savedEmail = localStorage.getItem("savedEmail");
-    const savedPassword = localStorage.getItem("savedPassword");
+    const savedEmail = localStorage.getItem("authEmail");
+    const savedPassword = localStorage.getItem("authPassword");
     if (savedEmail && savedPassword) {
       setEmail(savedEmail);
       setPassword(savedPassword);
@@ -36,16 +36,18 @@ export default function LoginPage() {
     setLoading(false);
 
     if (result?.ok) {
+       console.log("✅ Login erfolgreich", email);
       if (rememberMe) {
-        localStorage.setItem("savedEmail", email);
-        localStorage.setItem("savedPassword", password);
+        localStorage.setItem("authEmail", email);
+        localStorage.setItem("authPassword", password);
       } else {
-        localStorage.removeItem("savedEmail");
-        localStorage.removeItem("savedPassword");
+        localStorage.removeItem("authEmail");
+        localStorage.removeItem("authPassword");
       }
       toast.success("Login erfolgreich!");
       router.push("/");
     } else {
+       console.warn("❌ Login fehlgeschlagen", result?.error);
       toast.error("Login fehlgeschlagen. Bitte überprüfe deine Eingaben.");
     }
   };

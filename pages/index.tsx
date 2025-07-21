@@ -21,9 +21,11 @@ export default function Home() {
     }
 
     // Falls localStorage-Daten vorhanden → Auto-Login versuchen
-    const email = localStorage.getItem("email");
-    const password = localStorage.getItem("password");
-
+    const email = localStorage.getItem("authEmail");
+    const password = localStorage.getItem("authPassword");
+    if (email && password) {
+      console.log("🔐 Versuche automatischen Login mit gespeicherten Daten");
+    }
     if (email && password && !autoLoginAttempted) {
       setAutoLoginAttempted(true);
       signIn("credentials", {

@@ -11,8 +11,8 @@ export default function NotLoggedInPage() {
   const [showWarning, setShowWarning] = useState(false);
 
   useEffect(() => {
-    const localEmail = localStorage.getItem("rememberEmail");
-    const localPassword = localStorage.getItem("rememberPassword");
+    const localEmail = localStorage.getItem("authEmail");
+    const localPassword = localStorage.getItem("authPassword");
 
     if (status === "loading") return;
 
