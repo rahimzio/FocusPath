@@ -10,6 +10,7 @@ export default function Register() {
   const [email, setEmail] = useState("");
   const [userName, setuserName] = useState("");
   const [password, setPassword] = useState("");
+  const [birthDate, setBirthDate] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -39,7 +40,7 @@ export default function Register() {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, userName }),
+        body: JSON.stringify({ email, password, userName, birthDate }),
       });
 
       const data = await res.json();
@@ -114,7 +115,16 @@ export default function Register() {
             required
             className="w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
           />
-          <input
+         
+         <input
+            type="date"
+            placeholder="Geburtsdatum"
+            value={birthDate}
+            onChange={(e) => setBirthDate(e.target.value)}
+            required
+            className="w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+          />
+           <input
             type="password"
             placeholder="Passwort"
             value={password}
@@ -141,13 +151,14 @@ export default function Register() {
         >
           {loading ? "⏳ Registriere..." : "Registrieren"}
         </button>
-      </form>
-      <div className="text-center text-sm text-gray-600 mt-2">
+         <div className="text-center text-sm text-gray-600 mt-2">
         Bereits Mitglied?{' '}
         <a href="/login/login" className="text-blue-600 hover:underline">
           Zum Login
         </a>
       </div>
+      </form>
+     
     </div>
   );
 }

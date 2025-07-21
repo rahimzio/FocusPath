@@ -19,7 +19,6 @@ export const AuthWrapper = ({ children }: Props) => {
     "/login/login",
     "/login/register",
     "/login/forgot-password",
-    "/login/reset-password",
   ];
   const isPublicPath = publicPaths.includes(router.pathname);
 
