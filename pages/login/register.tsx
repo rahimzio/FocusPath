@@ -88,9 +88,12 @@ export default function Register() {
   
 
   return (
-    <div className="max-w-md mx-auto mt-20 p-6 border rounded shadow bg-white text-black">
-      <h2 className="text-xl font-bold mb-4">Registrieren</h2>
-      <form onSubmit={handleRegister} className="space-y-4">
+ <div className="w-screen h-screen overflow-hidden bg-gradient-to-br from-blue-50 via-white to-blue-100 flex items-center justify-center px-4">
+      <form
+        onSubmit={handleRegister}
+        className="bg-white rounded-2xl shadow-xl p-8 space-y-4 w-full max-w-sm border border-gray-200"
+      >
+        <h2 className="text-xl font-bold mb-4 text-center">Registrieren</h2>
         <input
           type="email"
           placeholder="E-Mail"
