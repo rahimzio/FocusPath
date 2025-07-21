@@ -14,8 +14,13 @@ export const AuthWrapper = ({ children }: Props) => {
   const [autoLoginAttempted, setAutoLoginAttempted] = useState(false);
   const router = useRouter();
 
-  const publicPaths = ["/login", "/login/login", "/login/register"];
-
+  const publicPaths = [
+    "/login",
+    "/login/login",
+    "/login/register",
+    "/login/forgot-password",
+    "/login/reset-password",
+  ];
   const isPublicPath = publicPaths.includes(router.pathname);
 
   useEffect(() => {

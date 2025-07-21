@@ -36,7 +36,7 @@ export default function LoginPage() {
     setLoading(false);
 
     if (result?.ok) {
-       console.log("✅ Login erfolgreich", email);
+      console.log("✅ Login erfolgreich", email);
       if (rememberMe) {
         localStorage.setItem("authEmail", email);
         localStorage.setItem("authPassword", password);
@@ -47,7 +47,7 @@ export default function LoginPage() {
       toast.success("Login erfolgreich!");
       router.push("/");
     } else {
-       console.warn("❌ Login fehlgeschlagen", result?.error);
+      console.warn("❌ Login fehlgeschlagen", result?.error);
       toast.error("Login fehlgeschlagen. Bitte überprüfe deine Eingaben.");
     }
   };
@@ -90,8 +90,7 @@ export default function LoginPage() {
             />
             Angemeldet bleiben
           </label>
-          <a href="#" className="text-blue-500 hover:underline">Passwort vergessen?</a>
-        </div>
+          <a href="/login/forgot-password" className="text-blue-500 hover:underline">Passwort vergessen?</a>        </div>
 
         <button
           type="submit"

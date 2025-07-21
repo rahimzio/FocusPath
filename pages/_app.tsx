@@ -8,9 +8,14 @@ import "react-toastify/dist/ReactToastify.css";
 import "./globals.css";
 
 export default function MyApp({ Component, pageProps }: AppProps) {
-    const router = useRouter();
-  const authPaths = ["/login", "/login/login", "/login/register"];
-  const isAuthPage = authPaths.includes(router.pathname);
+  const router = useRouter();
+  const authPaths = [
+    "/login",
+    "/login/login",
+    "/login/register",
+    "/login/forgot-password",
+    "/login/reset-password",
+  ]; const isAuthPage = authPaths.includes(router.pathname);
 
   const content = (
     <>
@@ -22,7 +27,7 @@ export default function MyApp({ Component, pageProps }: AppProps) {
   return (
     <SessionProvider session={pageProps.session}>
       <AuthWrapper>
-         {isAuthPage ? content : <AppLayout>{content}</AppLayout>}
+        {isAuthPage ? content : <AppLayout>{content}</AppLayout>}
       </AuthWrapper>
     </SessionProvider>
   );
