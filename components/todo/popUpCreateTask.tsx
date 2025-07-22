@@ -455,7 +455,7 @@ export default function SheetWithCreateTask({ userId, onTaskCreated }: Props) {
                   <div className="mb-2">
                     <label
                       htmlFor={`subtask-description-${index}`}
-                      className="block text-sm font-medium text-gray-700"
+                      className="block text-sm font-medium text-white"
                     >
                       Beschreibung
                     </label>
@@ -466,26 +466,6 @@ export default function SheetWithCreateTask({ userId, onTaskCreated }: Props) {
                       onChange={(e) => handleSubTaskChange(index, e)}
                       className="mt-1 block w-full rounded-md border-gray-300"
                     />
-                  </div>
-                  <div className="mb-2">
-                    <label
-                      htmlFor={`subtask-status-${index}`}
-                      className="block text-sm font-medium text-gray-700"
-                    >
-                      Status
-                    </label>
-                    <select
-                      id={`subtask-status-${index}`}
-                      name="status"
-                      value={subtask.status}
-                      onChange={(e) => handleSubTaskChange(index, e)}
-                      className="mt-1 block w-full rounded-md border-gray-300"
-                    >
-                      <option value="incomplete">Unvollständig</option>
-                      <option value="in-progress">In Bearbeitung</option>
-                      <option value="completed">Abgeschlossen</option>
-                      <option value="on-hold">Pausiert</option>
-                    </select>
                   </div>
                 </div>
               ))}
