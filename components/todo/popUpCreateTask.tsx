@@ -193,7 +193,7 @@ export default function SheetWithCreateTask({ userId, onTaskCreated }: Props) {
         </SheetTrigger>
         <SheetContent className="w-[400px] sm:w-[540px] max-h-[100vh] overflow-y-auto text-black">
           <SheetHeader>
-            <SheetTitle>Neue Aufgabe erstellen</SheetTitle>
+            <SheetTitle className="text-white">Neue Aufgabe erstellen</SheetTitle>
             <SheetDescription>
               Füllen Sie die Details aus, um eine neue Aufgabe zu erstellen.
             </SheetDescription>
@@ -202,7 +202,7 @@ export default function SheetWithCreateTask({ userId, onTaskCreated }: Props) {
           <form onSubmit={handleSubmit} className="mt-4">
             {/* Hauptaufgabenfelder */}
             <div className="mb-4">
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="name" className="block text-sm font-medium text-white">
                 Name
               </label>
               <input
@@ -217,7 +217,7 @@ export default function SheetWithCreateTask({ userId, onTaskCreated }: Props) {
             </div>
 
             <div className="mb-4">
-              <label htmlFor="description" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="description" className="block text-sm font-medium text-white">
                 Beschreibung
               </label>
               <textarea
@@ -231,7 +231,7 @@ export default function SheetWithCreateTask({ userId, onTaskCreated }: Props) {
             </div>
 
             <div className="mb-4">
-              <label htmlFor="points" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="points" className="block text-sm font-medium text-white">
                 Punkte
               </label>
               <input
@@ -248,7 +248,7 @@ export default function SheetWithCreateTask({ userId, onTaskCreated }: Props) {
             </div>
 
             <div className="mb-4">
-              <label htmlFor="color" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="color" className="block text-sm font-medium text-white">
                 Farbe der Aufgabe
               </label>
               <input
@@ -263,7 +263,7 @@ export default function SheetWithCreateTask({ userId, onTaskCreated }: Props) {
 
 
             <div className="mb-4">
-              <label htmlFor="dueDate" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="dueDate" className="block text-sm font-medium text-white">
                 Fälligkeitsdatum
               </label>
               <input
@@ -278,7 +278,7 @@ export default function SheetWithCreateTask({ userId, onTaskCreated }: Props) {
             </div>
 
             <div className="mb-4">
-              <label htmlFor="frequency" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="frequency" className="block text-sm font-medium text-white">
                 Häufigkeit
               </label>
               <select
@@ -298,7 +298,7 @@ export default function SheetWithCreateTask({ userId, onTaskCreated }: Props) {
 
 {task.frequency === "weekly" && (
               <div className="mb-4">
-                <span className="block text-sm font-medium text-gray-700">Wochentage</span>
+                <span className="block text-sm font-medium text-white">Wochentage</span>
                 <div className="flex flex-wrap gap-2 mt-1">
                   {['So','Mo','Di','Mi','Do','Fr','Sa'].map((label, idx) => (
                     <label key={idx} className="flex items-center text-sm gap-1">
@@ -316,7 +316,7 @@ export default function SheetWithCreateTask({ userId, onTaskCreated }: Props) {
 
             {task.frequency === "daily" && (
               <div className="mb-4">
-                <label htmlFor="interval" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="interval" className="block text-sm font-medium text-white">
                   Alle X Tage
                 </label>
                 <input
@@ -332,7 +332,7 @@ export default function SheetWithCreateTask({ userId, onTaskCreated }: Props) {
             )}
 
             <div className="mb-4">
-              <label htmlFor="goalId" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="goalId" className="block text-sm font-medium text-white">
                 Ziel
               </label>
               <select
@@ -352,7 +352,7 @@ export default function SheetWithCreateTask({ userId, onTaskCreated }: Props) {
             </div>
 
             <div className="mb-4">
-              <label htmlFor="category" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="category" className="block text-sm font-medium text-white">
                 Kategorie
               </label>
               <input
@@ -367,7 +367,7 @@ export default function SheetWithCreateTask({ userId, onTaskCreated }: Props) {
             </div>
 
             <div className="mb-4">
-              <label htmlFor="linkedApps" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="linkedApps" className="block text-sm font-medium text-white">
                 Verlinkte Apps (Komma-getrennt)
               </label>
               <input
@@ -384,7 +384,7 @@ export default function SheetWithCreateTask({ userId, onTaskCreated }: Props) {
             </div>
 
             <div className="mb-4 flex items-center gap-2">
-              <label htmlFor="timebased" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="timebased" className="block text-sm font-medium text-white">
                 Zeitbasiert
               </label>
               <input
@@ -400,7 +400,7 @@ export default function SheetWithCreateTask({ userId, onTaskCreated }: Props) {
             
             {task.timebased && (
               <>
-                <label className="block font-medium text-sm text-gray-700">Uhrzeit</label>
+                <label className="block font-medium text-sm text-white">Uhrzeit</label>
                 <input
                   type="time"
                   value={task.time}
@@ -408,7 +408,7 @@ export default function SheetWithCreateTask({ userId, onTaskCreated }: Props) {
                   className="p-2 border border-gray-300 rounded-md w-full mb-4"
                 />
 
-                <label className="block font-medium text-sm text-gray-700">Dauer (HH:MM)</label>
+                <label className="block font-medium text-sm text-white">Dauer (HH:MM)</label>
                 <input
                   type="time"
                   step="60"
@@ -422,11 +422,11 @@ export default function SheetWithCreateTask({ userId, onTaskCreated }: Props) {
 
             {/* Subtasks-Bereich */}
             <div className="mb-4 border-t pt-4">
-              <h3 className="text-lg font-semibold mb-2">Subtasks (optional)</h3>
+              <h3 className="text-lg font-semibold mb-2 text-white">Subtasks (optional)</h3>
               {subTasks.map((subtask, index) => (
                 <div key={subtask._id || index} className="mb-4 p-2 border rounded">
                   <div className="flex justify-between items-center mb-2">
-                    <span className="font-medium">Subtask {index + 1}</span>
+                    <span className="font-medium text-white">Subtask {index + 1}</span>
                     <button
                       type="button"
                       onClick={() => removeSubTask(index)}
@@ -438,7 +438,7 @@ export default function SheetWithCreateTask({ userId, onTaskCreated }: Props) {
                   <div className="mb-2">
                     <label
                       htmlFor={`subtask-name-${index}`}
-                      className="block text-sm font-medium text-gray-700"
+                      className="block text-sm font-medium text-white"
                     >
                       Name
                     </label>
