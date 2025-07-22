@@ -1,7 +1,7 @@
 import { MongoClient } from "mongodb";
 import type { NextApiRequest, NextApiResponse } from "next";
 
-const uri = process.env.MONGO_URI!;
+const uri = process.env.MONGODB_URI!;
 const dbName = process.env.DB_NAME || "focuspath";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
