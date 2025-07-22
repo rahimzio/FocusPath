@@ -366,23 +366,6 @@ export default function SheetWithCreateTask({ userId, onTaskCreated }: Props) {
               />
             </div>
 
-            <div className="mb-4">
-              <label htmlFor="linkedApps" className="block text-sm font-medium text-white">
-                Verlinkte Apps (Komma-getrennt)
-              </label>
-              <input
-                type="text"
-                id="linkedApps"
-                name="linkedApps"
-                value={task.linkedApps.join(", ")}
-                onChange={(e) => {
-                  const apps = e.target.value.split(",").map((app) => app.trim());
-                  setTask((prev) => ({ ...prev, linkedApps: apps }));
-                }}
-                className="mt-1 block w-full rounded-md border-gray-300"
-              />
-            </div>
-
             <div className="mb-4 flex items-center gap-2">
               <label htmlFor="timebased" className="block text-sm font-medium text-white">
                 Zeitbasiert
