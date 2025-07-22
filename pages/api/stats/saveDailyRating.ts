@@ -32,7 +32,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       else if (percent >= 85 && allGoalTasksDone && allImportantDone) rating = "W Day";
       else if (percent >= 50) rating = "M Day";
 
-      await db.collection("dailyRatings").updateOne(
+      await db.collection("stats").updateOne(
         { userId, date: today },
         { $set: { rating, updatedAt: new Date() } },
         { upsert: true }
