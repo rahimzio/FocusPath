@@ -1,19 +1,14 @@
-import { MongoClient } from "mongodb";
 import type { NextApiRequest, NextApiResponse } from "next";
-
-const uri = process.env.MONGODB_URI!;
-const dbName = process.env.DB_NAME || "focuspath";
+import { connectToDatabase } from "../db/mongo";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Only POST allowed" });
   }
 
-  const client = new MongoClient(uri);
-
   try {
-    await client.connect();
-    const db = client.db(dbName);
+    const { db } = await connectToDatabase();
+
     const users = await db.collection("users").find({}).toArray();
     const tasksCol = db.collection("tasks");
     const goalsCol = db.collection("goals");
@@ -37,7 +32,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       else if (percent >= 85 && allGoalTasksDone && allImportantDone) rating = "W Day";
       else if (percent >= 50) rating = "M Day";
 
-      await db.collection("stats").updateOne(
+      await db.collection("dailyRatings").updateOne(
         { userId, date: today },
         { $set: { rating, updatedAt: new Date() } },
         { upsert: true }
@@ -48,7 +43,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   } catch (err) {
     console.error("❌ Fehler beim Tagesrating:", err);
     res.status(500).json({ error: "Interner Fehler beim Speichern" });
-  } finally {
-    await client.close();
   }
 }
