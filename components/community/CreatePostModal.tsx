@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from  "@/components/ui/textarea";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useSession } from "next-auth/react";
 
@@ -16,6 +16,7 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({ onPostCreated }) => {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [type, setType] = useState<"update" | "survey">("update");
+  const [options, setOptions] = useState<string[]>(["", ""]);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async () => {
@@ -31,6 +32,7 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({ onPostCreated }) => {
           content,
           type,
           createdBy: session.user.email,
+          ...(type === "survey" ? { options } : {}),
         }),
       });
 
@@ -50,13 +52,14 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({ onPostCreated }) => {
       setTitle("");
       setContent("");
       setType("update");
+      setOptions(["", ""]);
     }
   };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline">Neues Update / Umfrage erstellen</Button>
+        <Button>Neues Update / Umfrage erstellen</Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
@@ -76,7 +79,31 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({ onPostCreated }) => {
             onChange={(e) => setContent(e.target.value)}
           />
 
-          <Select value={type} onValueChange={(value) => setType(value as "update" | "survey")}> 
+          {type === "survey" && (
+            <div className="space-y-2">
+              {options.map((opt, idx) => (
+                <Input
+                  key={idx}
+                  placeholder={`Option ${idx + 1}`}
+                  value={opt}
+                  onChange={(e) => {
+                    const arr = [...options];
+                    arr[idx] = e.target.value;
+                    setOptions(arr);
+                  }}
+                />
+              ))}
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setOptions([...options, ""])}
+              >
+                Option hinzufügen
+              </Button>
+            </div>
+          )}
+
+          <Select value={type} onValueChange={(value) => setType(value as "update" | "survey")}>
             <SelectTrigger>
               <SelectValue placeholder="Typ auswählen" />
             </SelectTrigger>

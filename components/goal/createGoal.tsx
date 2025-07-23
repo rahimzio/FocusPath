@@ -121,7 +121,7 @@ const NewGoalForm: React.FC<Props> = ({ onGoalCreated }) => {
       </div>
 
       <div className="mt-6">
-        <h3 className="text-md font-semibold mb-2">Aufgaben hinzufügen</h3>
+        <h3 className="text-md font-semibold mb-2 text-white">Aufgaben hinzufügen</h3>
         {tasks.map((task, idx) => (
           <div key={idx} className="border p-3 rounded mb-3">
             <div className="grid gap-2">

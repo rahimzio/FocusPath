@@ -4,7 +4,34 @@
  */
 
 import { ObjectId } from "mongodb";
+export interface User {
+  _id: string;
+  name: string;
+  email: string;
+  role: 'user' | 'admin';
+  createdAt: string;
+  updatedAt: string;
 
+  preferences?: {
+    theme?: 'light' | 'dark';
+    language?: string;
+    dailyReminder?: boolean;
+  };
+
+  onboardingStep?: number;
+  importantFields?: string[]; 
+
+  dailyRatings?: { [date: string]: string };
+  weeklyScores?: { [weekId: string]: number };
+  monthlyStats?: { [month: string]: { completedGoals: number; avgRating: string } };
+
+  subscription?: 'free' | 'pro' | 'enterprise';
+  linkedApps?: string[];
+
+  trainingStats?: any;
+  financeStats?: any;
+  nutritionProfile?: any;
+}
 /* -------------------------------------
  *          DB (Mongo) INTERFACES
  * ------------------------------------- */
@@ -235,8 +262,15 @@ export interface CommunityPost {
   type: "update" | "survey" | "userTopic";
   category?: "Bug Report" | "Feature Wunsch" | "Allgemein"; // Nur bei userTopics
   comments?: Comment[]; // Nur bei userTopics
+  options?: PollOption[]; // Nur bei Umfragen
+  likes?: string[]; // User, die den Post geliked haben
 }
 
+export interface PollOption {
+  id: string;
+  text: string;
+  votes: string[]; // E-Mail-Adressen der Abstimmenden
+}
 export interface Comment {
   _id: ObjectId;
   userId: string;
@@ -255,6 +289,9 @@ export interface Post {
   type: "update" | "survey" | "userTopic";
   createdAt: string;
   category?: string;
+  createdBy: string;
+  options?: PollOption[];
+  likes?: string[];
 }
 
 export interface TradeEntry {

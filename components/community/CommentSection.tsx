@@ -134,7 +134,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ postId }) => {
 
             {comment.userId === session?.user?.email && (
               <div className="flex gap-2 mt-2">
-                <Button size="sm" variant="outline" onClick={() => handleEditComment(comment._id)}>
+                <Button size="sm"  onClick={() => handleEditComment(comment._id)}>
                   Bearbeiten
                 </Button>
                 <Button size="sm" variant="destructive" onClick={() => handleDeleteComment(comment._id)}>

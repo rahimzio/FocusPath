@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Goal } from "@/utils/interface";
+import { Goal, Task } from "@/utils/interface";
 import { parseISO, isWithinInterval, startOfWeek, endOfWeek } from "date-fns";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -44,9 +44,56 @@ export default function GoalOverviewDashboard() {
     setSelectedGoal(goal);
     setEditMode(true);
     setMoveMode(false);
-    setEditedGoal({ title: goal.title, description: goal.description });
+    setEditedGoal({
+      title: goal.title,
+      description: goal.description,
+      startDate: goal.startDate,
+      endDate: goal.endDate,
+      goalType: goal.goalType || goal.type,
+      tasks: goal.tasks ? [...goal.tasks] : [],
+    });  };
+  const handleAddTask = () => {
+  setEditedGoal((prev) => ({
+    ...prev,
+    tasks: [
+      ...(prev.tasks || []),
+      {
+        name: '',
+        description: '',
+        duration: '',
+        color: '',
+        time: '',
+        category: '',
+        frequency: 'once',
+        timebased: false,
+        dueDate: '',
+        points: 0,
+        status: 'todo',
+        _id: crypto.randomUUID?.() || Math.random().toString(),
+        linkedApps: [],
+        subTasks: [],
+        excludedDates: [],
+      },
+    ] as Task[],
+  }));
+};
+
+
+
+  const handleTaskChange = (index: number, field: string, value: any) => {
+    setEditedGoal((prev) => {
+      const tasks = [...(prev.tasks || [])];
+      tasks[index] = { ...tasks[index], [field]: value };
+      return { ...prev, tasks };
+    });
   };
 
+  const handleRemoveTask = (index: number) => {
+    setEditedGoal((prev) => ({
+      ...prev,
+      tasks: (prev.tasks || []).filter((_, i) => i !== index),
+    }));
+  };
   const handleMove = (goal: Goal) => {
     setSelectedGoal(goal);
     setMoveMode(true);
@@ -178,8 +225,109 @@ export default function GoalOverviewDashboard() {
                 <textarea
                   value={editedGoal.description || ""}
                   onChange={(e) => setEditedGoal((prev) => ({ ...prev, description: e.target.value }))}
-                  className="border p-2 w-full rounded mb-4"
+                  className="border p-2 w-full rounded mb-3"
                 />
+                <label className="block text-sm font-medium mb-1">Startdatum</label>
+                <input
+                  type="date"
+                  value={editedGoal.startDate || ""}
+                  onChange={(e) => setEditedGoal((prev) => ({ ...prev, startDate: e.target.value }))}
+                  className="border p-2 w-full rounded mb-3"
+                />
+                <label className="block text-sm font-medium mb-1">Enddatum</label>
+                <input
+                  type="date"
+                  value={editedGoal.endDate || ""}
+                  onChange={(e) => setEditedGoal((prev) => ({ ...prev, endDate: e.target.value }))}
+                  className="border p-2 w-full rounded mb-3"
+                />
+                <label className="block text-sm font-medium mb-1">Zieltyp</label>
+                <select
+                  value={editedGoal.goalType || "weekly"}
+                  onChange={(e) => setEditedGoal((prev) => ({ ...prev, goalType: e.target.value as Goal["goalType"] }))}
+                  className="border p-2 w-full rounded mb-4"
+                >
+                  <option value="weekly">Wöchentlich</option>
+                  <option value="monthly">Monatlich</option>
+                  <option value="yearly">Jährlich</option>
+                </select>
+
+                {(editedGoal.tasks as any[])?.map((task: any, idx: number) => (
+                  <div key={idx} className="border p-3 rounded mb-3 space-y-1">
+                    <input
+                      type="text"
+                      placeholder="Name"
+                      value={task.name || ""}
+                      onChange={(e) => handleTaskChange(idx, 'name', e.target.value)}
+                      className="w-full border rounded p-1"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Beschreibung"
+                      value={task.description || ""}
+                      onChange={(e) => handleTaskChange(idx, 'description', e.target.value)}
+                      className="w-full border rounded p-1"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Dauer"
+                      value={task.duration || ""}
+                      onChange={(e) => handleTaskChange(idx, 'duration', e.target.value)}
+                      className="w-full border rounded p-1"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Farbe"
+                      value={task.color || ""}
+                      onChange={(e) => handleTaskChange(idx, 'color', e.target.value)}
+                      className="w-full border rounded p-1"
+                    />
+                    <input
+                      type="time"
+                      value={task.time || ""}
+                      onChange={(e) => handleTaskChange(idx, 'time', e.target.value)}
+                      className="w-full border rounded p-1"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Kategorie"
+                      value={task.category || ""}
+                      onChange={(e) => handleTaskChange(idx, 'category', e.target.value)}
+                      className="w-full border rounded p-1"
+                    />
+                    <select
+                      value={task.frequency || 'once'}
+                      onChange={(e) => handleTaskChange(idx, 'frequency', e.target.value)}
+                      className="w-full border rounded p-1"
+                    >
+                      <option value="once">Einmalig</option>
+                      <option value="daily">Täglich</option>
+                      <option value="weekly">Wöchentlich</option>
+                      <option value="monthly">Monatlich</option>
+                      <option value="yearly">Jährlich</option>
+                    </select>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={task.timebased || false}
+                        onChange={(e) => handleTaskChange(idx, 'timebased', e.target.checked)}
+                      />
+                      <span className="text-sm">Zeitbasiert</span>
+                    </div>
+                    <input
+                      type="date"
+                      value={task.dueDate || ''}
+                      onChange={(e) => handleTaskChange(idx, 'dueDate', e.target.value)}
+                      className="w-full border rounded p-1"
+                    />
+                    <button type="button" className="text-red-600 text-sm" onClick={() => handleRemoveTask(idx)}>
+                      🗑 Aufgabe entfernen
+                    </button>
+                  </div>
+                ))}
+                <Button variant="outline" type="button" className="mb-4" onClick={handleAddTask}>
+                  + Aufgabe hinzufügen
+                </Button>
                 <div className="flex justify-end gap-2">
                   <Button variant="outline" onClick={() => setSelectedGoal(null)}>Abbrechen</Button>
                   <Button onClick={handleSaveEdit}>Speichern</Button>

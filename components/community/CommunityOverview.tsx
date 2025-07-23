@@ -3,8 +3,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import PostList from "./PostList";
 import CreatePostModal from "./CreatePostModal";
 import CreateUserTopicModal from "./CreateUserTopicModal";
-import { Post } from "@/utils/interface";
 import { useSession } from "next-auth/react";
+import { Post } from "@/utils/interface";
 
 const CommunityOverviews = () => {
   const { data: session } = useSession();
@@ -14,7 +14,18 @@ const CommunityOverviews = () => {
     try {
       const res = await fetch("/api/community/getPosts");
       const data = await res.json();
-      setPosts(data.posts || []);
+      const formatted = (data.posts || []).map((p: any) => ({
+        id: p._id,
+        title: p.title,
+        content: p.content,
+        type: p.type,
+        createdAt: p.createdAt,
+        category: p.category,
+        createdBy: p.createdBy,
+        options: p.options,
+        likes: p.likes,
+      }));
+      setPosts(formatted);
     } catch (error) {
       console.error("Fehler beim Laden der Posts:", error);
     }
@@ -24,7 +35,7 @@ const CommunityOverviews = () => {
     fetchPosts();
   }, []);
 
-  const isAdmin = session?.user?.email === "Rahimzio@gmail.com";
+  const isAdmin = session?.user?.email === "Rahimzio11@gmail.com" || "rahimzio11@gmail.com";
 
   return (
     <div className="p-6">
@@ -39,15 +50,15 @@ const CommunityOverviews = () => {
           <div className="flex justify-end mb-4">
             {isAdmin && <CreatePostModal onPostCreated={fetchPosts} />}
           </div>
-          <PostList posts={posts.filter(post => post.type === "update" || post.type === "survey")} />
-        </TabsContent>
+            <PostList posts={posts.filter(post => post.type === "update" || post.type === "survey")} />
+          </TabsContent>
 
         <TabsContent value="usertopics">
           <div className="flex justify-end mb-4">
             <CreateUserTopicModal onPostCreated={fetchPosts} />
           </div>
-          <PostList posts={posts.filter(post => post.type === "userTopic")} />
-        </TabsContent>
+            <PostList posts={posts.filter(post => post.type === "userTopic")} />
+          </TabsContent>
       </Tabs>
     </div>
   );

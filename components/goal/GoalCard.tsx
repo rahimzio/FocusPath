@@ -1,10 +1,18 @@
-import React from "react";
-import { Goal } from "@/utils/interface";
+import React, { useState } from "react";import { Goal } from "@/utils/interface";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Progress } from "@/components/ui/progress";
 import { Pencil, MoveRight, Trash2, Copy } from "lucide-react";
-
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogFooter,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 interface GoalCardProps {
   goal: Goal;
   onEdit: (goal: Goal) => void;
@@ -37,8 +45,7 @@ const GoalCard: React.FC<GoalCardProps> = ({ goal, onEdit, onMove, onDelete, onD
   }
 
   return (
-    <div className={`group relative hover:shadow-lg transition-shadow border-l-4 ${color} bg-white rounded-lg shadow-sm`}> 
-      <div className="p-4">
+    <div className={`group relative hover:shadow-lg transition-shadow border-l-4 ${color} bg-white rounded-lg shadow-sm`}>      <div className="p-4">
         <div className="flex justify-between items-center">
           <h3 className="text-base font-semibold text-gray-800">
             {goal.title}
@@ -74,14 +81,29 @@ const GoalCard: React.FC<GoalCardProps> = ({ goal, onEdit, onMove, onDelete, onD
             <TooltipContent>Verschieben</TooltipContent>
           </Tooltip>
 
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button size="icon" variant="ghost" onClick={() => onDelete(goal._id)}>
-                <Trash2 className="w-4 h-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Löschen</TooltipContent>
-          </Tooltip>
+          <AlertDialog>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <AlertDialogTrigger asChild>
+                  <Button size="icon" variant="ghost">
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </AlertDialogTrigger>
+              </TooltipTrigger>
+              <TooltipContent>Löschen</TooltipContent>
+            </Tooltip>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>
+                  Bist du sicher, dass du dieses Ziel löschen möchtest? Diese Aktion kann nicht rückgängig gemacht werden.
+                </AlertDialogTitle>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+                <AlertDialogAction onClick={() => onDelete(goal._id)}>Löschen</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
           <Tooltip>
             <TooltipTrigger asChild>

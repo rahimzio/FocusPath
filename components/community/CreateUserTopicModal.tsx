@@ -57,7 +57,7 @@ const CreateUserTopicModal: React.FC<CreateUserTopicModalProps> = ({ onPostCreat
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline">Neues User-Thema erstellen</Button>
+        <Button>Neues User-Thema erstellen</Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
