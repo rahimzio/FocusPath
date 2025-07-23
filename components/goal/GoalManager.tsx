@@ -70,7 +70,7 @@ export default function GoalPage() {
       />
 
       <GoalContainerSection
-        title="Wochenziele"
+        title=""
         goals={weeklyGoals}
         onAddWeekly={handleAddWeeklyGoal}
         onGenerateDaily={handleGenerateDailyTasksForWeekGoal}
