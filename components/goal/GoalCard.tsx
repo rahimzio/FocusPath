@@ -2,7 +2,7 @@ import React, { useState } from "react";import { Goal } from "@/utils/interface"
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Progress } from "@/components/ui/progress";
-import { Pencil, MoveRight, Trash2, Copy } from "lucide-react";
+import { Pencil, MoveRight, Trash2, Copy,CheckCircle2  } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -20,9 +20,10 @@ interface GoalCardProps {
   onDelete: (goalId: string) => void;
   onDuplicate: (goalId: string) => void;
   onReflect?: (goal: Goal) => void;
+  onToggleComplete: (goal: Goal) => void;
 }
 
-const GoalCard: React.FC<GoalCardProps> = ({ goal, onEdit, onMove, onDelete, onDuplicate, onReflect }) => {
+const GoalCard: React.FC<GoalCardProps> = ({ goal, onEdit, onMove, onDelete, onDuplicate, onReflect,onToggleComplete  }) => {
   const isExpired = new Date(goal.endDate) < new Date() && goal.progress < 100;
   const type = goal.goalType || goal.type;
 
@@ -58,6 +59,11 @@ const GoalCard: React.FC<GoalCardProps> = ({ goal, onEdit, onMove, onDelete, onD
         <div className="mt-2">
           <Progress value={goal.progress} />
           {progressTag && <div className="mt-1">{progressTag}</div>}
+          {goal.completedAt && (
+            <div className="mt-1 text-xs text-gray-500">
+              Erledigt am {new Date(goal.completedAt).toLocaleString()}
+            </div>
+          )}
         </div>
       </div>
 
@@ -72,14 +78,31 @@ const GoalCard: React.FC<GoalCardProps> = ({ goal, onEdit, onMove, onDelete, onD
             <TooltipContent>Bearbeiten</TooltipContent>
           </Tooltip>
 
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button size="icon" variant="ghost" onClick={() => onMove(goal)}>
-                <MoveRight className="w-4 h-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Verschieben</TooltipContent>
-          </Tooltip>
+ <Tooltip>
+          <TooltipTrigger asChild>
+            <Button size="icon" variant="ghost" onClick={() => onMove(goal)}>
+              <MoveRight className="w-4 h-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Verschieben</TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => onToggleComplete(goal)}
+            >
+              <CheckCircle2
+                className={`w-4 h-4 ${goal.progress === 100 ? "text-green-600" : ""}`}
+              />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            {goal.progress === 100 ? "Rückgängig" : "Abhaken"}
+          </TooltipContent>
+        </Tooltip>
 
           <AlertDialog>
             <Tooltip>

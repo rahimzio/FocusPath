@@ -19,6 +19,7 @@ interface Props {
     onDuplicate: (goalId: string) => void;
     onReflect?: (goal: Goal) => void;
     onGoalCreated?: (goal: Goal) => void;
+    onToggleComplete: (goal: Goal) => void;
 }
 
 const FullGoalManagerSheet: React.FC<Props> = ({
@@ -34,6 +35,7 @@ const FullGoalManagerSheet: React.FC<Props> = ({
     onDelete,
     onDuplicate,
     onReflect,
+    onToggleComplete,
     onGoalCreated
 }) => {
     const showMonthly = filter === "all" || filter === "monthly";
@@ -66,7 +68,7 @@ const FullGoalManagerSheet: React.FC<Props> = ({
                             <h3 className="font-semibold mb-2">📅 Monatsziele</h3>
                             {monthly.length ? (
                                 monthly.map((g) => (
-                                    <GoalCard key={g._id} goal={g} onEdit={onEdit} onMove={onMove} onDelete={onDelete} onDuplicate={onDuplicate} onReflect={onReflect} />
+                                    <GoalCard key={g._id} goal={g} onEdit={onEdit} onMove={onMove} onDelete={onDelete} onDuplicate={onDuplicate} onReflect={onReflect} onToggleComplete={onToggleComplete} />
                                 ))
                             ) : (
                                 <p className="text-sm text-muted-foreground">Keine Monatsziele vorhanden</p>
@@ -79,7 +81,7 @@ const FullGoalManagerSheet: React.FC<Props> = ({
                             <h3 className="font-semibold mb-2">📆 Jahresziele</h3>
                             {yearly.length ? (
                                 yearly.map((g) => (
-                                    <GoalCard key={g._id} goal={g} onEdit={onEdit} onMove={onMove} onDelete={onDelete} onDuplicate={onDuplicate} onReflect={onReflect} />
+                                    <GoalCard key={g._id} goal={g} onToggleComplete={onToggleComplete} onEdit={onEdit} onMove={onMove} onDelete={onDelete} onDuplicate={onDuplicate} onReflect={onReflect} />
                                 ))
                             ) : (
                                 <p className="text-sm text-muted-foreground">Keine Jahresziele vorhanden</p>
@@ -92,7 +94,7 @@ const FullGoalManagerSheet: React.FC<Props> = ({
                             <h3 className="font-semibold mb-2">🕑 Vergangene Ziele</h3>
                             {past.length ? (
                                 past.map((g) => (
-                                    <GoalCard key={g._id} goal={g} onEdit={onEdit} onMove={onMove} onDelete={onDelete} onDuplicate={onDuplicate} onReflect={onReflect} />
+                                    <GoalCard key={g._id} goal={g}  onToggleComplete={onToggleComplete} onEdit={onEdit} onMove={onMove} onDelete={onDelete} onDuplicate={onDuplicate} onReflect={onReflect} />
                                 ))
                             ) : (
                                 <p className="text-sm text-muted-foreground">Keine vergangenen Ziele</p>

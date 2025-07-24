@@ -51,6 +51,7 @@ export default function GoalOverviewDashboard() {
       endDate: goal.endDate,
       goalType: goal.goalType || goal.type,
       tasks: goal.tasks ? [...goal.tasks] : [],
+      completedAt: goal.completedAt,
     });  };
   const handleAddTask = () => {
   setEditedGoal((prev) => ({
@@ -79,7 +80,22 @@ export default function GoalOverviewDashboard() {
 };
 
 
+  const handleToggleCompletion = async (goal: Goal) => {
+    const newProgress = goal.progress === 100 ? 0 : 100;
+    const completedAt = newProgress === 100 ? new Date().toISOString() : null;
 
+    await fetch(`/api/goals/updateGoalProgress`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ goalId: goal._id, progress: newProgress, completedAt }),
+    });
+
+    setGoals((prev) =>
+      prev.map((g) =>
+        g._id === goal._id ? { ...g, progress: newProgress, completedAt: completedAt ?? undefined } : g
+      )
+    );
+  };
   const handleTaskChange = (index: number, field: string, value: any) => {
     setEditedGoal((prev) => {
       const tasks = [...(prev.tasks || [])];
@@ -185,6 +201,7 @@ export default function GoalOverviewDashboard() {
         onDelete={handleDelete}
         onDuplicate={handleDuplicate}
         onReflect={handleReflect}
+        onToggleComplete={handleToggleCompletion}
       />
 
       <FullGoalManagerSheet
@@ -201,6 +218,7 @@ export default function GoalOverviewDashboard() {
         onDuplicate={handleDuplicate}
         onReflect={handleReflect}
         onGoalCreated={handleGoalCreated}
+        onToggleComplete={handleToggleCompletion}
       />
 
       {/* Ziel erstellen (fest verankert unten rechts) */}
@@ -208,7 +226,7 @@ export default function GoalOverviewDashboard() {
 
       {selectedGoal && (
         <Dialog open={!!selectedGoal} onOpenChange={() => setSelectedGoal(null)}>
-          <DialogContent>
+          <DialogContent className="sm:max-w-lg w-[95vw]">
             <DialogHeader>
               <DialogTitle>{editMode ? "Ziel bearbeiten" : moveMode ? "Ziel verschieben" : "Ziel"}</DialogTitle>
             </DialogHeader>
@@ -234,6 +252,11 @@ export default function GoalOverviewDashboard() {
                   onChange={(e) => setEditedGoal((prev) => ({ ...prev, startDate: e.target.value }))}
                   className="border p-2 w-full rounded mb-3"
                 />
+                                {editedGoal.completedAt && (
+                  <p className="text-xs text-gray-500 mb-3">
+                    Erledigt am {new Date(editedGoal.completedAt).toLocaleString()}
+                  </p>
+                )}
                 <label className="block text-sm font-medium mb-1">Enddatum</label>
                 <input
                   type="date"

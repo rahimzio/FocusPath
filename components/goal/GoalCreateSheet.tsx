@@ -15,9 +15,9 @@ export default function GoalCreateSheet({ onGoalCreated }: Props) {
         <SheetTrigger asChild>
           <Button>Neues Ziel erstellen</Button>
         </SheetTrigger>
-        <SheetContent className="w-[400px] sm:w-[540px] max-h-[100vh] overflow-y-auto text-black">
+        <SheetContent className="w-[400px] sm:w-[540px] max-h-[100vh] overflow-y-auto ">
           <SheetHeader>
-            <SheetTitle>Neues Ziel erstellen</SheetTitle>
+            <SheetTitle className="color-white">Neues Ziel erstellen</SheetTitle>
           </SheetHeader>
           <NewGoalForm onGoalCreated={onGoalCreated || (() => {})} />
         </SheetContent>

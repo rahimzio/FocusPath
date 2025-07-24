@@ -1,19 +1,17 @@
 // pages/api/stats/trustReserve.ts
 import type { NextApiRequest, NextApiResponse } from "next";
 import { connectToDatabase } from "../db/mongo";
-import { Task } from "@/utils/interface";
-
-function calculateDayScore(tasks: Task[]): number {
-  const total = tasks.length;
-  const completed = tasks.filter((t) => t.status === "completed").length;
-  const percent = total ? (completed / total) * 100 : 0;
-  const allGoalTasksDone = tasks.filter((t) => t.goalId).every((t) => t.status === "completed");
-  const allImportantDone = tasks.filter((t) => t.points && t.points > 7).every((t) => t.status === "completed");
-
-  if (percent === 100) return 2.5;
-  if (percent >= 85 && allGoalTasksDone && allImportantDone) return 2;
-  if (percent >= 50) return 1;
-  return 0;
+function ratingToScore(rating: string): number {
+  switch (rating) {
+    case "W+ Day":
+      return 2.5;
+    case "W Day":
+      return 2;
+    case "M Day":
+      return 1;
+    default:
+      return 0;
+  }
 }
 
 function getStatus(trust: number): string {
@@ -28,15 +26,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!userId || typeof userId !== "string") return res.status(400).json({ error: "Missing userId" });
 
   const { db } = await connectToDatabase();
-  const taskCollection = db.collection("task");
-  const raw = await taskCollection.find({ userId }).toArray();
-  const tasks = raw as unknown as Task[];
+    const statsCol = db.collection("stats");
+  const stats = await statsCol
+    .find({ userId })
+    .project({ _id: 0, date: 1, rating: 1 })
+    .toArray();
 
-  const grouped: { [date: string]: Task[] } = {};
-  tasks.forEach((t) => {
-    if (!t.dueDate) return;
-    if (!grouped[t.dueDate]) grouped[t.dueDate] = [];
-    grouped[t.dueDate].push(t);
+  const ratingByDate: Record<string, string> = {};
+  stats.forEach((s: any) => {
+    if (s.date && s.rating) ratingByDate[s.date] = s.rating;
   });
 
   const today = new Date();
@@ -48,8 +46,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   let trust = 50;
   past30Days.forEach((date) => {
-    const score = calculateDayScore(grouped[date] || []);
-    if (score === 2.5 || score === 2) trust += 2.5;
+const score = ratingToScore(ratingByDate[date]);    if (score === 2.5 || score === 2) trust += 2.5;
     else if (score === 1) trust += 0.5;
     else if (score === 0) trust -= 4;
   });

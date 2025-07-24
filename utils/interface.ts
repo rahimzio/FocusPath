@@ -24,7 +24,7 @@ export interface User {
   dailyRatings?: { [date: string]: string };
   weeklyScores?: { [weekId: string]: number };
   monthlyStats?: { [month: string]: { completedGoals: number; avgRating: string } };
-
+  trustReseverTank?: number; // 0-100
   subscription?: 'free' | 'pro' | 'enterprise';
   linkedApps?: string[];
 

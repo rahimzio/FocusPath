@@ -9,6 +9,7 @@ interface Props {
   onDelete: (goalId: string) => void;
   onDuplicate: (goalId: string) => void;
   onReflect?: (goal: Goal) => void;
+  onToggleComplete: (goal: Goal) => void;
 }
 
 const WeeklyGoalsDashboard: React.FC<Props> = ({
@@ -18,6 +19,7 @@ const WeeklyGoalsDashboard: React.FC<Props> = ({
   onDelete,
   onDuplicate,
   onReflect,
+  onToggleComplete,
 }) => {
   return (
     <section className="space-y-4">
@@ -32,6 +34,7 @@ const WeeklyGoalsDashboard: React.FC<Props> = ({
             onDelete={onDelete}
             onDuplicate={onDuplicate}
             onReflect={onReflect}
+            onToggleComplete={onToggleComplete}
           />
         ))
       ) : (

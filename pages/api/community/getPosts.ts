@@ -23,7 +23,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .sort({ createdAt: -1 })
       .toArray();
 
-    return res.status(200).json({ posts });
+    const formatted = posts.map((p) => ({
+      ...p,
+      _id: p._id.toString(),
+    }));
+
+    return res.status(200).json({ posts: formatted });
   } catch (error) {
     console.error("Error fetching community posts:", error);
     return res.status(500).json({ message: "Internal Server Error" });

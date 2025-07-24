@@ -32,7 +32,7 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({ onPostCreated }) => {
           content,
           type,
           createdBy: session.user.email,
-          ...(type === "survey" ? { options } : {}),
+          ...(type === "survey" ? { options: options.filter((o) => o.trim()) } : {}),
         }),
       });
 

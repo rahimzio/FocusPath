@@ -15,7 +15,7 @@ const CommunityOverviews = () => {
       const res = await fetch("/api/community/getPosts");
       const data = await res.json();
       const formatted = (data.posts || []).map((p: any) => ({
-        id: p._id,
+        id: p._id as string,
         title: p.title,
         content: p.content,
         type: p.type,
