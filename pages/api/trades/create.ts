@@ -17,8 +17,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Remove _id if present to avoid type conflict with MongoDB's ObjectId
     const { _id, ...tradeWithoutId } = trade;
+
+    const tradeSummaryText =
+      trade.tradeSummaryText ||
+      `${trade.symbol} ${trade.setup} ${trade.result} PnL:${trade.pnl}`;
+    const embeddingSourceText = `\n  ${trade.symbol} ${trade.setup} Entry: ${trade.entry}, Exit: ${trade.exit}, Result: ${trade.result}.\n  Notes: ${trade.notes || ""}. Reflection: ${trade.reflectionNotes || ""}.\n  Tags: ${trade.tags?.join(", ") || ""}. Violations: ${trade.ruleViolations?.join(", ") || ""}. Emotions: ${trade.emotions || ""}.\n`.trim();
+
     const result = await appData.insertOne({
       ...tradeWithoutId,
+      tradeSummaryText,
+      embeddingSourceText,
       type: "tradeEntry",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),

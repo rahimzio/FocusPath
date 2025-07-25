@@ -2,7 +2,8 @@
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { SavingGoal } from "@/utils/interface";
-
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 export default function SavingGoalsOverview() {
   const { data: session } = useSession();
   const [goals, setGoals] = useState<SavingGoal[]>([]);
@@ -25,15 +26,18 @@ export default function SavingGoalsOverview() {
       {goals.map((g) => {
         const percent = g.targetAmount ? Math.min(100, (g.currentAmount / g.targetAmount) * 100) : 0;
         return (
-          <div key={g.title} className="p-4 border rounded">
-            <div className="flex justify-between">
-              <span>{g.title}</span>
-              <span>{g.currentAmount} / {g.targetAmount} €</span>
-            </div>
-            <div className="w-full bg-gray-200 h-2 mt-2">
-              <div className="h-2 bg-blue-500" style={{width: `${percent}%`}} />
-            </div>
-          </div>
+          <Card key={g.title}>
+            <CardHeader>
+              <CardTitle>{g.title}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span>Fortschritt</span>
+                <span>{g.currentAmount} / {g.targetAmount} €</span>
+              </div>
+              <Progress value={percent} />
+            </CardContent>
+          </Card>
         );
       })}
     </div>

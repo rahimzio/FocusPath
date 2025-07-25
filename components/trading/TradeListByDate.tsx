@@ -1,7 +1,13 @@
 "use client";
 import useSWR from "swr";
 import { TradeEntry } from "@/utils/interface";
-
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 const fetcher = (url: string) => fetch(url).then(res => res.json());
 
 interface Props {
@@ -15,14 +21,18 @@ export default function TradeListByDate({ date, userId }: Props) {
 
   return (
     <div className="space-y-2">
-      {trades.map(trade => (
-        <div key={trade._id} className="border p-2 rounded bg-white shadow">
-          <div className="flex justify-between">
-            <span>{trade.symbol} - {trade.setup}</span>
-            <span>{trade.pnl}</span>
-          </div>
-          <div className="text-sm text-gray-500">Rating: {trade.rating}</div>
-        </div>
+      {trades.map((trade) => (
+        <Card key={trade._id}>
+          <CardHeader className="flex flex-row items-center justify-between py-2">
+            <CardTitle className="text-base">
+              {trade.symbol} - {trade.setup}
+            </CardTitle>
+            <CardDescription>{trade.pnl}</CardDescription>
+          </CardHeader>
+          <CardContent className="pt-0 text-sm text-muted-foreground">
+            Rating: {trade.rating}
+          </CardContent>
+        </Card>
       ))}
     </div>
   );

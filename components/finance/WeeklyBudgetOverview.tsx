@@ -2,7 +2,9 @@
 import { useEffect, useState } from "react";
 import { BudgetEntry } from "@/utils/interface";
 import { useSession } from "next-auth/react";
-
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "../ui/badge";
 function getWeekString(date: Date) {
   const firstDay = new Date(date.getFullYear(), 0, 1);
   const pastDays = Math.floor((+date - +firstDay) / 86400000);
@@ -34,24 +36,31 @@ export default function WeeklyBudgetOverview() {
   const rating = entry.rating ? `Bewertung: ${entry.rating}` : undefined;
 
   return (
-    <div className="border p-4 rounded space-y-2">
-      <div className="flex justify-between">
-        <span>Budget Woche {week}</span>
-        <span>{entry.spent} / {entry.budget} €</span>
-      </div>
-      <div className="w-full bg-gray-200 rounded h-2 overflow-hidden">
-        <div className={`h-2 ${warning ? 'bg-red-500' : 'bg-green-500'}`} style={{width: `${percent}%`}} />
-      </div>
-      <ul className="text-sm space-y-1">
-        {entry.categories.map((c) => (
-          <li key={c.name} className="flex justify-between">
-            <span>{c.name}</span>
-            <span>{c.amount} €</span>
-          </li>
-        ))}
-      </ul>      {rating && <p className="text-sm">{rating}</p>}
-
-      {warning && <p className="text-red-600 text-sm">Achtung: mehr als 80% des Budgets verbraucht!</p>}
-    </div>
+        <Card>
+      <CardHeader>
+        <CardTitle>Budget Woche {week}</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        <div className="flex justify-between text-sm">
+          <span className="font-medium">Verbrauch</span>
+          <span>{entry.spent} / {entry.budget} €</span>
+        </div>
+        <Progress value={percent} />
+        <ul className="text-sm space-y-1">
+          {entry.categories.map((c) => (
+            <li key={c.name} className="flex justify-between">
+              <span>{c.name}</span>
+              <Badge variant="secondary">{c.amount} €</Badge>
+            </li>
+          ))}
+        </ul>
+        {rating && <p className="text-sm">{rating}</p>}
+        {warning && (
+          <p className="text-destructive text-sm">
+            Achtung: mehr als 80% des Budgets verbraucht!
+          </p>
+        )}
+      </CardContent>
+    </Card>
   );
 }

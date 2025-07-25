@@ -12,6 +12,12 @@ import {
   Legend,
 } from "chart.js";
 
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 // Registrierung der benötigten Komponenten
 ChartJS.register(
   CategoryScale,
@@ -47,10 +53,14 @@ const options = {
 
 const MarketChart = () => {
   return (
-    <div>
-      <h2>Marktchart</h2>
-      <Line data={data} options={options} />
-    </div>
+        <Card>
+      <CardHeader>
+        <CardTitle>Marktchart</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Line data={data} options={options} />
+      </CardContent>
+    </Card>
   );
 };
 

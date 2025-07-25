@@ -7,7 +7,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 interface Props {
   userId: string;
   onSaved: () => void;
@@ -37,40 +39,33 @@ export default function AddSavingModal({ userId, onSaved }: Props) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <button className="px-4 py-2 bg-blue-600 text-white rounded-md">
-          Ersparnis für diesen Monat eintragen
-        </button>
+        <Button>Ersparnis für diesen Monat eintragen</Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Ersparnis eintragen</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
-          <input
+          <Input
             type="month"
             value={month}
             onChange={(e) => setMonth(e.target.value)}
             className="w-full border p-2 rounded"
           />
-          <input
+          <Input
             type="number"
             value={amount}
             onChange={(e) => setAmount(Number(e.target.value))}
             className="w-full border p-2 rounded"
             placeholder="Betrag"
           />
-          <textarea
+          <Textarea
             value={note}
             onChange={(e) => setNote(e.target.value)}
             className="w-full border p-2 rounded"
             placeholder="Notiz"
           />
-          <button
-            onClick={handleSave}
-            className="px-4 py-2 bg-green-600 text-white rounded-md w-full"
-          >
-            Speichern
-          </button>
+      <Button onClick={handleSave} className="w-full">Speichern</Button>
         </div>
       </DialogContent>
     </Dialog>

@@ -339,6 +339,12 @@ export interface TradeEntry {
   entryTime?: string;
   exitTime?: string;
   linkedGoalId?: string;
+    /** Optional short text summarising the trade */
+  tradeSummaryText?: string;
+  /** Notes from the reflection panel */
+  reflectionNotes?: string;
+  /** Combined string of all trade fields for later embeddings */
+  embeddingSourceText?: string;
 }
 
 
@@ -430,4 +436,13 @@ export interface BudgetEntry {
   createdAt: string;
   updatedAt: string;
   rating?: "L" | "M" | "W" | "W+";
+}
+
+export interface IncomeEntry {
+  userId: string;
+  month: string; // Format: "YYYY-MM"
+  amount: number;
+  note?: string;
+  createdAt: string;
+  updatedAt: string;
 }

@@ -1,6 +1,19 @@
 // components/trading/TradeHistory.tsx
 import React from "react";
-
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableHead,
+  TableHeader,
+  TableRow,
+  TableCell,
+} from "@/components/ui/table";
 const TradeHistory = () => {
   // Beispielhafte Daten
   const trades = [
@@ -10,27 +23,31 @@ const TradeHistory = () => {
   ];
 
   return (
-    <div>
-      <h2>Handelshistorie</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>Zeit</th>
-            <th>Preis</th>
-            <th>Menge</th>
-          </tr>
-        </thead>
-        <tbody>
-          {trades.map((trade, index) => (
-            <tr key={index}>
-              <td>{trade.time}</td>
-              <td>{trade.price}</td>
-              <td>{trade.amount}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+        <Card>
+      <CardHeader>
+        <CardTitle>Handelshistorie</CardTitle>
+      </CardHeader>
+      <CardContent className="p-0">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Zeit</TableHead>
+              <TableHead>Preis</TableHead>
+              <TableHead>Menge</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {trades.map((trade, index) => (
+              <TableRow key={index}>
+                <TableCell>{trade.time}</TableCell>
+                <TableCell>{trade.price}</TableCell>
+                <TableCell>{trade.amount}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
   );
 };
 

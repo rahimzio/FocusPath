@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { expense } from "@/utils/interface"; // Stelle sicher, dass der Import korrekt ist
-
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 const SetExpensesPage = () => {
   const [expenses, setExpenses] = useState<expense[]>([]);
   const [expenseName, setExpenseName] = useState<string>("");
@@ -44,35 +46,35 @@ const SetExpensesPage = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         {/* Eingabefelder */}
-        <input
+        <Input
           type="text"
           placeholder="Expense Name"
           value={expenseName}
           onChange={(e) => setExpenseName(e.target.value)}
           className="p-3 border-2 border-gray-300 rounded-md w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
-        <input
+        <Input
           type="number"
           placeholder="Amount"
           value={amount}
           onChange={(e) => setAmount(Number(e.target.value))}
           className="p-3 border-2 border-gray-300 rounded-md w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
-        <input
+        <Input
           type="text"
           placeholder="Category"
           value={category}
           onChange={(e) => setCategory(e.target.value)}
           className="p-3 border-2 border-gray-300 rounded-md w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
-          <input
+        <Input
           type="text"
           placeholder="Note"
           value={note}
           onChange={(e) => setNote(e.target.value)}
           className="p-3 border-2 border-gray-300 rounded-md w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
-        <input
+        <Input
           type="date"
           value={dueDate}
           onChange={(e) => setDueDate(e.target.value)}
@@ -81,15 +83,11 @@ const SetExpensesPage = () => {
       </div>
 
       <div className="flex justify-center mb-6">
-        <button
-          onClick={handleAddExpense}
-          className="px-6 py-3 bg-blue-600 text-white rounded-md shadow-md hover:bg-blue-500 transition duration-300"
-        >
-          Add Expense
-        </button>
+        <Button onClick={handleAddExpense}>Add Expense</Button>
       </div>
 
       {/* Liste der Ausgaben */}
+      <h2 className="text-2xl font-semibold text-gray-700 mb-4">Monthly Expenses</h2>
       <div className="bg-gray-50 p-6 rounded-lg shadow-md">
         <h2 className="text-2xl font-semibold text-gray-700 mb-4">
           Monthly Expenses
@@ -97,23 +95,21 @@ const SetExpensesPage = () => {
         {expenses.length === 0 ? (
           <p className="text-gray-500">No expenses added yet.</p>
         ) : (
-          <div>
-            {expenses.map((expense, index) => (
-              <div
-                key={index}
-                className="flex justify-between items-center p-4 mb-4 bg-white shadow-sm rounded-md"
-              >
+          <div className="grid gap-2">            {expenses.map((expense, index) => (
+            <Card key={index}>
+              <CardContent className="flex items-center justify-between p-4">
                 <div>
-                  <h3 className="text-xl font-bold">{expense.name}</h3>
-                  <p className="text-gray-600">{expense.category}</p>
-                  <p className="text-gray-500">{expense.frequency}</p>
+                  <h3 className="font-semibold">{expense.name}</h3>
+                  <p className="text-sm text-muted-foreground">{expense.category}</p>
+                  <p className="text-sm text-muted-foreground">{expense.frequency}</p>
                 </div>
-                <div>
-                  <p className="text-lg font-semibold">{expense.amount} EUR</p>
-                  <p className="text-gray-400">{expense.dueDate}</p>
+                <div className="text-right">
+                  <p className="font-semibold">{expense.amount} EUR</p>
+                  <p className="text-sm text-muted-foreground">{expense.dueDate}</p>
                 </div>
-              </div>
-            ))}
+              </CardContent>
+            </Card>
+          ))}
           </div>
         )}
       </div>

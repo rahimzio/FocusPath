@@ -3,21 +3,32 @@ import MarketChart from "./marketChart";
 import OrderBook from "./orderBooks";
 import TradeHistory from "./tradeHistory";
 import styled from "styled-components";
-// ... restlicher Importcode
-
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 const TradingOverview = () => {
   return (
-    <div className="">
-      <h1 className="">Trading Dashboard</h1>
-      <div className="">
-        <div className="">
+  <div className="space-y-4">
+      <h1 className="text-2xl font-bold">Trading Dashboard</h1>
+      <Tabs defaultValue="chart" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="chart">Chart</TabsTrigger>
+          <TabsTrigger value="orderbook">Orderbook</TabsTrigger>
+          <TabsTrigger value="history">History</TabsTrigger>
+        </TabsList>
+        <TabsContent value="chart">
           <MarketChart />
-        </div>
-        <div className="">
+       </TabsContent>
+        <TabsContent value="orderbook">
           <OrderBook />
-        </div>
-      </div>
-      <TradeHistory />
+              </TabsContent>
+        <TabsContent value="history">
+          <TradeHistory />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
