@@ -59,6 +59,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     await db.collection("appData").insertOne({
       type: "userConfig",
       userId: insertedUserId1,
+      categories: [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });

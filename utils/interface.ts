@@ -35,7 +35,14 @@ export interface User {
 /* -------------------------------------
  *          DB (Mongo) INTERFACES
  * ------------------------------------- */
-
+export interface UserConfigDocument {
+  _id?: string;
+  type?: "userConfig";
+  userId: string;
+  categories?: string[];
+  createdAt: string;
+  updatedAt: string;
+}
 export interface TaskDocument {
   userId?:string;
   _id?: ObjectId;

@@ -8,7 +8,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const { db } = await connectToDatabase();
+    const { userId, date, rating } = req.body || {};
 
+    // When called with explicit data, simply upsert that rating
+    if (
+      userId &&
+      typeof userId === "string" &&
+      date &&
+      typeof date === "string" &&
+      rating
+    ) {
+      await db.collection("stats").updateOne(
+        { userId, date },
+        { $set: { rating, updatedAt: new Date() } },
+        { upsert: true }
+      );
+      return res.status(200).json({ message: "Rating saved" });
+    }
+
+    // Fallback cron-like behaviour: compute today's rating for all users
     const users = await db.collection("users").find({}).toArray();
     const tasksCol = db.collection("tasks");
     const goalsCol = db.collection("goals");
@@ -16,25 +34,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const today = new Date().toISOString().split("T")[0];
 
     for (const user of users) {
-      const userId = user._id.toString();
-
-      const tasks = await tasksCol.find({ userId, dueDate: today }).toArray();
-      const goals = await goalsCol.find({ userId }).toArray();
+     const id = user._id.toString();
+      const tasks = await tasksCol.find({ userId: id, dueDate: today }).toArray();
+      const goals = await goalsCol.find({ userId: id }).toArray();
 
       const total = tasks.length;
-      const completed = tasks.filter(t => t.status === "completed").length;
+      const completed = tasks.filter((t) => t.status === "completed").length;
       const percent = total ? (completed / total) * 100 : 0;
-      const allGoalTasksDone = tasks.filter(t => t.goalId).every(t => t.status === "completed");
-      const allImportantDone = tasks.filter(t => t.points && t.points > 7).every(t => t.status === "completed");
+      const allGoalTasksDone = tasks
+        .filter((t) => t.goalId)
+        .every((t) => t.status === "completed");
+      const allImportantDone = tasks
+        .filter((t) => t.points && t.points > 7)
+        .every((t) => t.status === "completed");
 
-      let rating = "L Day";
-      if (percent === 100) rating = "W+ Day";
-      else if (percent >= 85 && allGoalTasksDone && allImportantDone) rating = "W Day";
-      else if (percent >= 50) rating = "M Day";
+      
+      let autoRating = "L Day";
+      if (percent === 100) autoRating = "W+ Day";
+      else if (percent >= 85 && allGoalTasksDone && allImportantDone)
+        autoRating = "W Day";
+      else if (percent >= 50) autoRating = "M Day";
 
       await db.collection("stats").updateOne(
-        { userId, date: today },
-        { $set: { rating, updatedAt: new Date() } },
+        { userId: id, date: today },
+        { $set: { rating: autoRating, updatedAt: new Date() } },
         { upsert: true }
       );
     }

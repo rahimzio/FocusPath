@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Input } from "@/components/ui/input";
+import { useState, useEffect } from "react";
+import { getSession } from "next-auth/react";import { Input } from "@/components/ui/input";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -20,6 +20,45 @@ export default function SettingsPage() {
     progressMode: "even",
     compactMode: false,
   });
+
+   const [userId, setUserId] = useState<string>("");
+  const [categories, setCategories] = useState<string[]>([]);
+  const [newCategory, setNewCategory] = useState("");
+
+  useEffect(() => {
+    getSession().then((session) => {
+      if (session?.user?.id) {
+        setUserId(session.user.id);
+        fetch(`/api/user/categories?userId=${session.user.id}`)
+          .then((res) => res.json())
+          .then((data) => setCategories(data.categories || []));
+      }
+    });
+  }, []);
+
+  const saveCategories = async (updated: string[]) => {
+    if (!userId) return;
+    await fetch(`/api/user/categories`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, categories: updated }),
+    });
+  };
+
+  const handleAddCategory = () => {
+    const cat = newCategory.trim();
+    if (!cat) return;
+    const updated = [...categories, cat];
+    setCategories(updated);
+    setNewCategory("");
+    saveCategories(updated);
+  };
+
+  const handleRemoveCategory = (cat: string) => {
+    const updated = categories.filter((c) => c !== cat);
+    setCategories(updated);
+    saveCategories(updated);
+  };
 
   const handleChange = (key: string, value: any) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
@@ -117,6 +156,28 @@ export default function SettingsPage() {
             <div className="flex items-center justify-between">
               <span>Erinnerungen erlauben</span>
               <Switch checked={settings.allowReminders} onCheckedChange={(val) => handleChange("allowReminders", val)} />
+            </div>
+
+                       <div className="border-t pt-4">
+              <h4 className="font-semibold mb-2">Kategorien</h4>
+              <div className="flex gap-2 mb-2">
+                <Input
+                  value={newCategory}
+                  onChange={(e) => setNewCategory(e.target.value)}
+                  placeholder="Neue Kategorie"
+                />
+                <button type="button" onClick={handleAddCategory} className="px-3 py-1 bg-blue-600 text-white rounded">
+                  Hinzufügen
+                </button>
+              </div>
+              <ul className="space-y-1">
+                {categories.map((cat) => (
+                  <li key={cat} className="flex justify-between items-center bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
+                    <span>{cat}</span>
+                    <button type="button" onClick={() => handleRemoveCategory(cat)} className="text-red-500 text-sm">✕</button>
+                  </li>
+                ))}
+              </ul>
             </div>
           </div>
         </TabsContent>

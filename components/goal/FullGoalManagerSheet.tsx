@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
+import { getSession } from "next-auth/react";
 import { Goal } from "@/utils/interface";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -41,22 +42,55 @@ const FullGoalManagerSheet: React.FC<Props> = ({
     const showMonthly = filter === "all" || filter === "monthly";
     const showYearly = filter === "all" || filter === "yearly";
     const showPast = filter === "all" || filter === "past";
+   const [userId, setUserId] = useState<string>("");
+    const [categories, setCategories] = useState<string[]>([]);
+    const [categoryFilter, setCategoryFilter] = useState<string>("all");
 
+    useEffect(() => {
+        getSession().then((session) => {
+            if (session?.user?.id) {
+                setUserId(session.user.id);
+                fetch(`/api/user/categories?userId=${session.user.id}`)
+                    .then((res) => res.json())
+                    .then((data) => setCategories(data.categories || []));
+            }
+        });
+    }, []);
+
+    const filterByCategory = (goals: Goal[]) => {
+        if (categoryFilter === "all") return goals;
+        return goals.filter(g => g.tasks?.some(t => t.category === categoryFilter));
+    };
+
+    const monthlyFiltered = filterByCategory(monthly);
+    const yearlyFiltered = filterByCategory(yearly);
+    const pastFiltered = filterByCategory(past);
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
             <SheetContent className="w-full sm:max-w-[640px] sm:ml-auto sm:mr-0 h-full sm:h-auto overflow-y-auto">
                 <SheetHeader>
                     <SheetTitle className="text-lg font-semibold">📚 Alle Ziele</SheetTitle>
-                    <div className="mt-2">
+                    <div className="mt-2 flex gap-2">
                         <Select value={filter} onValueChange={setFilter}>
-                            <SelectTrigger className="w-[180px]">
-                                <SelectValue placeholder="Filter" />
+                                <SelectTrigger className="w-[150px]">
+                                <SelectValue placeholder="Typ" />
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="all">Alle</SelectItem>
                                 <SelectItem value="monthly">Monatsziele</SelectItem>
                                 <SelectItem value="yearly">Jahresziele</SelectItem>
                                 <SelectItem value="past">Vergangene</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                            <SelectTrigger className="w-[150px]">
+                                <SelectValue placeholder="Kategorie" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">Alle</SelectItem>
+                                {categories.map((c) => (
+                                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                                ))}
                             </SelectContent>
                         </Select>
                     </div>
@@ -66,8 +100,8 @@ const FullGoalManagerSheet: React.FC<Props> = ({
                     {showMonthly && (
                         <section>
                             <h3 className="font-semibold mb-2">📅 Monatsziele</h3>
-                            {monthly.length ? (
-                                monthly.map((g) => (
+                            {monthlyFiltered.length ? (
+                                monthlyFiltered.map((g) => (
                                     <GoalCard key={g._id} goal={g} onEdit={onEdit} onMove={onMove} onDelete={onDelete} onDuplicate={onDuplicate} onReflect={onReflect} onToggleComplete={onToggleComplete} />
                                 ))
                             ) : (
@@ -79,8 +113,8 @@ const FullGoalManagerSheet: React.FC<Props> = ({
                     {showYearly && (
                         <section>
                             <h3 className="font-semibold mb-2">📆 Jahresziele</h3>
-                            {yearly.length ? (
-                                yearly.map((g) => (
+                             {yearlyFiltered.length ? (
+                                yearlyFiltered.map((g) => (
                                     <GoalCard key={g._id} goal={g} onToggleComplete={onToggleComplete} onEdit={onEdit} onMove={onMove} onDelete={onDelete} onDuplicate={onDuplicate} onReflect={onReflect} />
                                 ))
                             ) : (
@@ -92,8 +126,8 @@ const FullGoalManagerSheet: React.FC<Props> = ({
                     {showPast && (
                         <section>
                             <h3 className="font-semibold mb-2">🕑 Vergangene Ziele</h3>
-                            {past.length ? (
-                                past.map((g) => (
+                            {pastFiltered.length ? (
+                                pastFiltered.map((g) => (
                                     <GoalCard key={g._id} goal={g}  onToggleComplete={onToggleComplete} onEdit={onEdit} onMove={onMove} onDelete={onDelete} onDuplicate={onDuplicate} onReflect={onReflect} />
                                 ))
                             ) : (

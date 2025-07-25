@@ -14,12 +14,16 @@ const NewGoalForm: React.FC<Props> = ({ onGoalCreated }) => {
   const [endDate, setEndDate] = useState('');
   const [type, setType] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>('monthly');
   const [tasks, setTasks] = useState<CreateTaskBody[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
 
   useEffect(() => {
     const fetchUserId = async () => {
       const session = await getSession();
       if (session?.user?.id) {
         setUserId(session.user.id);
+        const res = await fetch(`/api/user/categories?userId=${session.user.id}`);
+        const data = await res.json();
+        setCategories(data.categories || []);
       }
     };
     fetchUserId();
@@ -128,8 +132,18 @@ const NewGoalForm: React.FC<Props> = ({ onGoalCreated }) => {
               <input type="text" placeholder="Name" value={task.name} onChange={(e) => handleTaskChange(idx, 'name', e.target.value)} className="w-full border rounded p-1" />
               <input type="text" placeholder="Beschreibung" value={task.description} onChange={(e) => handleTaskChange(idx, 'description', e.target.value)} className="w-full border rounded p-1" />
               <input type="number" placeholder="Punkte" value={task.points} onChange={(e) => handleTaskChange(idx, 'points', Number(e.target.value))} className="w-full border rounded p-1" />
-              <input type="text" placeholder="Kategorie" value={task.category} onChange={(e) => handleTaskChange(idx, 'category', e.target.value)} className="w-full border rounded p-1" />
-              <select value={task.frequency} onChange={(e) => handleTaskChange(idx, 'frequency', e.target.value as any)} className="w-full border rounded p-1">
+              <select
+                value={task.category}
+                onChange={(e) => handleTaskChange(idx, 'category', e.target.value)}
+                className="w-full border rounded p-1"
+              >
+                <option value="">none</option>
+                {categories.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>              <select value={task.frequency} onChange={(e) => handleTaskChange(idx, 'frequency', e.target.value as any)} className="w-full border rounded p-1">
                 <option value="once">Einmalig</option>
                 <option value="daily">Täglich</option>
                 <option value="weekly">Wöchentlich</option>

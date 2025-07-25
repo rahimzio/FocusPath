@@ -25,11 +25,21 @@ import { useEffect, useState, Dispatch, SetStateAction } from "react";
 
 const defaultItems = [
   { title: "Home", url: "/", icon: Home },
+  //{ title: "Goals", url: "/overview/goals", icon: Calendar },
+  //{ title: "stats", url: "/overview/stats", icon: Calendar },
+  //{ title: "Community", url: "/overview/community", icon: Inbox },
+  { title: "Settings", url: "/Settings", icon: Settings },
+];
+const defaultItemsAdmin = [
+  { title: "Home", url: "/", icon: Home },
   { title: "Goals", url: "/overview/goals", icon: Calendar },
   { title: "stats", url: "/overview/stats", icon: Calendar },
   { title: "Community", url: "/overview/community", icon: Inbox },
   { title: "Settings", url: "/Settings", icon: Settings },
-];
+  { title: "Finanzen", url: "/finance", icon: Calendar },
+  { title: "Trading", url: "/overview/trading", icon: Search },
+  { title: "sport", url: "/overview/sport", icon: Settings },
+  ];
 
 const defaultItemsOriginal = [
   { title: "Home", url: "/", icon: Home },

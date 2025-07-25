@@ -43,6 +43,7 @@ export default function SheetWithCreateTask({ userId, onTaskCreated }: Props) {
     interval: 1,
   });
  
+  const [categories, setCategories] = useState<string[]>([]);
   // Subtasks-Array
   const [subTasks, setSubTasks] = useState<SubTask[]>([]);
 
@@ -72,6 +73,13 @@ export default function SheetWithCreateTask({ userId, onTaskCreated }: Props) {
         setGoals(predefinedGoals);
       });
   }, []);
+
+  useEffect(() => {
+    if (!userId) return;
+    fetch(`/api/user/categories?userId=${userId}`)
+      .then((res) => res.json())
+      .then((data) => setCategories(data.categories || []));
+  }, [userId]);
 
   // Beim Absenden der Formulardaten wird die Aufgabe inkl. Subtasks erstellt
   const handleSubmit = async (event: React.FormEvent) => {
@@ -355,16 +363,21 @@ export default function SheetWithCreateTask({ userId, onTaskCreated }: Props) {
               <label htmlFor="category" className="block text-sm font-medium text-white">
                 Kategorie
               </label>
-              <input
-                type="text"
+              <select
                 id="category"
                 name="category"
                 value={task.category}
                 onChange={handleChange}
-                required
                 className="mt-1 block w-full rounded-md border-gray-300"
-              />
-            </div>
+              >
+                <option value="">none</option>
+                {categories.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+              </div>
 
             <div className="mb-4 flex items-center gap-2">
               <label htmlFor="timebased" className="block text-sm font-medium text-white">
