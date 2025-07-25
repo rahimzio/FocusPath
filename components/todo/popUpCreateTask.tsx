@@ -233,7 +233,6 @@ export default function SheetWithCreateTask({ userId, onTaskCreated }: Props) {
                 name="description"
                 value={task.description}
                 onChange={handleChange}
-                required
                 className="mt-1 block w-full rounded-md border-gray-300"
               />
             </div>

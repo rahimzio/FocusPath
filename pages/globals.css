@@ -68,7 +68,13 @@ body {
     @apply bg-background text-foreground;
   }
 }
-
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.hide-scrollbar {
+  -ms-overflow-style: none;  /* IE, Edge */
+  scrollbar-width: none;     /* Firefox */
+}
 /* components/trading/TradingOverview.module.css */
 .container {
   display: flex;

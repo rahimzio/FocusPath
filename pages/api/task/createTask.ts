@@ -31,7 +31,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     interval
   } = req.body as CreateTaskBody & { userId: string };
   console.log("📝 createTask payload", req.body);
-  if (!userId || !name || !description || !points || !dueDate || !frequency || !category) {
+  if (!userId || !name || !points || !dueDate || !frequency) {
     return res.status(400).json({ message: "Pflichtfelder fehlen (inkl. userId)." });
   }
 
@@ -61,7 +61,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       status: status || "incomplete",
       dueDate,
       frequency,
-      category,
+      category: category || "",
       linkedApps: linkedApps || [],
       timebased: !!timebased,
       time: time || "",

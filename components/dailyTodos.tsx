@@ -52,6 +52,7 @@ const DailyTaskList = () => {
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
   const [dayScore, setDayScore] = useState<string>("-");
  const [budgetInfo, setBudgetInfo] = useState<string>("");
+ const [showNoTimeOnMobile, setShowNoTimeOnMobile] = useState(false);
   useEffect(() => {
     getSession().then((session) => {
       if (session?.user?.id) setUserId(session.user.id);
@@ -236,16 +237,39 @@ const DailyTaskList = () => {
 
       {renderGoalsWithProgress()}
 
-      <NoTimeTaskList
-        tasks={tasks}
-        selectedDate={selectedDate}
-        handleCheckTask={(taskId, date, checked) =>
-          handleCheckTaskExternal(userId, taskId, date, checked, fetchTasks)
-        }
-        openTaskDetails={openTaskDetails}
-        openEditDialog={openEditDialog}
-        confirmDelete={confirmDelete}
-      />
+<button
+        onClick={() => setShowNoTimeOnMobile(!showNoTimeOnMobile)}
+        className="block sm:hidden w-full py-2 rounded-lg bg-blue-500 text-white mb-4"
+      >
+        {showNoTimeOnMobile ? "Aufgaben ausblenden" : "Aufgaben ohne Uhrzeit anzeigen"}
+      </button>
+
+      {showNoTimeOnMobile && (
+        <div className="block sm:hidden">
+          <NoTimeTaskList
+            tasks={tasks}
+            selectedDate={selectedDate}
+            handleCheckTask={(taskId, date, checked) =>
+              handleCheckTaskExternal(userId, taskId, date, checked, fetchTasks)
+            }
+            openTaskDetails={openTaskDetails}
+            openEditDialog={openEditDialog}
+            confirmDelete={confirmDelete}
+          />
+        </div>
+      )}
+      <div className="hidden sm:block">
+        <NoTimeTaskList
+          tasks={tasks}
+          selectedDate={selectedDate}
+          handleCheckTask={(taskId, date, checked) =>
+            handleCheckTaskExternal(userId, taskId, date, checked, fetchTasks)
+          }
+          openTaskDetails={openTaskDetails}
+          openEditDialog={openEditDialog}
+          confirmDelete={confirmDelete}
+        />
+      </div>
 
 
 
