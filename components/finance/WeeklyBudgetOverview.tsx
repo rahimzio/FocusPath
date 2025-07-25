@@ -31,6 +31,7 @@ export default function WeeklyBudgetOverview() {
 
   const percent = entry.budget ? Math.min(100, (entry.spent / entry.budget) * 100) : 0;
   const warning = percent > 80;
+  const rating = entry.rating ? `Bewertung: ${entry.rating}` : undefined;
 
   return (
     <div className="border p-4 rounded space-y-2">
@@ -48,7 +49,8 @@ export default function WeeklyBudgetOverview() {
             <span>{c.amount} €</span>
           </li>
         ))}
-      </ul>
+      </ul>      {rating && <p className="text-sm">{rating}</p>}
+
       {warning && <p className="text-red-600 text-sm">Achtung: mehr als 80% des Budgets verbraucht!</p>}
     </div>
   );

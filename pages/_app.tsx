@@ -4,6 +4,7 @@ import { ToastContainer } from "react-toastify";
 import { AuthWrapper } from "@/components/login/AuthWrapper";
 import AppLayout from "./AppLayout";
 import { useRouter } from "next/router";
+import { SettingsProvider } from "@/hooks/useSettings";
 import "react-toastify/dist/ReactToastify.css";
 import "./globals.css";
 
@@ -26,9 +27,11 @@ export default function MyApp({ Component, pageProps }: AppProps) {
 
   return (
     <SessionProvider session={pageProps.session}>
-      <AuthWrapper>
-        {isAuthPage ? content : <AppLayout>{content}</AppLayout>}
-      </AuthWrapper>
+      <SettingsProvider>
+        <AuthWrapper>
+          {isAuthPage ? content : <AppLayout>{content}</AppLayout>}
+        </AuthWrapper>
+      </SettingsProvider>
     </SessionProvider>
   );
 }

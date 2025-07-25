@@ -3,7 +3,7 @@ import { connectToDatabase } from '../db/mongo';
 import { expense } from '@/utils/interface';
 
 const saveExpense = async (req: NextApiRequest, res: NextApiResponse) => {
-  const { name, amount, category, frequency, dueDate }: expense = req.body;
+  const { name, amount,note, category, frequency, dueDate }: expense = req.body;
 
   if (!name || !amount || !category || !frequency || !dueDate) {
     return res.status(400).json({ message: 'All fields are required.' });
@@ -18,6 +18,7 @@ const saveExpense = async (req: NextApiRequest, res: NextApiResponse) => {
       amount,
       category,
       frequency,
+      note,
       dueDate,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),

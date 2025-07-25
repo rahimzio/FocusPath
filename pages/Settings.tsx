@@ -155,18 +155,6 @@ export default function SettingsPage() {
               </SelectContent>
             </Select>
 
-            <Select
-              onValueChange={(val) => handleChange("weekStart", val)}
-              defaultValue={settings.weekStart}
-            >
-              <SelectTrigger className="bg-white dark:bg-[#2c2c2e] text-black dark:text-white">
-                <SelectValue placeholder="Wochenstart" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="monday">Montag</SelectItem>
-                <SelectItem value="sunday">Sonntag</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
         </TabsContent>
 

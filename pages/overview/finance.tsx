@@ -6,10 +6,12 @@ const FinanceDashboard = dynamic(
   { loading: () => <p>Loading...</p>, ssr: false }
 );
 
-export default function FinancePage() {
+function FinancePage() {
   return (
     <React.Suspense fallback={<div>Loading...</div>}>
       <FinanceDashboard />
     </React.Suspense>
   );
 }
+
+export default FinancePage

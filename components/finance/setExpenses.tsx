@@ -8,19 +8,21 @@ const SetExpensesPage = () => {
   const [category, setCategory] = useState<string>("");
   const [frequency, setFrequency] = useState<string>("monthly");
   const [dueDate, setDueDate] = useState<string>("");
+  const [note, setNote] = useState<string>("");
 
   const handleAddExpense = async () => {
     const newExpense: expense = {
       name: expenseName,
       amount,
       category,
+      note,
       frequency,
       dueDate,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
 
-    const res = await fetch("/api/expense/save", {
+    const res = await fetch("/api/finance/save", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -61,6 +63,13 @@ const SetExpensesPage = () => {
           placeholder="Category"
           value={category}
           onChange={(e) => setCategory(e.target.value)}
+          className="p-3 border-2 border-gray-300 rounded-md w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+          <input
+          type="text"
+          placeholder="Note"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
           className="p-3 border-2 border-gray-300 rounded-md w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         <input

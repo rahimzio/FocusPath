@@ -19,7 +19,7 @@ export interface User {
   };
 
   onboardingStep?: number;
-  importantFields?: string[]; 
+  importantFields?: string[];
 
   dailyRatings?: { [date: string]: string };
   weeklyScores?: { [weekId: string]: number };
@@ -61,7 +61,7 @@ export interface UserSettings {
   compactMode?: boolean;
 }
 export interface TaskDocument {
-  userId?:string;
+  userId?: string;
   _id?: ObjectId;
   name: string;
   description: string;
@@ -78,10 +78,10 @@ export interface TaskDocument {
   createdAt: string;
   updatedAt: string;
   color?: string;
-  duration?:string;
-  excludedDates?:string[];
+  duration?: string;
+  excludedDates?: string[];
   subTasks?: SubTask[];
-   /** Wochentage, an denen die Aufgabe erscheinen soll (0=Sonntag) */
+  /** Wochentage, an denen die Aufgabe erscheinen soll (0=Sonntag) */
   daysOfWeek?: number[];
   /** Intervall für Wiederholungen in Tagen */
   interval?: number;
@@ -89,7 +89,7 @@ export interface TaskDocument {
 }
 
 export interface GoalDocument {
-  userId?:string;
+  userId?: string;
   _id: ObjectId;
   title: string;
   description: string;
@@ -111,7 +111,7 @@ export interface GoalDocument {
  * ------------------------------------- */
 
 export interface Task {
-  userId?:string;
+  userId?: string;
   _id: string;
   id?: string;
   name: string;
@@ -127,10 +127,10 @@ export interface Task {
   progress: number;         // 0-100%
   createdAt: string;
   updatedAt: string;
-  duration?:string;
+  duration?: string;
   goalId?: string;
   color?: string;
-  excludedDates?:string[];
+  excludedDates?: string[];
   reward?: {
     type: string;           // "badge" | "points" | ...
     value: any;             // "Gold-Badge" | 50 | ...
@@ -148,7 +148,7 @@ export interface Task {
  * Hier kann _id ein string sein.
  */
 export interface Goal {
-  userId?:string;
+  userId?: string;
   _id: string;
   title: string;
   description: string;
@@ -157,12 +157,12 @@ export interface Goal {
   tasks?: Task[];     // Task-IDs im String-Format
   createdAt: string;
   endDate: string;
-  startDate: string;  
-  type: "once"|"daily" | "weekly" | "monthly" | "yearly" |"none";
-  goalType: "once"|"daily" | "weekly" | "monthly" | "yearly"| "none";
-  completedAt?:string;
+  startDate: string;
+  type: "once" | "daily" | "weekly" | "monthly" | "yearly" | "none";
+  goalType: "once" | "daily" | "weekly" | "monthly" | "yearly" | "none";
+  completedAt?: string;
   updatedAt: string;
-  subGoals:Goal[];
+  subGoals: Goal[];
   parentGoalId?: string;
   reward?: {
     type: string;
@@ -186,7 +186,7 @@ export interface GoalWithProgress extends Goal {
 
 
 export interface CreateTaskBody {
-  userId?:string;
+  userId?: string;
   name: string;
   description: string;
   points: number;
@@ -199,13 +199,13 @@ export interface CreateTaskBody {
   time?: string;
   goalId?: string;
   subTasks?: SubTask[];
-  color?:string;
-   duration?:string;
+  color?: string;
+  duration?: string;
   daysOfWeek?: number[];
   interval?: number;
 }
 export interface SubTask {
-  userId?:string;
+  userId?: string;
   _id?: string;
   name: string;
   description?: string;
@@ -411,6 +411,7 @@ export interface expense {
   dueDate: string; // Format: "YYYY-MM-DD"
   createdAt: string; // ISO-Format
   updatedAt: string; // ISO-Format
+  note?: string;
 }
 
 
@@ -428,4 +429,5 @@ export interface BudgetEntry {
   categories: BudgetCategoryEntry[];
   createdAt: string;
   updatedAt: string;
+  rating?: "L" | "M" | "W" | "W+";
 }

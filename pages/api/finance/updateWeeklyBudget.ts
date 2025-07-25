@@ -2,6 +2,14 @@ import { NextApiRequest, NextApiResponse } from "next";
 import { connectToDatabase } from "../db/mongo";
 import { BudgetEntry } from "@/utils/interface";
 
+function calcRating(budget: number, spent: number): "L" | "M" | "W" | "W+" {
+  if (spent > budget) return "L";
+  const ratio = spent / budget;
+  if (ratio === 1) return "W+";
+  if (ratio >= 0.85) return "W";
+  if (ratio >= 0.5) return "M";
+  return "L";
+}
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
     return res.status(405).json({ message: "Method not allowed. Use POST." });
@@ -11,6 +19,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!userId || !week || typeof budget !== "number" || typeof spent !== "number") {
     return res.status(400).json({ message: "Missing required fields." });
   }
+  const rating = calcRating(budget, spent);
 
   try {
     const { db } = await connectToDatabase();
@@ -26,6 +35,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             budget,
             spent,
             categories,
+            rating,
             updatedAt: timestamp,
           },
         }
@@ -37,6 +47,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         week,
         budget,
         spent,
+        rating,
+
         categories: categories || [],
         createdAt: timestamp,
         updatedAt: timestamp,
