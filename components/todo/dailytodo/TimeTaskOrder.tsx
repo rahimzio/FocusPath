@@ -100,7 +100,7 @@ const TaskListTimeBased: React.FC<Props> = ({
         );
       }
     }
-    return <div className="w-20 pr-2">{rows}</div>;
+    return <div className="w-10 pr-1">{rows}</div>;
   };
 
   return (
