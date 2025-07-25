@@ -39,9 +39,26 @@ export interface UserConfigDocument {
   _id?: string;
   type?: "userConfig";
   userId: string;
+  settings?: UserSettings;
   categories?: string[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface UserSettings {
+  startPage?: "todos" | "goals" | "finance";
+  language?: "de" | "en";
+  darkMode?: "auto" | "light" | "dark";
+  weekStart?: "monday" | "sunday";
+  timeFormat?: "24h" | "12h";
+  defaultDuration?: string;
+  defaultColor?: string;
+  showGoalTasksSeparately?: boolean;
+  dragSnap?: "15" | "30";
+  allowReminders?: boolean;
+  enableDayRating?: boolean;
+  progressMode?: "even" | "weighted";
+  compactMode?: boolean;
 }
 export interface TaskDocument {
   userId?:string;
