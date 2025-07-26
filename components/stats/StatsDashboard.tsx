@@ -10,6 +10,7 @@ import {
 import dayjs from "dayjs";
 import isBetween from "dayjs/plugin/isBetween";
 dayjs.extend(isBetween);
+
 interface DayRating {
   date: string;
   rating: string;
@@ -38,21 +39,32 @@ const StatsDashboard = ({ userId }: { userId: string }) => {
       try {
         const res = await fetch(`/api/stats/dailyRatings?userId=${userId}`);
         const data = await res.json();
-        const ratings = Array.isArray(data.dailyRatings)
+
+        // nur valide Einträge
+        let ratings: DayRating[] = Array.isArray(data.dailyRatings)
           ? data.dailyRatings.filter(
               (r: any) => r && typeof r.date === "string" && typeof r.rating === "string"
             )
           : [];
+
+        // sortiere nach Datum aufsteigend
+        ratings.sort((a, b) => dayjs(a.date).diff(dayjs(b.date)));
+
         setDailyStats(ratings);
         setFilteredStats(filterData(ratings, filterType, customStart, customEnd));
 
+        // Konsistenz-Streak ab dem neuesten Tag rückwärts zählen
         let streak = 0;
         for (let i = ratings.length - 1; i >= 0; i--) {
           const r = ratings[i].rating;
-          if (r === "M Day" || r === "W Day" || r === "W+ Day") streak++;
-          else break;
+          if (r === "M Day" || r === "W Day" || r === "W+ Day") {
+            streak++;
+          } else {
+            break;
+          }
         }
         setConsistencyStreak(streak);
+
       } catch (error) {
         console.error("Fehler beim Laden der Tagesstatistiken:", error);
         setDailyStats([]);
@@ -60,8 +72,9 @@ const StatsDashboard = ({ userId }: { userId: string }) => {
         setConsistencyStreak(0);
       }
     };
+
     if (userId) fetchStats();
-  }, [userId]);
+  }, [userId, filterType, customStart, customEnd]);
 
   const filterData = (
     data: DayRating[],
@@ -70,11 +83,13 @@ const StatsDashboard = ({ userId }: { userId: string }) => {
     end?: string
   ): DayRating[] => {
     const now = dayjs();
-    if (type === "7") return data.filter((d) => dayjs(d.date).isAfter(now.subtract(7, "day")));
-    if (type === "30") return data.filter((d) => dayjs(d.date).isAfter(now.subtract(30, "day")));
+    if (type === "7")
+      return data.filter((d) => dayjs(d.date).isAfter(now.subtract(7, "day")));
+    if (type === "30")
+      return data.filter((d) => dayjs(d.date).isAfter(now.subtract(30, "day")));
     if (type === "custom" && start && end) {
-      return data.filter(
-        (d) => dayjs(d.date).isBetween(dayjs(start), dayjs(end), null, "[]")
+      return data.filter((d) =>
+        dayjs(d.date).isBetween(dayjs(start), dayjs(end), null, "[]")
       );
     }
     return data;
@@ -82,10 +97,10 @@ const StatsDashboard = ({ userId }: { userId: string }) => {
 
   useEffect(() => {
     setFilteredStats(filterData(dailyStats, filterType, customStart, customEnd));
-  }, [filterType, customStart, customEnd]);
+  }, [dailyStats, filterType, customStart, customEnd]);
 
   const chartData = filteredStats.map((d) => ({
-    date: d.date?.substring(5),
+    date: d.date.substring(5),
     value: getRatingValue(d.rating),
   }));
 
@@ -95,34 +110,39 @@ const StatsDashboard = ({ userId }: { userId: string }) => {
     return parseFloat((sum / data.length).toFixed(2));
   };
 
-  const countRatings = (data: DayRating[]) => {
-    return {
-      l: data.filter((d) => d.rating === "L Day").length,
-      m: data.filter((d) => d.rating === "M Day").length,
-      w: data.filter((d) => d.rating === "W Day").length,
-      wp: data.filter((d) => d.rating === "W+ Day").length,
-    };
-  };
+  const countRatings = (data: DayRating[]) => ({
+    l: data.filter((d) => d.rating === "L Day").length,
+    m: data.filter((d) => d.rating === "M Day").length,
+    w: data.filter((d) => d.rating === "W Day").length,
+    wp: data.filter((d) => d.rating === "W+ Day").length,
+  });
 
   const currentAvg = calculateAverage(filteredStats);
   const counts = countRatings(filteredStats);
 
   const pastFiltered = (() => {
     if (filterType === "7") {
-      return filterData(dailyStats, "custom",
+      return filterData(
+        dailyStats,
+        "custom",
         dayjs().subtract(14, "day").format("YYYY-MM-DD"),
         dayjs().subtract(7, "day").format("YYYY-MM-DD")
       );
     }
     if (filterType === "30") {
-      return filterData(dailyStats, "custom", 
+      return filterData(
+        dailyStats,
+        "custom",
         dayjs().subtract(60, "day").format("YYYY-MM-DD"),
         dayjs().subtract(30, "day").format("YYYY-MM-DD")
       );
     }
     if (filterType === "custom" && customStart && customEnd) {
-      const days = dayjs(customEnd).diff(dayjs(customStart), "day") + 1;
-      return filterData(dailyStats, "custom",
+      const days =
+        dayjs(customEnd).diff(dayjs(customStart), "day") + 1;
+      return filterData(
+        dailyStats,
+        "custom",
         dayjs(customStart).subtract(days, "day").format("YYYY-MM-DD"),
         dayjs(customStart).subtract(1, "day").format("YYYY-MM-DD")
       );
@@ -175,7 +195,8 @@ const StatsDashboard = ({ userId }: { userId: string }) => {
         </div>
 
         <p className="text-sm text-gray-500">
-          Zeitraum: {filteredStats[0]?.date ?? "-"} – {filteredStats.at(-1)?.date ?? "-"}
+          Zeitraum: {filteredStats[0]?.date ?? "-"} –{" "}
+          {filteredStats.at(-1)?.date ?? "-"}
         </p>
 
         {chartData.length > 0 ? (
@@ -196,7 +217,9 @@ const StatsDashboard = ({ userId }: { userId: string }) => {
                 }}
               />
               <Tooltip
-                formatter={(v) => `${v === 2.5 ? "W+" : v === 2 ? "W" : v === 1 ? "M" : "L"} Day`}
+                formatter={(v) =>
+                  `${v === 2.5 ? "W+" : v === 2 ? "W" : v === 1 ? "M" : "L"} Day`
+                }
               />
               <Line
                 type="monotone"
@@ -212,20 +235,36 @@ const StatsDashboard = ({ userId }: { userId: string }) => {
         )}
 
         <div className="text-sm text-gray-700 mt-4">
-          Aktueller Schnitt: <span className="font-medium">{currentAvg}</span> –
-          Vorperiode: <span className="font-medium">{pastAvg}</span>
+          Aktueller Schnitt:{" "}
+          <span className="font-medium">{currentAvg}</span> – Vorperiode:{" "}
+          <span className="font-medium">{pastAvg}</span>
           <br />
-          Veränderung:
-          <span className={diff >= 0 ? "text-green-600" : "text-red-600"}>
-            {diff >= 0 ? ` +${diff}` : ` ${diff}`}
-          </span> Punkte
+          Veränderung:{" "}
+          <span
+            className={diff >= 0 ? "text-green-600" : "text-red-600"}
+          >
+            {diff >= 0 ? `+${diff}` : `${diff}`}
+          </span>{" "}
+          Punkte
         </div>
 
         <div className="text-sm text-gray-700 mt-4 space-y-1">
-          <p>Anzahl W+ Days: <span className="font-semibold">{counts.wp}</span></p>
-          <p>Anzahl W Days: <span className="font-semibold">{counts.w}</span></p>
-          <p>Anzahl M Days: <span className="font-semibold">{counts.m}</span></p>
-          <p>Anzahl L Days: <span className="font-semibold">{counts.l}</span></p>
+          <p>
+            Anzahl W+ Days:{" "}
+            <span className="font-semibold">{counts.wp}</span>
+          </p>
+          <p>
+            Anzahl W Days:{" "}
+            <span className="font-semibold">{counts.w}</span>
+          </p>
+          <p>
+            Anzahl M Days:{" "}
+            <span className="font-semibold">{counts.m}</span>
+          </p>
+          <p>
+            Anzahl L Days:{" "}
+            <span className="font-semibold">{counts.l}</span>
+          </p>
         </div>
       </div>
     </div>

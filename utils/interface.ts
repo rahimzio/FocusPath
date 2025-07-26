@@ -21,10 +21,34 @@ export interface User {
   onboardingStep?: number;
   importantFields?: string[];
 
-  dailyRatings?: { [date: string]: string };
-  weeklyScores?: { [weekId: string]: number };
-  monthlyStats?: { [month: string]: { completedGoals: number; avgRating: string } };
-  trustReseverTank?: number; // 0-100
+  // Für jeden Tag speichern wir nun { avg: number; rating: string }
+  dailyRatingsAverage?: {
+    [date: string]: {
+      avg: number;
+      rating: string;
+    };
+  };
+
+  // Für jede Kalenderwoche ebenfalls { avg: number; rating: string }
+  weeklyRatingsAverage?: {
+    [weekId: string]: {
+      avg: number;
+      rating: string;
+    };
+  };
+
+  // Für jeden Monat speichern wir zusätzlich completedGoals,
+  // dazu avg und letter-Rating
+  monthlyRatingsAverage?: {
+    [month: string]: {
+      completedGoals: number;
+      avg: number;
+      rating: string;
+    };
+  };
+
+  trustReserveTank?: number;
+
   subscription?: 'free' | 'pro' | 'enterprise';
   linkedApps?: string[];
 
@@ -32,6 +56,7 @@ export interface User {
   financeStats?: any;
   nutritionProfile?: any;
 }
+
 /* -------------------------------------
  *          DB (Mongo) INTERFACES
  * ------------------------------------- */

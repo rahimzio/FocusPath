@@ -2,7 +2,6 @@ import React from "react";
 import MarketChart from "./marketChart";
 import OrderBook from "./orderBooks";
 import TradeHistory from "./tradeHistory";
-import styled from "styled-components";
 import {
   Tabs,
   TabsContent,

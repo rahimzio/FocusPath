@@ -23,6 +23,9 @@ export default function WeekMonthStatsDisplay({ userId }: { userId: string }) {
       setWeekRatings(data.weekRatings || []);
       setMonthRatings((data.recentMonthRatings || []).filter((m: MonthRating) => Array.isArray(m.weeks) && m.weeks.length > 0));
     };
+    console.log("Geladene weekRatings:", weekRatings);
+    console.log("Geladene monthRatings:", monthRatings);
+
     fetchRatings();
   }, [userId]);
 

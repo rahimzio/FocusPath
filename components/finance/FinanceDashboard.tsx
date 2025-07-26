@@ -59,21 +59,31 @@ export default function FinanceDashboard() {
 
   if (!userId) return <p>Bitte einloggen...</p>;
 
-  return (
-    <div className="space-y-6">
-      <div className="flex gap-2">
+return (
+  <div className="space-y-6">
+    <>
       <div className="flex gap-2">
         <AddSavingModal userId={userId} onSaved={loadSavings} />
         <AddIncomeModal userId={userId} onSaved={loadIncome} />
         <AddWeeklyBudgetModal userId={userId} week={getWeekString(new Date())} onSaved={() => {}} />
         <AddSavingGoalModal userId={userId} onSaved={() => {}} />
       </div>
-      <FinancialSummary income={incomeTotal} expenses={expenseTotal} savings={savings.reduce((s, e) => s + e.amount, 0)} />
+
+      <FinancialSummary
+        income={incomeTotal}
+        expenses={expenseTotal}
+        savings={savings.reduce((s, e) => s + e.amount, 0)}
+      />
+
       <div className="border p-4 rounded space-y-1">
         <p>Verfügbar nach Fixkosten: {incomeTotal - expenseTotal} €</p>
         <p>Automatisch zurückgelegte Sparsumme: {savings.reduce((s, e) => s + e.amount, 0)} €</p>
-        <p>Restliches Sparpotenzial: {incomeTotal - expenseTotal - savings.reduce((s, e) => s + e.amount, 0)} €</p>
+        <p>
+          Restliches Sparpotenzial:{" "}
+          {incomeTotal - expenseTotal - savings.reduce((s, e) => s + e.amount, 0)} €
+        </p>
       </div>
+
       {chartData.length > 0 && (
         <Card>
           <CardHeader>
@@ -90,9 +100,10 @@ export default function FinanceDashboard() {
           </CardContent>
         </Card>
       )}
+
       <WeeklyBudgetOverview />
       <SavingGoalsOverview />
-      </div>
-    </div>
-  );
+    </>
+  </div>
+);
 }
