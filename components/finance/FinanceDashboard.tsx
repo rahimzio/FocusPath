@@ -11,6 +11,7 @@ import AddSavingGoalModal from "./AddSavingGoalModal";
 import AddIncomeModal from "./AddIncomeModal";
 import FinancialSummary from "./financialSummary";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import MetricCard from "./MetricCard";
 
 function getWeekString(date: Date) {
   const firstDay = new Date(date.getFullYear(), 0, 1);
@@ -23,7 +24,7 @@ export default function FinanceDashboard() {
   const [savings, setSavings] = useState<SavingEntry[]>([]);
   const [incomeTotal, setIncomeTotal] = useState(0);
   const [expenseTotal, setExpenseTotal] = useState(0);
-
+  const [metrics, setMetrics] = useState<any>(null);
   const userId = (session as any)?.user?.id as string | undefined;
 
   async function loadSavings() {
@@ -37,6 +38,7 @@ export default function FinanceDashboard() {
     loadSavings();
     loadIncome();
     loadExpenses();
+    loadMetrics();
   }, [userId]);
   async function loadIncome() {
     if (!userId) return;
@@ -56,7 +58,12 @@ export default function FinanceDashboard() {
     setExpenseTotal(data.totalExpenses || 0);
   }
   const chartData = savings.map((s) => ({ month: s.month, amount: s.amount }));
-
+async function loadMetrics() {
+    if (!userId) return;
+    const res = await fetch(`/api/finance/metrics?userId=${userId}`);
+    const data = await res.json();
+    setMetrics(data);
+  }
   if (!userId) return <p>Bitte einloggen...</p>;
 
 return (
@@ -68,6 +75,32 @@ return (
         <AddWeeklyBudgetModal userId={userId} week={getWeekString(new Date())} onSaved={() => {}} />
         <AddSavingGoalModal userId={userId} onSaved={() => {}} />
       </div>
+ {metrics && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+          <MetricCard
+            title="Sparquote"
+            value={(metrics.savingRate * 100).toFixed(1)}
+            unit="%"
+            tooltip="Anteil des Einkommens, der gespart wurde"
+          />
+          <MetricCard
+            title="Ausgabenwachstum"
+            value={(metrics.expenseGrowth * 100).toFixed(1)}
+            unit="%"
+            tooltip="Veränderung der Ausgaben zum Vormonat"
+          />
+          <MetricCard
+            title="Investment ROI"
+            value={(metrics.investmentROI * 100).toFixed(1)}
+            unit="%"
+          />
+          <MetricCard
+            title="Notgroschen"
+            value={`${metrics.emergencyFundStatus.current} / ${metrics.emergencyFundStatus.target}`}
+            unit="€"
+          />
+        </div>
+      )}
 
       <FinancialSummary
         income={incomeTotal}

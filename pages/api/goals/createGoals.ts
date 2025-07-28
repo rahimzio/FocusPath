@@ -9,7 +9,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ message: "Method not allowed. Use POST." });
   }
 
-  const { title, description, goalType, startDate, endDate, tasks = [], userId } = req.body;
+  const { title, description, goalType, startDate,category, endDate, tasks = [], userId } = req.body;
 
   if (!title || !goalType || !startDate || !endDate || !userId) {
     return res.status(400).json({
@@ -47,6 +47,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       startDate,
       endDate,
       createdAt,
+      category,
       updatedAt: createdAt,
       subGoals: [],
       tasks: []
@@ -65,6 +66,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         userId,
         goalId: goalId.toHexString(),
         status: "incomplete",
+        category,
         createdAt,
         updatedAt: createdAt,
       };

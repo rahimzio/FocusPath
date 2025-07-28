@@ -1,0 +1,35 @@
+openapi: 3.0.0
+info:
+  title: Finance API
+  version: 1.0.0
+paths:
+  /api/finance/metrics:
+    get:
+      summary: Get aggregated finance metrics
+      parameters:
+        - in: query
+          name: userId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Metrics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  savingRate:
+                    type: number
+                  expenseGrowth:
+                    type: number
+                  investmentROI:
+                    type: number
+                  emergencyFundStatus:
+                    type: object
+                    properties:
+                      current:
+                        type: number
+                      target:
+                        type: number

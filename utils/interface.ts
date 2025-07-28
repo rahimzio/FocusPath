@@ -124,6 +124,7 @@ export interface GoalDocument {
   createdAt: string;
   parentGoalId?: string;
   updatedAt: Date;
+  category?: string;
   reward?: {
     type: string;
     value: any;
@@ -183,6 +184,7 @@ export interface Goal {
   createdAt: string;
   endDate: string;
   startDate: string;
+  category?: string;
   type: "once" | "daily" | "weekly" | "monthly" | "yearly" | "none";
   goalType: "once" | "daily" | "weekly" | "monthly" | "yearly" | "none";
   completedAt?: string;
