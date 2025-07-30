@@ -31,7 +31,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { db } = await connectToDatabase();
     const statsCol = db.collection("stats");
     const usersCol = db.collection("users");
-    const tasksCol = db.collection("tasks");
+    const tasksCol = db.collection("appData");
 
     const { userId, date, rating } = req.body || {};
 
