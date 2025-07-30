@@ -27,6 +27,8 @@ export default function TradeListByDate({ date, userId }: Props) {
             <CardTitle className="text-base">
               {trade.symbol} - {trade.setup}
             </CardTitle>
+            {trade.tiltDetected && <span className="ml-2 text-red-500">⚠ Tilt</span>}
+
             <CardDescription>{trade.pnl}</CardDescription>
           </CardHeader>
           <CardContent className="pt-0 text-sm text-muted-foreground">

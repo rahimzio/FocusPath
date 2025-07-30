@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { connectToDatabase } from "@/pages/api/db/mongo";
-import nodemailer from "nodemailer";
 import { randomBytes } from "crypto";
+import { Resend } from "resend";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
@@ -27,18 +27,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     { upsert: true }
   );
 
-  const transporter = nodemailer.createTransport({
-    host: process.env.EMAIL_HOST,
-    port: Number(process.env.EMAIL_PORT || 587),
-    secure: false,
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
-  });
-
-  await transporter.sendMail({
-    from: process.env.EMAIL_FROM,
+  const resend = new Resend(process.env.RESEND_API_KEY || "");
+ await resend.emails.send({
+    from: process.env.EMAIL_FROM || "",
     to: email,
     subject: "Password Reset",
     text: `Dein Bestätigungscode: ${code}`,

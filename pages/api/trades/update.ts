@@ -18,11 +18,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const collection = db.collection("trading");
 
     const { _id, ...updateData } = trade;
+ const lastTrade = await collection
+      .find({ userId, type: "tradeEntry" })
+      .sort({ createdAt: -1 })
+      .limit(1)
+      .next();
+
+    let tiltDetected = trade.tiltDetected;
+    if (
+      trade.pnl !== undefined &&
+      trade.pnl < -300 &&
+      lastTrade &&
+      lastTrade._id.toString() !== id &&
+      lastTrade.createdAt &&
+      Date.now() - new Date(lastTrade.createdAt).getTime() < 30 * 60 * 1000
+    ) {
+      tiltDetected = true;
+    }
 
     const result = await collection.updateOne(
       { _id: new ObjectId(id), userId, type: "tradeEntry" },
-      { $set: { ...updateData, updatedAt: new Date().toISOString() } }
-    );
+ { $set: { ...updateData, tiltDetected, updatedAt: new Date().toISOString() } }    );
 
     if (result.modifiedCount === 0) {
       return res.status(404).json({ message: "Trade not found or not updated" });

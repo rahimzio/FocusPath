@@ -162,6 +162,8 @@ const NewGoalForm: React.FC<Props> = ({ onGoalCreated }) => {
             <option value="weekly">Wöchentlich</option>
             <option value="monthly">Monatlich</option>
             <option value="yearly">Jährlich</option>
+            <option value="mental">Mental</option>
+
           </select>
         </div>
 

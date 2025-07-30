@@ -185,8 +185,8 @@ export interface Goal {
   endDate: string;
   startDate: string;
   category?: string;
-  type: "once" | "daily" | "weekly" | "monthly" | "yearly" | "none";
-  goalType: "once" | "daily" | "weekly" | "monthly" | "yearly" | "none";
+ type: "once" | "daily" | "weekly" | "monthly" | "yearly" | "mental" | "none";
+  goalType: "once" | "daily" | "weekly" | "monthly" | "yearly" | "mental" | "none";
   completedAt?: string;
   updatedAt: string;
   subGoals: Goal[];
@@ -377,6 +377,15 @@ export interface TradeEntry {
   reflectionNotes?: string;
   /** Combined string of all trade fields for later embeddings */
   embeddingSourceText?: string;
+   emotionBefore?: string;             // z. B. "Angst", "Gier"
+  triggerEvent?: string;              // Freitext
+  mentalMistake?: string;             // z. B. "SL verschoben"
+  performanceState?: "A" | "B" | "C"; // A/B/C-Game Einschätzung
+  followedSetup?: boolean;
+  respectedStopLoss?: boolean;
+  managedRisk?: boolean;
+  disciplineScore?: number;           // 0–100 (aus 3 Checkboxes berechnet)
+  tiltDetected?: boolean;      
 }
 
 

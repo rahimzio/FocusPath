@@ -12,8 +12,11 @@ export default function WeeklySummary({ userId }: Props) {
     userId ? `/api/trades/getStats?range=week&userId=${userId}` : null,
     fetcher
   );
-
-  if (!data) return <div>Wochendaten laden...</div>;
+ const { data: mental } = useSWR(
+    userId ? `/api/trades/mentalStats?userId=${userId}` : null,
+    fetcher
+  );
+  if (!data || !mental) return <div>Wochendaten laden...</div>;
 
   return (
     <div className="p-2 bg-white rounded shadow text-sm space-y-1">
@@ -21,6 +24,8 @@ export default function WeeklySummary({ userId }: Props) {
       <div>Winrate: {Math.round(data.winrate * 100)}%</div>
       <div>Ø PnL: {data.avgPnl}</div>
       <div>Ø Rating: {data.avgRating}</div>
+       <div>A/B/C: {mental.performance.A}/{mental.performance.B}/{mental.performance.C}</div>
+      <div>Ø Disziplin: {Math.round(mental.avgDiscipline)}</div>
     </div>
   );
 }

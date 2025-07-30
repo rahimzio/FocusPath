@@ -5,6 +5,7 @@ import TradeEntryForm from "./TradeEntryForm";
 import TradeListByDate from "./TradeListByDate";
 import WeeklySummary from "./WeeklySummary";
 import TradeStatsOverview from "./TradeStatsOverview";
+import MentalStatsOverview from "./MentalStatsOverview";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -26,7 +27,7 @@ export default function RecapPage() {
   return (
     <div className="p-4 space-y-4">
       <div className="flex items-center gap-2">
-                <Input
+        <Input
           type="date"
           value={selectedDate}
           onChange={(e) => setSelectedDate(e.target.value)}
@@ -48,6 +49,8 @@ export default function RecapPage() {
       <TradeListByDate date={selectedDate} userId={userId} />
       <TradeStatsOverview userId={userId} />
       <WeeklySummary userId={userId} />
+      <MentalStatsOverview userId={userId} />
+
     </div>
   );
 }

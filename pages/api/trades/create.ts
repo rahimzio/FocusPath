@@ -14,6 +14,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const { db } = await connectToDatabase();
     const appData = db.collection("trading");
+const lastTrade = await appData
+      .find({ userId: trade.userId, type: "tradeEntry" })
+      .sort({ createdAt: -1 })
+      .limit(1)
+      .next();
+    let tiltDetected = trade.tiltDetected || false;
+    if (
+      trade.pnl !== undefined &&
+      trade.pnl < -300 &&
+      lastTrade &&
+      lastTrade.createdAt &&
+      Date.now() - new Date(lastTrade.createdAt).getTime() < 30 * 60 * 1000
+    ) {
+      tiltDetected = true;
+    }
 
     // Remove _id if present to avoid type conflict with MongoDB's ObjectId
     const { _id, ...tradeWithoutId } = trade;
@@ -30,6 +45,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       type: "tradeEntry",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      tiltDetected,
     });
 
     return res.status(201).json({ id: result.insertedId });

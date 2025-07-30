@@ -52,32 +52,33 @@ export default function GoalOverviewDashboard() {
       goalType: goal.goalType || goal.type,
       tasks: goal.tasks ? [...goal.tasks] : [],
       completedAt: goal.completedAt,
-    });  };
+    });
+  };
   const handleAddTask = () => {
-  setEditedGoal((prev) => ({
-    ...prev,
-    tasks: [
-      ...(prev.tasks || []),
-      {
-        name: '',
-        description: '',
-        duration: '',
-        color: '',
-        time: '',
-        category: '',
-        frequency: 'once',
-        timebased: false,
-        dueDate: '',
-        points: 0,
-        status: 'todo',
-        _id: crypto.randomUUID?.() || Math.random().toString(),
-        linkedApps: [],
-        subTasks: [],
-        excludedDates: [],
-      },
-    ] as Task[],
-  }));
-};
+    setEditedGoal((prev) => ({
+      ...prev,
+      tasks: [
+        ...(prev.tasks || []),
+        {
+          name: '',
+          description: '',
+          duration: '',
+          color: '',
+          time: '',
+          category: '',
+          frequency: 'once',
+          timebased: false,
+          dueDate: '',
+          points: 0,
+          status: 'todo',
+          _id: crypto.randomUUID?.() || Math.random().toString(),
+          linkedApps: [],
+          subTasks: [],
+          excludedDates: [],
+        },
+      ] as Task[],
+    }));
+  };
 
 
   const handleToggleCompletion = async (goal: Goal) => {
@@ -164,6 +165,8 @@ export default function GoalOverviewDashboard() {
     const monthly: Goal[] = [];
     const yearly: Goal[] = [];
     const past: Goal[] = [];
+    const mental: Goal[] = [];
+
     all.forEach((goal) => {
       const start = parseISO(goal.startDate);
       const end = parseISO(goal.endDate);
@@ -178,20 +181,21 @@ export default function GoalOverviewDashboard() {
         monthly.push(goal);
       } else if (type === "yearly") {
         yearly.push(goal);
-      }
+      } else if (type === "mental") {
+        mental.push(goal);
     });
-    return { weekly, monthly, yearly, past };
+    return { weekly, monthly, yearly, past, mental };
   };
 
-  const { weekly, monthly, yearly, past } = categorizeGoals(goals);
+  const { weekly, monthly, yearly, mental, past } = categorizeGoals(goals);
 
   if (loading) return <p className="text-center">Ziele werden geladen...</p>;
 
   return (
     <div className="space-y-6">
-        <h2 className="text-2xl font-bold text-gray-800">Zielübersicht</h2>
+      <h2 className="text-2xl font-bold text-gray-800">Zielübersicht</h2>
       <div className="flex justify-between items-center">
-        <Button className="border-solid color-blue"  onClick={() => setOpenSheet(true)}>Alle Ziele anzeigen</Button>
+        <Button className="border-solid color-blue" onClick={() => setOpenSheet(true)}>Alle Ziele anzeigen</Button>
       </div>
 
       <WeeklyGoalsDashboard
@@ -203,7 +207,23 @@ export default function GoalOverviewDashboard() {
         onReflect={handleReflect}
         onToggleComplete={handleToggleCompletion}
       />
-
+      {mental.length > 0 && (
+        <section className="space-y-4">
+          <h2 className="text-xl font-semibold">🧠 Mentale Ziele</h2>
+          {mental.map((goal) => (
+            <GoalCard
+              key={goal._id}
+              goal={goal}
+              onEdit={handleEdit}
+              onMove={handleMove}
+              onDelete={handleDelete}
+              onDuplicate={handleDuplicate}
+              onReflect={handleReflect}
+              onToggleComplete={handleToggleCompletion}
+            />
+          ))}
+        </section>
+      )}
       <FullGoalManagerSheet
         open={openSheet}
         onOpenChange={setOpenSheet}
@@ -252,7 +272,7 @@ export default function GoalOverviewDashboard() {
                   onChange={(e) => setEditedGoal((prev) => ({ ...prev, startDate: e.target.value }))}
                   className="border p-2 w-full rounded mb-3"
                 />
-                                {editedGoal.completedAt && (
+                {editedGoal.completedAt && (
                   <p className="text-xs text-gray-500 mb-3">
                     Erledigt am {new Date(editedGoal.completedAt).toLocaleString()}
                   </p>

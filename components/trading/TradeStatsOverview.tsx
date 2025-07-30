@@ -13,8 +13,11 @@ export default function TradeStatsOverview({ userId, range = "week" }: Props) {
     userId ? `/api/trades/getStats?range=${range}&userId=${userId}` : null,
     fetcher
   );
-
-  if (!data) return <div>Lade Statistik...</div>;
+ const { data: mental } = useSWR(
+    userId ? `/api/trades/mentalStats?userId=${userId}` : null,
+    fetcher
+  );
+  if (!data || !mental) return <div>Lade Statistik...</div>;
 
   return (
     <div className="p-2 bg-white rounded shadow space-y-1 text-sm">
@@ -22,6 +25,8 @@ export default function TradeStatsOverview({ userId, range = "week" }: Props) {
       <div>Winrate: {Math.round(data.winrate * 100)}%</div>
       <div>Ø PnL: {data.avgPnl}</div>
       <div>Ø Rating: {data.avgRating}</div>
+      <div>Ø Disziplin: {Math.round(mental.avgDiscipline)}</div>
+      <div>Tilt Events: {mental.tiltCount}</div>
     </div>
   );
 }
