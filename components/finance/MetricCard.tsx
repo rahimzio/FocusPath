@@ -10,7 +10,7 @@ interface MetricCardProps {
   tooltip?: string;
 }
 
-const MetricCard = ({ title, value, unit, trend, tooltip }: MetricCardProps) => {
+export default function MetricCard({ title, value, unit, trend, tooltip }: MetricCardProps) {
   const card = (
     <Card className="w-full">
       <CardHeader className="pb-2">
@@ -44,5 +44,3 @@ const MetricCard = ({ title, value, unit, trend, tooltip }: MetricCardProps) => 
 
   return card;
 }
-
-export default MetricCard;

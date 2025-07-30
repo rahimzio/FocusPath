@@ -25,8 +25,9 @@ export default function FinanceDashboard() {
   const [incomeTotal, setIncomeTotal] = useState(0);
   const [expenseTotal, setExpenseTotal] = useState(0);
   const [metrics, setMetrics] = useState<any>(null);
-  const userId = (session as any)?.user?.id as string | undefined;
 
+  const userId = (session as any)?.user?.id as string | undefined;
+ 
   async function loadSavings() {
     if (!userId) return;
     const res = await fetch(`/api/finance/getSavings?userId=${userId}`);

@@ -365,6 +365,11 @@ export interface TradeEntry {
   emotions?: string;
   entryTime?: string;
   exitTime?: string;
+    strategyId?: string;
+  /** Name der Strategie zum Zeitpunkt des Trades */
+  strategy_name?: string;
+  /** Ergebnis der Strategie (win/loss) */
+  strategy_result?: "win" | "loss";
   linkedGoalId?: string;
     /** Optional short text summarising the trade */
   tradeSummaryText?: string;
@@ -472,4 +477,42 @@ export interface IncomeEntry {
   note?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+
+export interface UserAccount {
+  userId: string;
+  balance: number;
+  equity_curve: { date: string; value: number }[];
+  used_margin: number;
+  available_margin: number;
+}
+
+export interface WeeklyStat {
+  _id?: string;
+  userId: string;
+  week_start: string;
+  best_pair: string;
+  win_rate: number; // 0 - 1
+  pct_change: number;
+  top_pairs: { pair: string; win_rate: number }[];
+  createdAt?: string;
+}
+
+export interface Strategy {
+  _id?: string;
+  userId: string;
+  name: string;
+  description?: string;
+  tag_color?: string;
+  createdAt?: string;
+}
+
+export interface TradeMistake {
+  _id?: string;
+  userId: string;
+  tradeId: string;
+  mistake_type: "StopLossVergessen" | "ZuSpätAusgestoppt" | string;
+  notes?: string;
+  createdAt?: string;
 }
