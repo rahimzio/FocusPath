@@ -1,7 +1,30 @@
 "use client";
-import { useState } from "react";
+import React from "react";
 import useSWR from "swr";
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, ResponsiveContainer } from "recharts";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogTrigger,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Spinner } from "../ui/spinner";
+import { AspectRatio } from "@/components/ui/aspect-ratio";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  Tooltip,
+} from "recharts";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Stat, StatLabel, StatNumber } from "../ui/stat";
 
 interface Props {
   userId: string;
@@ -10,48 +33,84 @@ interface Props {
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 export default function MonthlyStatsOverlay({ userId }: Props) {
-  const [open, setOpen] = useState(false);
-  const { data } = useSWR(open ? `/api/stats/monthly/${userId}` : null, fetcher);
+  const { data, error, isLoading } = useSWR<{
+    months: { month: string; pnl: number; cumulative: number }[];
+    maxDrawdown: number;
+    avgRiskReward: number;
+  }>(userId ? `/api/stats/monthly/${userId}` : null, fetcher);
 
   return (
-    <div>
-      <button onClick={() => setOpen(true)} className="px-3 py-1 bg-blue-600 text-white rounded">
-        Letzte Monate Stats
-      </button>
-      {open && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-          <div className="bg-white p-4 w-full max-w-xl">
-            <button className="mb-2" onClick={() => setOpen(false)}>Schließen</button>
-            {data ? (
-              <div className="space-y-4">
-                <div className="h-40">
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button variant="outline">Letzte Monate Stats</Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Monatliche Statistiken</DialogTitle>
+          <DialogDescription>Übersicht der letzten Monate</DialogDescription>
+        </DialogHeader>
+
+        {isLoading ? (
+          <div className="flex justify-center py-8">
+            <Spinner />
+          </div>
+        ) : error ? (
+          <div className="text-red-600 text-center py-4">Fehler beim Laden der Daten</div>
+        ) : (
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Monatliches PnL</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <AspectRatio ratio={4 / 1} className="w-full">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={data.months}>
+                    <BarChart data={data!.months}>
                       <XAxis dataKey="month" />
-                      <YAxis />
-                      <Bar dataKey="pnl" fill="#8884d8" />
+                      <YAxis allowDecimals={false} />
+                      <Tooltip />
+                      <Bar dataKey="pnl" fill="#3b82f6" />
                     </BarChart>
                   </ResponsiveContainer>
-                </div>
-                <div className="h-40">
+                </AspectRatio>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Kumulative Entwicklung</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <AspectRatio ratio={4 / 1} className="w-full">
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={data.months}>
+                    <LineChart data={data!.months}>
                       <XAxis dataKey="month" />
                       <YAxis />
-                      <Line type="monotone" dataKey="cumulative" stroke="#82ca9d" />
+                      <Tooltip />
+                      <Line type="monotone" dataKey="cumulative" stroke="#10b981" dot={false} />
                     </LineChart>
                   </ResponsiveContainer>
-                </div>
-                <div className="text-sm">
-                  Max Drawdown: {data.maxDrawdown.toFixed(2)} | Avg. RR: {data.avgRiskReward.toFixed(2)}
-                </div>
-              </div>
-            ) : (
-              <div>Daten laden...</div>
-            )}
+                </AspectRatio>
+              </CardContent>
+            </Card>
+
+            <div className="grid grid-cols-2 gap-4">
+              <Stat>
+                <StatLabel>Max Drawdown</StatLabel>
+                <StatNumber>{data!.maxDrawdown.toFixed(2)}</StatNumber>
+              </Stat>
+              <Stat>
+                <StatLabel>Ø Risk/Reward</StatLabel>
+                <StatNumber>{data!.avgRiskReward.toFixed(2)}</StatNumber>
+              </Stat>
+            </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+
+        <DialogFooter>
+          <Button variant="secondary">Schließen</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

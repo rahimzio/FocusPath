@@ -1,6 +1,9 @@
 "use client";
-import { PieChart, Pie, Cell, LineChart, Line, ResponsiveContainer } from "recharts";
-
+import React from "react";
+import { PieChart, Pie, Cell, LineChart, Line, ResponsiveContainer, Tooltip } from "recharts";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { AspectRatio } from "@/components/ui/aspect-ratio";
+import { Stat, StatLabel, StatNumber } from "../ui/stat";
 export interface EquityPoint {
   date: string;
   value: number;
@@ -18,26 +21,54 @@ export default function AccountOverviewCard({ balance, equityCurve, usedMargin, 
     { name: "Used", value: usedMargin },
     { name: "Free", value: availableMargin },
   ];
+
   return (
-    <div className="p-4 bg-white rounded shadow space-y-2">
-      <div className="text-lg font-semibold">Balance: {balance.toFixed(2)}</div>
-      <div className="h-20">
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={equityCurve}>
-            <Line type="monotone" dataKey="value" stroke="#8884d8" dot={false} />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
-      <div className="h-24 w-full flex justify-center">
-        <ResponsiveContainer width="50%" height="100%">
-          <PieChart>
-            <Pie data={pieData} dataKey="value" innerRadius={30} outerRadius={40}>
-              <Cell fill="#2563eb" />
-              <Cell fill="#d1d5db" />
-            </Pie>
-          </PieChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
+    <Card>
+      <CardHeader>
+        <CardTitle>Kontoübersicht</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {/* Statistiken: Balance & verfügbare Marge */}
+        <div className="grid grid-cols-2 gap-4">
+          <Stat>
+            <StatLabel>Balance</StatLabel>
+            <StatNumber>{balance.toFixed(2)} €</StatNumber>
+          </Stat>
+          <Stat>
+            <StatLabel>Verfügbare Marge</StatLabel>
+            <StatNumber>{availableMargin.toFixed(2)} €</StatNumber>
+          </Stat>
+        </div>
+
+        {/* Equity-Verlauf als Linie, mobil-optimiert */}
+        <AspectRatio ratio={4 / 1} className="w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={equityCurve}>
+              <Line type="monotone" dataKey="value" stroke="#3b82f6" dot={false} />
+              <Tooltip />
+            </LineChart>
+          </ResponsiveContainer>
+        </AspectRatio>
+
+        {/* Marge-Verteilung als Pie-Chart */}
+        <AspectRatio ratio={1 / 1} className="w-32 mx-auto">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={pieData}
+                dataKey="value"
+                innerRadius={20}
+                outerRadius={50}
+                label
+              >
+                <Cell fill="#3b82f6" />
+                <Cell fill="#e5e7eb" />
+              </Pie>
+              <Tooltip />
+            </PieChart>
+          </ResponsiveContainer>
+        </AspectRatio>
+      </CardContent>
+    </Card>
   );
 }

@@ -1,22 +1,33 @@
 "use client";
-import { useState } from "react";
+import React, { useState } from "react";
 import { TradeEntry } from "@/utils/interface";
 import {
   Card,
-  CardContent,
-  CardFooter,
   CardHeader,
   CardTitle,
+  CardContent,
+  CardFooter,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
+  FormField,
+  FormItem,
+  FormLabel,
+  FormControl,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import {
   Select,
-  SelectContent,
-  SelectItem,
   SelectTrigger,
   SelectValue,
+  SelectContent,
+  SelectItem,
 } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { AspectRatio } from "@/components/ui/aspect-ratio";
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
+
 interface Props {
   date: string;
   userId: string;
@@ -29,54 +40,60 @@ export default function TradeEntryForm({ date, userId, onCreated }: Props) {
     followedSetup: false,
     respectedStopLoss: false,
     managedRisk: false,
+    disciplineScore: 0,
   });
-
   const [loading, setLoading] = useState(false);
+
   const updateDiscipline = (values: Partial<TradeEntry>) => {
     const fs = values.followedSetup ? 1 : 0;
     const rs = values.respectedStopLoss ? 1 : 0;
     const mr = values.managedRisk ? 1 : 0;
-    const score = Math.round(((fs + rs + mr) / 3) * 100);
-    return score;
+    return Math.round(((fs + rs + mr) / 3) * 100);
   };
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
-    const value =
-      e.target.type === "checkbox"
-        ? (e.target as HTMLInputElement).checked
-        : e.target.value;
-    const updated = { ...form, [e.target.name]: value } as Partial<TradeEntry>;
+    // Casten auf HTMLInputElement, damit .checked verfügbar ist
+    const target = e.target as HTMLInputElement;
+    const { name, value, type, checked } = target;
+    const val = type === "checkbox" ? checked : value;
+    const updated = { ...form, [name]: val } as Partial<TradeEntry>;
     updated.disciplineScore = updateDiscipline(updated);
     setForm(updated);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSelect = (name: keyof TradeEntry, value: any) => {
+    const updated = { ...form, [name]: value } as Partial<TradeEntry>;
+    updated.disciplineScore = updateDiscipline(updated);
+    setForm(updated);
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
     const disciplineScore = updateDiscipline(form);
-    const tradeSummaryText =
-      form.tradeSummaryText ||
-      `${form.symbol} ${form.setup} ${form.result} PnL:${form.pnl}`;
-    const embeddingSourceText = `\n  ${form.symbol} ${form.setup} Entry: ${form.entry}, Exit: ${form.exit}, Result: ${form.result}.\n  Notes: ${form.notes || ""}. Reflection: ${form.reflectionNotes || ""}.\n  Tags: ${form.tags?.join(", ") || ""}. Violations: ${form.ruleViolations?.join(", ") || ""}. Emotions: ${form.emotions || ""}.\n`.trim();
     await fetch("/api/trades/create", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...form,
-        disciplineScore,
-
-        tradeSummaryText,
-        embeddingSourceText,
-        date,
-        userId,
-      }),
+      body: JSON.stringify({ ...form, disciplineScore, date, userId }),
     });
     setLoading(false);
-    setForm({ result: "win", followedSetup: false, respectedStopLoss: false, managedRisk: false });
+    setForm({
+      result: "win",
+      followedSetup: false,
+      respectedStopLoss: false,
+      managedRisk: false,
+      disciplineScore: 0,
+    });
     onCreated();
   };
+
+  const pieData = [
+    { name: "Disziplin", value: form.disciplineScore || 0 },
+    { name: "Fehler", value: 100 - (form.disciplineScore || 0) },
+  ];
+  const COLORS = ["#10b981", "#e5e7eb"];
 
   return (
     <Card className="w-full">
@@ -84,113 +101,236 @@ export default function TradeEntryForm({ date, userId, onCreated }: Props) {
         <CardHeader>
           <CardTitle>Neuer Trade</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
-          <div>
-            <label className="block text-sm pb-1">Symbol</label>
-            <Input name="symbol" onChange={handleChange} />
-          </div>
-          <div>
-            <label className="block text-sm pb-1">Setup</label>
-            <Input name="setup" onChange={handleChange} />
-          </div>
+
+        <CardContent className="space-y-4">
+          {/* Symbol */}
+          <FormField
+            name="symbol"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Symbol</FormLabel>
+                <FormControl>
+                  <Input {...field} value={form.symbol || ""} onChange={handleChange} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {/* Setup */}
+          <FormField
+            name="setup"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Setup</FormLabel>
+                <FormControl>
+                  <Input {...field} value={form.setup || ""} onChange={handleChange} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {/* entry, exit, pnl */}
           <div className="flex gap-2">
-            <Input
-              name="entry"
-              type="number"
-              placeholder="Entry"
-              onChange={handleChange}
-              className="flex-1"
-            />
-            <Input
-              name="exit"
-              type="number"
-              placeholder="Exit"
-              onChange={handleChange}
-              className="flex-1"
-            />
-            <Input
-              name="pnl"
-              type="number"
-              placeholder="PnL"
-              onChange={handleChange}
-              className="flex-1"
-            />
+            {(["entry", "exit", "pnl"] as const).map((key) => (
+              <FormField
+                key={key}
+                name={key}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{key.toUpperCase()}</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        type="number"
+                        value={form[key] ?? ""}
+                        onChange={handleChange}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            ))}
           </div>
-          <div>
-            <label className="block text-sm pb-1">Ergebnis</label>
-            <Select
-              name="result"
-              defaultValue="win"
-              onValueChange={(value) =>
-                setForm((prev) => ({ ...prev, result: value as any }))
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Result" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="win">Win</SelectItem>
-                <SelectItem value="loss">Loss</SelectItem>
-                <SelectItem value="BE">BE</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+
+          {/* Ergebnis */}
+          <FormField
+            name="result"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Ergebnis</FormLabel>
+                <FormControl>
+                  <Select
+                    {...field}
+                    defaultValue={form.result}
+                    onValueChange={(v) => handleSelect("result", v)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Result" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="win">Win</SelectItem>
+                      <SelectItem value="loss">Loss</SelectItem>
+                      <SelectItem value="BE">BE</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {/* Mentale Faktoren */}
           <details className="border rounded p-2">
-            <summary className="cursor-pointer select-none">Mentale Faktoren</summary>
-            <div className="mt-2 space-y-2">
-              <div>
-                <label className="block text-sm pb-1">Emotion vor dem Trade</label>
-                <select name="emotionBefore" onChange={handleChange} className="w-full border p-1 rounded">
-                  <option value="">-</option>
-                  <option value="Angst">Angst</option>
-                  <option value="Gier">Gier</option>
-                  <option value="Stress">Stress</option>
-                  <option value="Ruhe">Ruhe</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm pb-1">Trigger Event</label>
-                <textarea name="triggerEvent" onChange={handleChange} className="w-full border p-1 rounded" />
-              </div>
-              <div>
-                <label className="block text-sm pb-1">Mentaler Fehler</label>
-                <select name="mentalMistake" onChange={handleChange} className="w-full border p-1 rounded">
-                  <option value="">-</option>
-                  <option value="SL verschoben">SL verschoben</option>
-                  <option value="Overtrading">Overtrading</option>
-                  <option value="FOMO">FOMO</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm pb-1">Performance State</label>
-                <select name="performanceState" onChange={handleChange} className="w-full border p-1 rounded">
-                  <option value="A">A</option>
-                  <option value="B">B</option>
-                  <option value="C">C</option>
-                </select>
-              </div>
-              <div className="flex gap-2 items-center">
-                <label className="flex items-center gap-1 text-sm">
-                  <input type="checkbox" name="followedSetup" onChange={handleChange} checked={!!form.followedSetup} />
-                  Setup befolgt
-                </label>
-                <label className="flex items-center gap-1 text-sm">
-                  <input type="checkbox" name="respectedStopLoss" onChange={handleChange} checked={!!form.respectedStopLoss} />
-                  StopLoss respektiert
-                </label>
-                <label className="flex items-center gap-1 text-sm">
-                  <input type="checkbox" name="managedRisk" onChange={handleChange} checked={!!form.managedRisk} />
-                  Risiko gemanagt
-                </label>
-              </div>
-              <div className="text-sm">
-                Disziplin: {form.disciplineScore || 0}
+            <summary className="cursor-pointer select-none">
+              Mentale Faktoren
+            </summary>
+            <div className="mt-2 space-y-4">
+              {/* Emotion vor dem Trade */}
+              <FormField
+                name="emotionBefore"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Emotion vor dem Trade</FormLabel>
+                    <FormControl>
+                      <Select
+                        {...field}
+                        defaultValue={form.emotionBefore}
+                        onValueChange={(v) => handleSelect("emotionBefore", v)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Emotion wählen" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Angst">Angst</SelectItem>
+                          <SelectItem value="Gier">Gier</SelectItem>
+                          <SelectItem value="Stress">Stress</SelectItem>
+                          <SelectItem value="Ruhe">Ruhe</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Trigger Event */}
+              <FormField
+                name="triggerEvent"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Trigger Event</FormLabel>
+                    <FormControl>
+                      <Input {...field} value={form.triggerEvent || ""} onChange={handleChange} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Mentaler Fehler */}
+              <FormField
+                name="mentalMistake"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Mentaler Fehler</FormLabel>
+                    <FormControl>
+                      <Select
+                        {...field}
+                        defaultValue={form.mentalMistake}
+                        onValueChange={(v) => handleSelect("mentalMistake", v)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Fehler wählen" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="SL verschoben">SL verschoben</SelectItem>
+                          <SelectItem value="Overtrading">Overtrading</SelectItem>
+                          <SelectItem value="FOMO">FOMO</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Performance State */}
+              <FormField
+                name="performanceState"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Performance State</FormLabel>
+                    <FormControl>
+                      <Select
+                        {...field}
+                        defaultValue={form.performanceState}
+                        onValueChange={(v) => handleSelect("performanceState", v)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Rating wählen" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="A">A</SelectItem>
+                          <SelectItem value="B">B</SelectItem>
+                          <SelectItem value="C">C</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Checkboxes */}
+              <div className="grid grid-cols-3 gap-2">
+                {([
+                  ["followedSetup", "Setup befolgt"],
+                  ["respectedStopLoss", "StopLoss respektiert"],
+                  ["managedRisk", "Risiko gemanagt"],
+                ] as const).map(([key, label]) => (
+                  <FormField
+                    key={key}
+                    name={key}
+                    render={({ field }) => (
+                      <FormItem className="flex items-center gap-2">
+                        <FormControl>
+                          <Checkbox
+                            checked={!!form[key]}
+                            onCheckedChange={(v) => handleSelect(key, v)}
+                          />
+                        </FormControl>
+                        <FormLabel>{label}</FormLabel>
+                      </FormItem>
+                    )}
+                  />
+                ))}
               </div>
             </div>
           </details>
+
+          {/* Tortendiagramm */}
+          <AspectRatio ratio={1} className="w-24 mx-auto">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={pieData} dataKey="value" innerRadius={20} outerRadius={40}>
+                  {pieData.map((_, i) => (
+                    <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="text-center mt-2 text-sm">
+              Disziplin: {form.disciplineScore}%  
+            </div>
+          </AspectRatio>
         </CardContent>
-        <CardFooter>
-          <Button type="submit" disabled={loading} className="ml-auto">
+
+        <CardFooter className="flex justify-end">
+          <Button type="submit" disabled={loading}>
             {loading ? "Speichern..." : "Speichern"}
           </Button>
         </CardFooter>
