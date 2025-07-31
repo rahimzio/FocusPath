@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { AffirmationEntry } from "@/utils/frequenz/frequencyModels";
-
+import { AffirmationEntry } from "@/utils/interface";
 interface Props {
   userId?: string;
 }

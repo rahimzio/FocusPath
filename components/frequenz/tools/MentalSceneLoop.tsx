@@ -1,6 +1,5 @@
 import React, { useState } from "react";
-import { MentalScene } from "@/utils/frequenz/frequencyModels";
-
+import { MentalScene } from "@/utils/interface";
 interface Props {
   onComplete?: () => void;
 }

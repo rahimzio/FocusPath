@@ -1,6 +1,5 @@
 import React, { useState } from "react";
-import { ManifestationProof } from "@/utils/frequenz/frequencyModels";
-
+import { ManifestationProof } from "@/utils/interface";
 interface Props {
   initial?: ManifestationProof[];
 }
