@@ -1,6 +1,37 @@
 import React from "react";
 import SetExpensesPage from "./setExpenses"; // Importiere mit Großbuchstaben
 import FinancialSummary from "./financialSummary"; // Importiere die FinancialSummary-Komponente
+import { useEffect,useState } from "react";
+import { getSession } from "next-auth/react";
+import { toast } from "react-toastify";
+
+const [income, setIncome] = useState(0);
+const [expenses, setExpenses] = useState(0);
+const [savings, setSavings] = useState(0);
+const [userId, setUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    getSession().then((session) => {
+      if (session?.user?.id) setUserId(session.user.id);
+      else toast.error("Fehlende Benutzer-Session.");
+    });
+  }, []);
+
+useEffect(() => {
+  async function loadFinanceData() {
+    if (userId) {
+      const res = await fetch("/api/finance/overview");
+      const data = await res.json();
+      setIncome(data.income || 0);
+      setExpenses(data.expenses || 0);
+      setSavings(data.savings || 0);
+  }else{
+    setIncome(0);
+    setExpenses(0);
+    setSavings(0);
+  }}
+  loadFinanceData();
+}, []);
 
 const FinanceOverview = () => {
   return (
@@ -10,7 +41,7 @@ const FinanceOverview = () => {
       </h1>
 
       {/* Finanzübersicht */}
-      <FinancialSummary />
+<FinancialSummary income={income} expenses={expenses} savings={savings} />
 
       {/* Aktivitäten */}
       <div className="bg-white shadow-lg rounded-lg p-6 mb-6">

@@ -32,6 +32,7 @@ const defaultItems = [
 ];
 const defaultItemsAdmin = [
   { title: "Home", url: "/", icon: Home },
+  { title: "Frequenz", url: "/overview/frequenz", icon: Calendar },
   { title: "Goals", url: "/overview/goals", icon: Calendar },
   { title: "stats", url: "/overview/stats", icon: Calendar },
   { title: "Finanzen", url: "/overview/finance", icon: Calendar },

@@ -525,3 +525,31 @@ export interface TradeMistake {
   notes?: string;
   createdAt?: string;
 }
+// Manifestation Tools ------------------------------
+export interface AffirmationEntry {
+  _id?: string;
+  sentence: string;
+  emotion: string;
+  context?: string;
+  createdAt: Date;
+  active: boolean;
+}
+
+export interface MentalScene {
+  _id?: string;
+  description: string;
+  person: string;
+  comment: string;
+  touch?: string;
+  loopStyle?: "fade" | "cut";
+  associatedEmotion: string;
+  createdAt: Date;
+  lastUsed?: Date;
+}
+
+export interface ManifestationProof {
+  date: Date;
+  proof: string;
+  linkedGoalId?: string;
+  category?: "visuell" | "zufall" | "synchronicity" | "emotion";
+}

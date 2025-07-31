@@ -1,6 +1,12 @@
 "use client";
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "../ui/button";
 
@@ -33,17 +39,19 @@ export default function AddSavingGoalModal({ userId, onSaved }: Props) {
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button onClick={handleSave} className="w-full">Sparziele erstellen</Button>      </DialogTrigger>
+                <Button>Sparziele erstellen</Button>
+            </DialogTrigger>
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Neues Sparziel</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4">
-                    <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="Titel" />
-                    <Input type="number" value={target} onChange={e => setTarget(Number(e.target.value))} placeholder="Zielbetrag" />
-                    <Input type="number" value={monthly} onChange={e => setMonthly(Number(e.target.value))} placeholder="Monatliche Einzahlung (optional)" />
-                    <Input type="date" value={deadline} onChange={e => setDeadline(e.target.value)} />
-                    <Button onClick={handleSave} className="w-full">Speichern</Button>        </div>
+                    <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Titel" />
+                    <Input type="number" value={target} onChange={(e) => setTarget(Number(e.target.value))} placeholder="Zielbetrag" />
+                    <Input type="number" value={monthly} onChange={(e) => setMonthly(Number(e.target.value))} placeholder="Monatliche Einzahlung (optional)" />
+                    <Input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
+                    <Button onClick={handleSave} className="w-full">Speichern</Button>
+                </div>
             </DialogContent>
         </Dialog>
     );

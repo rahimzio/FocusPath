@@ -1,5 +1,4 @@
-import { connectToDatabase } from "../pages/api/db/mongo";
-
+import { connectToDatabase } from "@/pages/api/db/mongo";
 export default async function createIndexes() {
   const { db } = await connectToDatabase();
   await db.collection("user_accounts").createIndex({ userId: 1 });

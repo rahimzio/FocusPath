@@ -15,21 +15,23 @@ export default function FinancialSummary({ income, expenses, savings }: Props) {
       </CardHeader>
       <CardContent className="space-y-2">
         <div className="flex justify-between text-sm">
-          <span>Total Balance:</span>
-          <span className="font-semibold text-green-600">$10,000</span>
-        </div><div className="flex justify-between text-sm">
-          <span>Investments:</span>
-          <span className="font-semibold text-blue-600">$5,000</span>
+          <span>Einkommen:</span>
+          <span className="font-semibold">{income} €</span>
         </div>
         <div className="flex justify-between text-sm">
-          <span>Expenses:</span>
-          <span className="font-semibold text-red-600">$2,000</span>
+          <span>Ausgaben:</span>
+          <span className="font-semibold">{expenses} €</span>
         </div>
         <div className="flex justify-between text-sm">
-          <span>Net Worth:</span>
-          <span className="font-semibold text-indigo-600">$13,000</span>
-        </div>     </CardContent>
-    </Card>
+          <span>Gespart:</span>
+        <span className="font-semibold">{savings} €</span>
+      </div>
+      <div className="flex justify-between text-sm">
+        <span>Verfügbar:</span>
+        <span className="font-semibold">{balance} €</span>
+      </div>
+    </CardContent>
+    </Card >
   );
 };
 

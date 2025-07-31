@@ -3,7 +3,7 @@ import { Goal, Task } from "@/utils/interface";
 import { parseISO, isWithinInterval, startOfWeek, endOfWeek } from "date-fns";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-
+import GoalCard from "./GoalCard";
 import WeeklyGoalsDashboard from "./WeeklyGoalsDashboard";
 import FullGoalManagerSheet from "./FullGoalManagerSheet";
 import GoalCreateSheet from "./GoalCreateSheet";
@@ -183,6 +183,7 @@ export default function GoalOverviewDashboard() {
         yearly.push(goal);
       } else if (type === "mental") {
         mental.push(goal);
+      }
     });
     return { weekly, monthly, yearly, past, mental };
   };

@@ -50,19 +50,16 @@ export default function AddSavingModal({ userId, onSaved }: Props) {
             type="month"
             value={month}
             onChange={(e) => setMonth(e.target.value)}
-            className="w-full border p-2 rounded"
           />
           <Input
             type="number"
             value={amount}
             onChange={(e) => setAmount(Number(e.target.value))}
-            className="w-full border p-2 rounded"
             placeholder="Betrag"
           />
           <Textarea
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            className="w-full border p-2 rounded"
             placeholder="Notiz"
           />
       <Button onClick={handleSave} className="w-full">Speichern</Button>

@@ -1,6 +1,13 @@
 "use client";
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 interface Props {
@@ -32,21 +39,32 @@ export default function AddIncomeModal({ userId, onSaved }: Props) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <button className="px-4 py-2 bg-blue-600 text-white rounded-md">
-          Einkommen eintragen
-        </button>
+ <Button>Einkommen eintragen</Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Einkommen eintragen</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
-          <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
-          <Input type="number" value={amount} onChange={(e) => setAmount(Number(e.target.value))} placeholder="Betrag" />
-          <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Notiz" />
-          <button onClick={handleSave} className="w-full px-4 py-2 bg-green-600 text-white rounded-md">
+          <Input
+            type="month"
+            value={month}
+            onChange={(e) => setMonth(e.target.value)}
+          />
+          <Input
+            type="number"
+            value={amount}
+            onChange={(e) => setAmount(Number(e.target.value))}
+            placeholder="Betrag"
+          />
+          <Input
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Notiz"
+          />
+          <Button onClick={handleSave} className="w-full">
             Speichern
-          </button>
+          </Button>
         </div>
       </DialogContent>
     </Dialog>
