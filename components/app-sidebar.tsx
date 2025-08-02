@@ -27,8 +27,8 @@ const defaultItems = [
   { title: "Home", url: "/", icon: Home },
   //{ title: "Goals", url: "/overview/goals", icon: Calendar },
   //{ title: "stats", url: "/overview/stats", icon: Calendar },
-  //{ title: "Community", url: "/overview/community", icon: Inbox },
-  { title: "Settings", url: "/Settings", icon: Settings },
+  { title: "Community", url: "/overview/community", icon: Inbox },
+  //{ title: "Settings", url: "/Settings", icon: Settings },
 ];
 const defaultItemsAdmin = [
   { title: "Home", url: "/", icon: Home },
@@ -67,8 +67,11 @@ export function AppSidebar({ mobileOpen, setMobileOpen }: AppSidebarProps) {
   const { data: session } = useSession();
   useEffect(() => {
     const email = session?.user?.email?.toLowerCase();
-    if (email === "rahimzio11@gmail.com" || "Rahimzio11@gmail.com") {
+    const adminEmails = ["rahimzio11@gmail.com", "Rahimzio11@gmail.com"];
+    if (email && adminEmails.includes(email)) {
       setVisibleItems(defaultItemsAdmin);
+    }else{
+      setVisibleItems(defaultItems);
     }
   }, [session]);
   useEffect(() => {

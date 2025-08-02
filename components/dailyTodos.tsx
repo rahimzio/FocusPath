@@ -53,6 +53,8 @@ const DailyTaskList = () => {
   const [dayScore, setDayScore] = useState<string>("-");
  const [budgetInfo, setBudgetInfo] = useState<string>("");
  const [showNoTimeOnMobile, setShowNoTimeOnMobile] = useState(false);
+ const [isSavingDayScore, setIsSavingDayScore] = useState(false);
+ const [saveSuccess, setSaveSuccess] = useState(false);
   useEffect(() => {
     getSession().then((session) => {
       if (session?.user?.id) setUserId(session.user.id);
@@ -182,7 +184,28 @@ const DailyTaskList = () => {
     if (percent >= 50) return "M Day";
     return "L Day";
   }
-
+ async function handleSaveDayScore() {
+    if (!userId) {
+      toast.error("Fehlende Benutzer-Session.");
+      return;
+    }
+    setIsSavingDayScore(true);
+    setSaveSuccess(false);
+    try {
+      const res = await fetch("/api/stats/saveDailyRating", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, rating: dayScore }),
+      });
+      if (!res.ok) throw new Error("Fehler beim Speichern");
+      toast.success("Tagesbewertung gespeichert");
+      setSaveSuccess(true);
+    } catch (e) {
+      toast.error("Fehler beim Speichern der Bewertung");
+    } finally {
+      setIsSavingDayScore(false);
+    }
+  }
   return (
     <div className="space-y-6 px-4 sm:px-6 md:px-8 pt-4 pb-8 overflow-x-hidden">
       <div className="flex items-center justify-between bg-white border border-[#e5e5ea] rounded-xl px-4 py-3 shadow hover:shadow-md cursor-pointer transition" onClick={() => setShowCalendar(!showCalendar)}>
@@ -234,7 +257,18 @@ const DailyTaskList = () => {
       <p className="text-center text-sm text-[#20253b] font-medium rounded-xl shadow border-[#e5e5ea] font-wweight-600 py-2">
          Bisheriges Tages Rating <span className="underline">{dayScore}</span>
       </p>
-
+      <button
+        className="mt-2 px-4 py-2 bg-blue-600 text-white rounded"
+        onClick={handleSaveDayScore}
+        disabled={isSavingDayScore}
+      >
+        {isSavingDayScore ? "Speichern..." : "Tagesbewertung speichern"}
+      </button>
+      {saveSuccess && (
+        <p className="text-center text-sm text-green-700 mt-1">
+          Erfolgreich gespeichert
+        </p>
+      )}
       {renderGoalsWithProgress()}
 
 <button

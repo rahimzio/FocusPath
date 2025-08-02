@@ -3,9 +3,9 @@
 import { ReactNode, useEffect, useState } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
 import { useRouter } from "next/router";
-import { Menu } from "lucide-react";
-import { TooltipProvider } from "@/components/ui/tooltip"; 
-
+import { Menu, LogOut } from "lucide-react";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { signOut } from "next-auth/react";
 export default function AppLayout({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const router = useRouter();
@@ -33,9 +33,18 @@ export default function AppLayout({ children }: { children: ReactNode }) {
             <Menu className="w-5 h-5" />
           </button>
           <h1 className="text-lg font-semibold">FocusPath</h1>
-          <span className="text-sm text-gray-500">
-            {new Date().toLocaleDateString("de-DE")}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-500">
+              {new Date().toLocaleDateString("de-DE")}
+            </span>
+            <button
+              className="sm:hidden text-[#1c1c1e]"
+              onClick={() => signOut({ callbackUrl: "/login/login" })}
+              aria-label="Abmelden"
+            >
+              <LogOut className="w-5 h-5" />
+            </button>
+          </div>
         </header>
 
         {/* Main Content */}

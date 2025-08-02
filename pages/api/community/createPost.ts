@@ -25,8 +25,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ message: "Category required for userTopic" });
     }
 
-    const ADMIN_EMAIL = "Rahimzio11@gmail.com";
-    if ((type === "update" || type === "survey") && createdBy !== ADMIN_EMAIL) {
+    const ADMIN_EMAIL = "rahimzio11@gmail.com";
+    if (
+      (type === "update" || type === "survey") &&
+      createdBy.toLowerCase() !== ADMIN_EMAIL
+    ) {
       return res.status(403).json({ message: "Unauthorized" });
     }
 

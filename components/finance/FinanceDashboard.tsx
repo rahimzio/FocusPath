@@ -12,6 +12,7 @@ import AddIncomeModal from "./AddIncomeModal";
 import FinancialSummary from "./financialSummary";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import MetricCard from "./MetricCard";
+import AddExpenseModal from "./AddExpenseModal";
 
 function getWeekString(date: Date) {
   const firstDay = new Date(date.getFullYear(), 0, 1);
@@ -25,7 +26,7 @@ export default function FinanceDashboard() {
   const [incomeTotal, setIncomeTotal] = useState(0);
   const [expenseTotal, setExpenseTotal] = useState(0);
   const [metrics, setMetrics] = useState<any>(null);
-
+ const plannedBudget = 2000;
   const userId = (session as any)?.user?.id as string | undefined;
  
   async function loadSavings() {
@@ -73,8 +74,9 @@ return (
       <div className="flex gap-2">
         <AddSavingModal userId={userId} onSaved={loadSavings} />
         <AddIncomeModal userId={userId} onSaved={loadIncome} />
-        <AddWeeklyBudgetModal userId={userId} week={getWeekString(new Date())} onSaved={() => {}} />
         <AddSavingGoalModal userId={userId} onSaved={() => {}} />
+        <AddWeeklyBudgetModal userId={userId} week={getWeekString(new Date())} onSaved={() => {}} />
+        <AddExpenseModal userId={userId} onSaved={loadExpenses} />
       </div>
  {metrics && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
@@ -108,6 +110,11 @@ return (
         expenses={expenseTotal}
         savings={savings.reduce((s, e) => s + e.amount, 0)}
       />
+      <div className="border p-4 rounded space-y-1">
+        <p>Geplantes Monatsbudget: {plannedBudget} €</p>
+        <p>Bisher ausgegeben: {expenseTotal} €</p>
+        <p>Verfügbar: {plannedBudget - expenseTotal} €</p>
+      </div>
 
       <div className="border p-4 rounded space-y-1">
         <p>Verfügbar nach Fixkosten: {incomeTotal - expenseTotal} €</p>

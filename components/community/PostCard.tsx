@@ -23,7 +23,9 @@ const PostCard: React.FC<PostCardProps> = ({ post, onUpdated }) => {
   const { data: session } = useSession();
   const userEmail = session?.user?.email;
   const isOwner = userEmail === post.createdBy;
-  const isAdmin = userEmail === "Rahimzio11@gmail.com" || "rahimzio11@gmail.com"; const getBadgeColor = () => {
+  const adminEmails = ["rahimzio11@gmail.com"];
+  const isAdmin = adminEmails.includes(userEmail?.toLowerCase() || "");
+  const getBadgeColor = () => {
     switch (post.type) {
       case "update":
         return "bg-blue-500";

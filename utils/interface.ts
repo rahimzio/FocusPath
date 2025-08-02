@@ -359,8 +359,24 @@ export interface TradeEntry {
   pnl: number;
   rating: number; // 1–10
   screenshotUrl?: string;
+  // bereits vorhanden
   notes?: string;
-  tags?: string[];
+  /* … weitere bestehende Felder … */
+
+  // NEU für dein Formular
+  /** Name der gewählten Strategie */
+  strategy?: string;
+  /** Buy oder Sell */
+  tradeType?: "buy" | "sell";
+  /** Lot-Größe */
+  lotSize?: number;
+  /** Potenzieller Verlust (wenn Stop Loss getroffen) */
+  potentialLoss?: number;
+  /** Risk/Reward-Ratio, z.B. "1:2" */
+  riskReward?: string;
+  /** Alle ausgewählten Confluences */
+  confluences?: string[];
+    tags?: string[];
   ruleViolations?: string[];
   emotions?: string;
   entryTime?: string;
@@ -385,8 +401,9 @@ export interface TradeEntry {
   respectedStopLoss?: boolean;
   managedRisk?: boolean;
   disciplineScore?: number;           // 0–100 (aus 3 Checkboxes berechnet)
-  tiltDetected?: boolean;      
+  tiltDetected?: boolean;
 }
+
 
 
 export interface TradeEntryVectorReady extends TradeEntry {

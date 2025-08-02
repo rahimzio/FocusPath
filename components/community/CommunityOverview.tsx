@@ -35,8 +35,9 @@ const CommunityOverviews = () => {
     fetchPosts();
   }, []);
 
-  const isAdmin = session?.user?.email === "Rahimzio11@gmail.com" || "rahimzio11@gmail.com";
 
+  const adminEmails = ["rahimzio11@gmail.com", "Rahimzio11@gmail.com"];
+  const isAdmin = adminEmails.includes(session?.user?.email?.toLowerCase() || "");
   return (
     <div className="p-6">
       <h1 className="text-2xl font-bold mb-6">Community</h1>

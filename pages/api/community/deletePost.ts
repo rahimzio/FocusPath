@@ -17,8 +17,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const post = await db.collection("community").findOne({ _id: new ObjectId(postId) });
     if (!post) return res.status(404).json({ message: "Post not found" });
 
-    const ADMIN_EMAILS = ["Rahimzio11@gmail.com", "rahimzio11@gmail.com"];
-    if (post.createdBy !== userEmail && !ADMIN_EMAILS.includes(userEmail)) {
+    const ADMIN_EMAILS = ["rahimzio11@gmail.com"];
+    const normalizedEmail = (userEmail as string).toLowerCase();
+    if (post.createdBy !== userEmail && !ADMIN_EMAILS.includes(normalizedEmail)) {
       return res.status(403).json({ message: "Unauthorized" });
     }
 
