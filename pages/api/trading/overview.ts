@@ -16,7 +16,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const { db } = await connectToDatabase();
-  const collection = db.collection<UserAccount>("user_accounts");
+  const collection = db.collection<UserAccount>("trading");
   const account = await collection.findOne({ userId });
   if (!account) return res.status(404).json({ message: "not found" });
 

@@ -15,7 +15,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const { db } = await connectToDatabase();
-    const collection = db.collection<Account>("trading_accounts");
+    const collection = db.collection<Account>("trading");
     const result = await collection.updateOne(
       { _id: new ObjectId(id) as any},
       { $set: { ...updateData, updatedAt: new Date().toISOString() } }

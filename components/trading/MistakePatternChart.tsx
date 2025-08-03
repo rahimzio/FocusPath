@@ -34,7 +34,7 @@ export default function MistakePatternChart({ userId }: Props) {
     );
   }
 
-  if (error || !data) {
+  if (error || !data || !Array.isArray(data.mistakes)) {
     return (
       <div className="text-center text-red-600 py-4">
         Stats aktuell nicht verfügbar

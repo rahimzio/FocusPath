@@ -44,12 +44,10 @@ export default function TradeRecapList({ userId }: TradeRecapListProps) {
     {} as Record<string, string>
   );
 
-  const { data, mutate } = useSWR<{ trades: TradeEntry[] }>(
-    userId
-      ? `/api/trading/getByDate?date=${date}&userId=${userId}${account ? `&accountId=${account}` : ""}`
-      : null,
-    fetcher
-  );
+const { data, mutate } = useSWR<{ trades: TradeEntry[] }>(
+  userId ? `/api/trading/getRecent?userId=${userId}` : null,
+  fetcher
+);
   const trades: TradeEntry[] = data?.trades || [];
   const filtered = symbol
     ? trades.filter((t) =>

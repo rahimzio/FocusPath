@@ -12,7 +12,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const { db } = await connectToDatabase();
-    const collection = db.collection<Account>("trading_accounts");
+    const collection = db.collection<Account>("trading");
     const accounts = await collection.find({ userId }).toArray();
     return res.status(200).json({ accounts });
   } catch (err) {

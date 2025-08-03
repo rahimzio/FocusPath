@@ -15,7 +15,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const { db } = await connectToDatabase();
-  const collection = db.collection<WeeklyStat>("weekly_stats");
+  const collection = db.collection<WeeklyStat>("trading");
   let stats: WeeklyStat | null = null;
   if (week_start && typeof week_start === "string") {
     stats = await collection.findOne({ userId, week_start });

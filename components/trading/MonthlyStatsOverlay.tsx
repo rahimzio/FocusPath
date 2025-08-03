@@ -37,7 +37,7 @@ export default function MonthlyStatsOverlay({ userId }: Props) {
     months: { month: string; pnl: number; cumulative: number }[];
     maxDrawdown: number;
     avgRiskReward: number;
-  }>(userId ? `/api/stats/monthly/${userId}` : null, fetcher);
+  }>(userId ? `/api/trading/monthly/${userId}` : null, fetcher);
 
   return (
     <Dialog>

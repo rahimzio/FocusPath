@@ -32,10 +32,18 @@ export default function StrategyPills({ userId, onSelect }: Props) {
     );
   }
 
-  if (error || !data) {
+  if (error) {
     return (
       <div className="text-center text-red-600 py-4">
         Strategien konnten nicht geladen werden.
+      </div>
+    );
+  }
+
+  if (!data || !Array.isArray(data.strategies)) {
+    return (
+      <div className="text-center text-muted-foreground py-4">
+        Keine Strategien verfügbar.
       </div>
     );
   }
@@ -53,7 +61,7 @@ export default function StrategyPills({ userId, onSelect }: Props) {
               size="sm"
               variant="outline"
               style={{ backgroundColor: s.tag_color ?? undefined }}
-              onClick={() => onSelect && onSelect(s._id)}
+              onClick={() => onSelect?.(s._id)}
             >
               {s.name}
             </Button>

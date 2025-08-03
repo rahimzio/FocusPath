@@ -12,7 +12,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const { db } = await connectToDatabase();
-    const collection = db.collection<Account>("trading_accounts");
+    const collection = db.collection<Account>("trading");
     const result = await collection.insertOne({
       userId,
       name,
