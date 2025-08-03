@@ -18,6 +18,7 @@ import RecapAccordion from "./RecapAccordion";
 import TradeEntryFAB from "./TradeEntryFAB";
 import WeeklyStatsCard from "./WeeklyStatsCard";
 import { Component as WishGainVsReality } from "./charts/wishgainvsreality";
+import AccountManager from "./AccountManager";
 
 export default function TradingDashboard() {
   const { data: session } = useSession();
@@ -48,6 +49,7 @@ export default function TradingDashboard() {
         <TabsList>
           <TabsTrigger value="overview">Übersicht</TabsTrigger>
           <TabsTrigger value="components">Komponenten</TabsTrigger>
+          <TabsTrigger value="accounts">Accounts</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview">
@@ -96,6 +98,9 @@ export default function TradingDashboard() {
               <WishGainVsReality />
             </div>
           </div>
+        </TabsContent>
+                <TabsContent value="accounts">
+          <AccountManager userId={userId} />
         </TabsContent>
       </Tabs>
     </div>

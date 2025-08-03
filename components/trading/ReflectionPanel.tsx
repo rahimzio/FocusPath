@@ -68,7 +68,7 @@ export default function ReflectionPanel({ trade, onSaved }: Props) {
         100
     );
 
-    await fetch(`/api/trades/update?id=${trade._id}&userId=${trade.userId}`, {
+    await fetch(`/api/trading/update?id=${trade._id}&userId=${trade.userId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

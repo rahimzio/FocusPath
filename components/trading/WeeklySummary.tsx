@@ -26,11 +26,11 @@ const fetcher = (url: string) => fetch(url).then(res => res.json());
 
 export default function WeeklySummary({ userId }: Props) {
   const { data: stats, error: statsError } = useSWR<StatsData>(
-    userId ? `/api/trades/getStats?range=week&userId=${userId}` : null,
+    userId ? `/api/trading/getStats?range=week&userId=${userId}` : null,
     fetcher
   );
   const { data: mental, error: mentalError } = useSWR<MentalData>(
-    userId ? `/api/trades/mentalStats?userId=${userId}` : null,
+    userId ? `/api/trading/mentalStats?userId=${userId}` : null,
     fetcher
   );
 

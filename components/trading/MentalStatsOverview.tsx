@@ -20,7 +20,7 @@ export default function MentalStatsOverview({ userId }: Props) {
         tiltCount: number;
         mistakes: { name: string; count: number }[];
     }>(
-        userId ? `/api/trades/mentalStats?userId=${userId}` : null,
+        userId ? `/api/trading/mentalStats?userId=${userId}` : null,
         fetcher
     );
 

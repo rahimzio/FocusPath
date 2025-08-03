@@ -18,6 +18,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const collection = db.collection("trading");
 
     const { _id, ...updateData } = trade;
+        void _id;
+
  const lastTrade = await collection
       .find({ userId, type: "tradeEntry" })
       .sort({ createdAt: -1 })

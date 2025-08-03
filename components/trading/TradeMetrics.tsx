@@ -17,7 +17,7 @@ const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 export default function TradeMetrics({ userId, range = "week" }: TradeMetricsProps) {
   const { data } = useSWR<TradeStats>(
-    userId ? `/api/trades/getStats?range=${range}&userId=${userId}` : null,
+    userId ? `/api/trading/getStats?range=${range}&userId=${userId}` : null,
     fetcher
   );
 

@@ -13,7 +13,7 @@ const fetcher = (url: string) => fetch(url).then((res) => res.json());
 export default function TradeReflection({ userId, date }: TradeReflectionProps) {
   const day = date || new Date().toISOString().slice(0, 10);
   const { data } = useSWR(
-    userId ? `/api/trades/getByDate?date=${day}&userId=${userId}` : null,
+    userId ? `/api/trading/getByDate?date=${day}&userId=${userId}` : null,
     fetcher
   );
   const trade = data?.trades?.[0];

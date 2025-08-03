@@ -33,7 +33,7 @@ export default function RecapPage() {
 
   // Optional: Monthly PnL Trend
   const { data: monthlyPnl } = useSWR<{ day: string; cumPnl: number }[]>(
-    userId ? `/api/trades/monthlyPnl?userId=${userId}` : null,
+    userId ? `/api/trading/monthlyPnl?userId=${userId}` : null,
     fetcher
   );
 

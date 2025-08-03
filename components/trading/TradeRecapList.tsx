@@ -14,9 +14,9 @@ import {
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { TradeEntry } from "@/utils/interface";
 import TradeEntryForm from "./TradeEntryForm";
-
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import { Account, TradeEntry } from "@/utils/interface";
 interface TradeRecapListProps {
   userId: string;
 }
@@ -32,16 +32,29 @@ function fmt(num: number | string | undefined, digits: number) {
 export default function TradeRecapList({ userId }: TradeRecapListProps) {
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [symbol, setSymbol] = useState("");
+  const [account, setAccount] = useState("all");
+
+  const { data: accountData } = useSWR<{ accounts: Account[] }>(
+    userId ? `/api/trading/getAllAccounts?userId=${userId}` : null,
+    fetcher
+  );
+  const accounts = accountData?.accounts || [];
+  const accountMap = accounts.reduce(
+    (acc, cur) => ({ ...acc, [cur._id || ""]: cur.name }),
+    {} as Record<string, string>
+  );
 
   const { data, mutate } = useSWR<{ trades: TradeEntry[] }>(
-    userId ? `/api/trades/getByDate?date=${date}&userId=${userId}` : null,
+    userId
+      ? `/api/trading/getByDate?date=${date}&userId=${userId}${account ? `&accountId=${account}` : ""}`
+      : null,
     fetcher
   );
   const trades: TradeEntry[] = data?.trades || [];
   const filtered = symbol
     ? trades.filter((t) =>
-        t.symbol?.toLowerCase().includes(symbol.toLowerCase())
-      )
+      t.symbol?.toLowerCase().includes(symbol.toLowerCase())
+    )
     : trades;
 
   const totalPnl = filtered.reduce(
@@ -84,13 +97,26 @@ export default function TradeRecapList({ userId }: TradeRecapListProps) {
               value={symbol}
               onChange={(e) => setSymbol(e.target.value)}
               className="sm:max-w-[150px]"
-            />
+            />            <Select value={account} onValueChange={setAccount}>
+              <SelectTrigger className="sm:max-w-[150px]">
+                <SelectValue placeholder="Account" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Alle</SelectItem>
+                {accounts.map((a) => (
+                  <SelectItem key={a._id} value={a._id!}>
+                    {a.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Datum</TableHead>
+                <TableHead>Account</TableHead>
                 <TableHead>Symbol</TableHead>
                 <TableHead>Ergebnis</TableHead>
                 <TableHead>PnL</TableHead>
@@ -102,6 +128,7 @@ export default function TradeRecapList({ userId }: TradeRecapListProps) {
               {filtered.map((t) => (
                 <TableRow key={t._id} className="cursor-pointer hover:bg-gray-50" onClick={() => handleRowClick(t)}>
                   <TableCell>{t.date}</TableCell>
+                  <TableCell>{accountMap[t.accountId || ""] || "-"}</TableCell>
                   <TableCell>{t.symbol}</TableCell>
                   <TableCell>{t.result}</TableCell>
                   <TableCell>{fmt(t.pnl, 2)}</TableCell>
@@ -111,7 +138,7 @@ export default function TradeRecapList({ userId }: TradeRecapListProps) {
               ))}
               {filtered.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center">
+                  <TableCell colSpan={7} className="text-center">
                     Keine Trades
                   </TableCell>
                 </TableRow>

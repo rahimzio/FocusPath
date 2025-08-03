@@ -20,7 +20,7 @@ const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 export default function StrategyPills({ userId, onSelect }: Props) {
   const { data, error, isLoading } = useSWR<{ strategies: Strategy[] }>(
-    userId ? `/api/strategies?userId=${userId}` : null,
+    userId ? `/api/trading/strategies?userId=${userId}` : null,
     fetcher
   );
 

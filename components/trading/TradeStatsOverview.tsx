@@ -25,12 +25,12 @@ const fetcher = (url: string) => fetch(url).then((res) => res.json());
 export default function TradeStatsOverview({ userId, range = "week" }: Props) {
   // Lade Trading-Stats
   const { data: stats } = useSWR(
-    userId ? `/api/trades/getStats?range=${range}&userId=${userId}` : null,
+    userId ? `/api/trading/getStats?range=${range}&userId=${userId}` : null,
     fetcher
   );
   // Lade mentale Stats (Disziplin, Tilt)
   const { data: mental } = useSWR(
-    userId ? `/api/trades/mentalStats?userId=${userId}` : null,
+    userId ? `/api/trading/mentalStats?userId=${userId}` : null,
     fetcher
   );
 

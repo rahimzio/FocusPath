@@ -51,10 +51,10 @@ const DailyTaskList = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
   const [dayScore, setDayScore] = useState<string>("-");
- const [budgetInfo, setBudgetInfo] = useState<string>("");
- const [showNoTimeOnMobile, setShowNoTimeOnMobile] = useState(false);
- const [isSavingDayScore, setIsSavingDayScore] = useState(false);
- const [saveSuccess, setSaveSuccess] = useState(false);
+  const [budgetInfo, setBudgetInfo] = useState<string>("");
+  const [showNoTimeOnMobile, setShowNoTimeOnMobile] = useState(false);
+  const [isSavingDayScore, setIsSavingDayScore] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
   useEffect(() => {
     getSession().then((session) => {
       if (session?.user?.id) setUserId(session.user.id);
@@ -65,7 +65,7 @@ const DailyTaskList = () => {
   async function fetchTasks(dateParam?: string) {
     const dateToUse = dateParam || formatDate(new Date());
     if (!userId) return;
-    try { 
+    try {
       console.log("📥 fetchTasks", { dateToUse, userId });
       const response = await fetch(`/api/task/getTasks?date=${dateToUse}&userId=${userId}`);
       const data = await response.json();
@@ -184,7 +184,7 @@ const DailyTaskList = () => {
     if (percent >= 50) return "M Day";
     return "L Day";
   }
- async function handleSaveDayScore() {
+  async function handleSaveDayScore() {
     if (!userId) {
       toast.error("Fehlende Benutzer-Session.");
       return;
@@ -195,7 +195,7 @@ const DailyTaskList = () => {
       const res = await fetch("/api/stats/saveDailyRating", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, rating: dayScore }),
+        body: JSON.stringify({ userId, rating: dayScore, date: selectedDate }),
       });
       if (!res.ok) throw new Error("Fehler beim Speichern");
       toast.success("Tagesbewertung gespeichert");
@@ -248,22 +248,16 @@ const DailyTaskList = () => {
           />
         </div>
       )}
- {budgetInfo && (
+      {budgetInfo && (
         <p className="text-center text-sm text-green-700 font-medium">
           {budgetInfo}
         </p>
       )}
 
       <p className="text-center text-sm text-[#20253b] font-medium rounded-xl shadow border-[#e5e5ea] font-wweight-600 py-2">
-         Bisheriges Tages Rating <span className="underline">{dayScore}</span>
+        Bisheriges Tages Rating <span className="underline">{dayScore}</span>
       </p>
-      <button
-        className="mt-2 px-4 py-2 bg-blue-600 text-white rounded"
-        onClick={handleSaveDayScore}
-        disabled={isSavingDayScore}
-      >
-        {isSavingDayScore ? "Speichern..." : "Tagesbewertung speichern"}
-      </button>
+
       {saveSuccess && (
         <p className="text-center text-sm text-green-700 mt-1">
           Erfolgreich gespeichert
@@ -271,7 +265,7 @@ const DailyTaskList = () => {
       )}
       {renderGoalsWithProgress()}
 
-<button
+      <button
         onClick={() => setShowNoTimeOnMobile(!showNoTimeOnMobile)}
         className="block sm:hidden w-full py-2 rounded-lg bg-blue-500 text-white mb-4"
       >

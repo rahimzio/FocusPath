@@ -19,7 +19,7 @@ const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 export default function PerformanceChart({ userId }: PerformanceChartProps) {
   const { data } = useSWR(
-    userId ? `/api/trades/monthlyPnl?userId=${userId}` : null,
+    userId ? `/api/trading/monthlyPnl?userId=${userId}` : null,
     fetcher
   );
 

@@ -345,8 +345,19 @@ export interface Post {
   likes?: string[];
 }
 
+export interface Account {
+  _id?: string;
+  userId: string;
+  name: string;
+  type: 'Live' | 'Demo';
+  currency: string;
+  startBalance: number;
+  createdAt: string;
+}
+
 export interface TradeEntry {
   _id?: string;
+  accountId?: string;
   userId: string;
   date: string; // Format: YYYY-MM-DD
   symbol: string;

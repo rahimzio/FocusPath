@@ -27,7 +27,7 @@ interface Props {
 
 export default function TradeListByDate({ date, userId }: Props) {
   const { data } = useSWR<{ trades: TradeEntry[] }>(
-    date ? `/api/trades/getByDate?date=${date}&userId=${userId}` : null,
+    date ? `/api/trading/getByDate?date=${date}&userId=${userId}` : null,
     fetcher
   );
   const trades: TradeEntry[] = data?.trades || [];

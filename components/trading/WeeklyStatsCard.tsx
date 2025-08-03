@@ -35,7 +35,7 @@ const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 export default function WeeklyStatsCard({ userId }: Props) {
   const { data, error, isLoading } = useSWR<{ stats: WeeklyStats }>(
-    userId ? `/api/stats/weekly?userId=${userId}` : null,
+    userId ? `/api/trading/weekly?userId=${userId}` : null,
     fetcher,
     { refreshInterval: 300000 }
   );

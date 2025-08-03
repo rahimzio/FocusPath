@@ -14,7 +14,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const { db } = await connectToDatabase();
     const appData = db.collection("trading");
-const lastTrade = await appData
+    const lastTrade = await appData
       .find({ userId: trade.userId, type: "tradeEntry" })
       .sort({ createdAt: -1 })
       .limit(1)
@@ -32,7 +32,7 @@ const lastTrade = await appData
 
     // Remove _id if present to avoid type conflict with MongoDB's ObjectId
     const { _id, ...tradeWithoutId } = trade;
-
+    void _id;
     const tradeSummaryText =
       trade.tradeSummaryText ||
       `${trade.symbol} ${trade.setup} ${trade.result} PnL:${trade.pnl}`;

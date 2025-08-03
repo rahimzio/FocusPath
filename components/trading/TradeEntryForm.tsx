@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import { useForm, FormProvider } from "react-hook-form";
-import { TradeEntry } from "@/utils/interface";
+import { TradeEntry,Account } from "@/utils/interface";
+import useSWR from "swr";
 import {
   Card,
   CardHeader,
@@ -31,6 +32,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from "recharts";
+const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 interface Props {
   date: string;
@@ -46,6 +48,7 @@ export default function TradeEntryForm({ date, userId, onCreated, initialData }:
       ...initialData,
       date,
       symbol: initialData?.symbol || "",
+      accountId: initialData?.accountId || "",
       entry: initialData?.entry || 0,
       exit: initialData?.exit || 0,
       pnl: initialData?.pnl || 0,
@@ -66,7 +69,7 @@ export default function TradeEntryForm({ date, userId, onCreated, initialData }:
       respectedStopLoss: initialData?.respectedStopLoss || false,
       managedRisk: initialData?.managedRisk || false,
       disciplineScore: initialData?.disciplineScore || 0,
-    } as any,
+      } as unknown as TradeEntry,
   });
   const { control, handleSubmit, watch, setValue } = methods;
   const formValues = watch();
@@ -77,6 +80,12 @@ export default function TradeEntryForm({ date, userId, onCreated, initialData }:
     { name: 'Fehler', value: 100 - (formValues.disciplineScore || 0) }
   ];
   const COLORS = ['#10b981', '#e5e7eb'];
+
+  const { data: accountData } = useSWR<{ accounts: Account[] }>(
+    userId ? `/api/trading/getAllAccounts?userId=${userId}` : null,
+    fetcher
+  );
+  const accounts = accountData?.accounts || [];
 
   // Dropdown options
   const [pairs, setPairs] = useState<string[]>([]);
@@ -92,7 +101,7 @@ export default function TradeEntryForm({ date, userId, onCreated, initialData }:
   }, []);
 
   const onSubmit = async (values: TradeEntry) => {
-    await fetch("/api/trades/create", {
+    await fetch("/api/trading/create", {
       method: initialData ? "PUT" : "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ...values, userId }),
@@ -119,7 +128,27 @@ export default function TradeEntryForm({ date, userId, onCreated, initialData }:
 
               <TabsContent value="general">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Symbol, tradeType, entry, exit, pnl, lotSize, potentialLoss, riskReward, notes */}
+ {/* Account, Symbol, tradeType, entry, exit, pnl, lotSize, potentialLoss, riskReward, notes */}
+                  <FormField control={control} name="accountId" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Account</FormLabel>
+                      <FormControl>
+                        <Select value={field.value || ""} onValueChange={field.onChange}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Account wählen" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {accounts.map((a) => (
+                              <SelectItem key={a._id} value={a._id!}>
+                                {a.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
                   <FormField control={control} name="symbol" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Währungspaar</FormLabel>
@@ -225,7 +254,7 @@ export default function TradeEntryForm({ date, userId, onCreated, initialData }:
                         ["respectedStopLoss", "StopLoss respektiert"],
                         ["managedRisk", "Risiko gemanagt"],
                       ] as const).map(([key, label]) => (
-                        <FormField key={key} control={control} name={key} render={({ field }) => (
+                        <FormField key={key} control={control} name={key} render={() => (
                           <FormItem className="flex items-center gap-2">
                             <FormControl>
                               <Checkbox checked={formValues[key] as boolean} onCheckedChange={v => setValue(key, v === true)} />
