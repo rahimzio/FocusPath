@@ -107,7 +107,7 @@ export default function FrequenzOverviewDashboard() {
             <div className="col-span-1 md:col-span-2 xl:col-span-4 min-w-0">
               <AffirmationAnchor userId={userId} />
             </div>
-            <div className="col-span-1 md:col-span-2 xl:col-span-4 min-w-0">
+            <div className="col-span-1 md:col-span-2 xl:col-span-4 min-w-0 flex-col">
               <ManifestationProofLog />
             </div>
 

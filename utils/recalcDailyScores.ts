@@ -64,7 +64,7 @@ export async function recalcDailyScores(userId: string, date: string) {
   };
 
   if (existing) {
-    await appData.updateOne({ _id: existing._id }, { $set: payload });
+    await appData.updateOne({ _id: existing._id as any }, { $set: payload });
   } else {
     await appData.insertOne(payload);
   }

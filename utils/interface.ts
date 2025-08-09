@@ -3,6 +3,7 @@
  * Gemeinsame Sammelstelle für DB- und App-Interfaces
  */
 
+import { FileType2Icon } from "lucide-react";
 import { ObjectId } from "mongodb";
 export interface User {
   _id: string;
@@ -599,7 +600,7 @@ export interface ActionLog {
   _id: string;
   userId: string;
   date: string; // Tagesbucket YYYY-MM-DD
-  type: "commitment_done" | "commitment_broken" | "commitment_rescoped" | "unintended_action";
+  typ: "commitment_done" | "commitment_broken" | "commitment_rescoped" | "unintended_action";
   meta?: {
     weight?: number; // z.B. 2/3/5/8
     reason?: string;
@@ -658,7 +659,7 @@ export interface ActionLog {
   _id: string;
   userId: string;
   date: string; // Tagesbucket YYYY-MM-DD
-  typ: "action_log";
+  FileType2Icon: "action_log";
   logType:
     | "commitment_done"
     | "commitment_broken"

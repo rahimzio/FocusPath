@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import { ObjectId } from "mongodb";
 import { connectToDatabase } from "../db/mongo";
-import { recalcDailyScores } from "../../../lib/recalcDailyScores";
+import { recalcDailyScores } from "@/utils/metrcis/recalcDailyScores";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {

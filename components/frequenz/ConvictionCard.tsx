@@ -5,7 +5,7 @@ export default function ConvictionCard({ userId }: { userId: string }) {
 
   useEffect(() => {
     (async () => {
-      const res = await fetch(`/api/conviction/today?userId=${userId}`);
+      const res = await fetch(`/api/frequency/conviction/today?userId=${userId}`);
       const data = await res.json(); // liefert inputs + prevEma
       const { ema } = computeConvictionScore(data.inputs as ConvictionInputs);
       setEma(ema);

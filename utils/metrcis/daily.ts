@@ -1,5 +1,5 @@
-mport { NextApiRequest, NextApiResponse } from "next";
-import { connectToDatabase } from "../db/mongo";
+import { NextApiRequest, NextApiResponse } from "next";
+import { connectToDatabase } from "@/pages/api/db/connectToDatabase";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "GET") {

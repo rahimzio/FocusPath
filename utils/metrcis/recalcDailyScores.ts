@@ -34,9 +34,9 @@ export async function recalcDailyScores(userId: string, date: string) {
   let delta = 0;
   let unintendedCount = 0;
   actions.forEach((a) => {
-    if (a.type === "commitment_done") delta += a.meta?.weight || 0;
-    if (a.type === "commitment_broken") delta -= 2 * (a.meta?.weight || 0);
-    if (a.type === "unintended_action") unintendedCount += 1;
+    if (a.typ === "commitment_done") delta += a.meta?.weight || 0;
+    if (a.typ === "commitment_broken") delta -= 2 * (a.meta?.weight || 0);
+    if (a.typ === "unintended_action") unintendedCount += 1;
   });
   const rawTrust = (prevScores?.trustTank ?? 50) + delta;
   const trustTank = clamp(ema(rawTrust, prevScores?.trustTank ?? null, 7), 0, 100);

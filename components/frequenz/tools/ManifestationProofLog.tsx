@@ -20,7 +20,7 @@ const ManifestationProofLog: React.FC<Props> = ({ initial = [] }) => {
   };
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow space-y-4">
+    <div className="bg-white p-6 rounded-lg shadow space-y-4 flex-col">
       <h2 className="text-2xl font-semibold">Manifestation Proof Log</h2>
       <div className="flex gap-2">
         <input

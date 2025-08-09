@@ -17,11 +17,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const collection = db.collection<ActionLog>("actionLogs");
     const date = new Date().toISOString().slice(0, 10);
     const log: Omit<ActionLog, "_id"> = {
-      userId,
-      date,
-      type: "unintended_action",
-      meta: { reason, taskId },
-      createdAt: new Date().toISOString(),
+        userId,
+        date,
+        typ: "unintended_action",
+        meta: { reason, taskId },
+        createdAt: new Date().toISOString(),
+        FileType2Icon: "action_log",
+        logType: "unintended_action"
     };
     const result = await collection.insertOne(log as unknown as ActionLog);
     return res.status(201).json({ id: result.insertedId });
