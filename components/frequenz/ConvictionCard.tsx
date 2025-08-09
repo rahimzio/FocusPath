@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-import { computeConvictionScore, ConvictionInputs } from "@/utils/conviction";
-
+import { ConvictionInputs, computeConvictionScore} from "@/pages/api/frequency/conviction";
 export default function ConvictionCard({ userId }: { userId: string }) {
   const [ema, setEma] = useState<number>(0);
 

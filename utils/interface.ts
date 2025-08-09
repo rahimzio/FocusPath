@@ -581,3 +581,127 @@ export interface ManifestationProof {
   linkedGoalId?: string;
   category?: "visuell" | "zufall" | "synchronicity" | "emotion";
 }
+// Commitment & Scoring Models
+export interface Commitment {
+  _id: string;
+  userId: string;
+  title: string;
+  dueDate: string; // ISO
+  weight: "tiny" | "small" | "medium" | "big"; // +2/+3/+5/+8
+  createdAt: string;
+  status: "open" | "done" | "broken" | "rescoped";
+  completedAt?: string;
+  rescopedAt?: string;
+  source?: { type: "task" | "manual"; refId?: string };
+}
+
+export interface ActionLog {
+  _id: string;
+  userId: string;
+  date: string; // Tagesbucket YYYY-MM-DD
+  type: "commitment_done" | "commitment_broken" | "commitment_rescoped" | "unintended_action";
+  meta?: {
+    weight?: number; // z.B. 2/3/5/8
+    reason?: string;
+    taskId?: string;
+  };
+  createdAt: string;
+}
+
+export interface DailyMindset {
+  _id: string;
+  userId: string;
+  date: string; // YYYY-MM-DD
+  beliefs: number;
+  convictionSelf: number;
+  perception: number;
+  emotion: number;
+  focus: number;
+  reactions: number;
+  expectations: number;
+  heaven: number;
+  neediness: number;
+}
+
+export interface DailyScores {
+  _id: string;
+  userId: string;
+  date: string; // YYYY-MM-DD
+  conviction: number; // 0–100
+  trustTank: number; // 0–100
+  frequency: number; // 0–100
+  details?: {
+    followThrough7d?: number;
+    decisionConsistency?: number;
+    winRate14d?: number;
+    clarity10?: number;
+    selfConfidence10?: number;
+    streakDays?: number;
+    unintendedCount?: number;
+  };
+  createdAt: string;
+}
+export interface Commitment {
+  _id: string;
+  userId: string;
+  title: string;
+  dueDate: string; // ISO
+  weight: "tiny" | "small" | "medium" | "big"; // +2/+3/+5/+8
+  createdAt: string;
+  status: "open" | "done" | "broken" | "rescoped";
+  completedAt?: string;
+  rescopedAt?: string;
+  source?: { type: "task" | "manual"; refId?: string };
+}
+
+export interface ActionLog {
+  _id: string;
+  userId: string;
+  date: string; // Tagesbucket YYYY-MM-DD
+  typ: "action_log";
+  logType:
+    | "commitment_done"
+    | "commitment_broken"
+    | "commitment_rescoped"
+    | "unintended_action";
+  meta?: {
+    weight?: number;
+    reason?: string;
+    taskId?: string;
+  };
+  createdAt: string;
+}
+
+export interface DailyMindset {
+  _id: string;
+  userId: string;
+  date: string; // YYYY-MM-DD
+  beliefs: number;
+  convictionSelf: number;
+  perception: number;
+  emotion: number;
+  focus: number;
+  reactions: number; // "respond" > "react"
+  expectations: number;
+  heaven: number; // Ruhe/Detachment 1–10
+  neediness: number; // Wichtigkeit 1–10
+}
+
+export interface DailyScores {
+  _id: string;
+  userId: string;
+  date: string; // YYYY-MM-DD
+  conviction: number; // 0–100
+  trustTank: number; // 0–100
+  frequency: number; // 0–100
+  details?: {
+    followThrough7d?: number;
+    decisionConsistency?: number;
+    winRate14d?: number;
+    clarity10?: number;
+    selfConfidence10?: number;
+    streakDays?: number;
+    unintendedCount?: number;
+  };
+  createdAt: string;
+}
