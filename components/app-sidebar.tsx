@@ -32,9 +32,9 @@ const defaultItems = [
 ];
 const defaultItemsAdmin = [
   { title: "Home", url: "/", icon: Home },
+  { title: "stats", url: "/overview/stats", icon: Calendar },
   { title: "Frequenz", url: "/overview/frequenz", icon: Calendar },
   { title: "Goals", url: "/overview/goals", icon: Calendar },
-  { title: "stats", url: "/overview/stats", icon: Calendar },
   { title: "Finanzen", url: "/overview/finance", icon: Calendar },
   { title: "Trading", url: "/overview/trading", icon: Search },
   { title: "sport", url: "/overview/sport", icon: Settings },
@@ -70,7 +70,7 @@ export function AppSidebar({ mobileOpen, setMobileOpen }: AppSidebarProps) {
     const adminEmails = ["rahimzio11@gmail.com", "Rahimzio11@gmail.com"];
     if (email && adminEmails.includes(email)) {
       setVisibleItems(defaultItemsAdmin);
-    }else{
+    } else {
       setVisibleItems(defaultItems);
     }
   }, [session]);
