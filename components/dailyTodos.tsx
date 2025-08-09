@@ -257,7 +257,13 @@ const DailyTaskList = () => {
       <p className="text-center text-sm text-[#20253b] font-medium rounded-xl shadow border-[#e5e5ea] font-wweight-600 py-2">
         Bisheriges Tages Rating <span className="underline">{dayScore}</span>
       </p>
-
+      <button
+        className="mt-2 px-4 py-2 bg-blue-600 text-white rounded"
+        onClick={handleSaveDayScore}
+        disabled={isSavingDayScore}
+      >
+        {isSavingDayScore ? "Speichern..." : "Tagesbewertung speichern"}
+      </button>
       {saveSuccess && (
         <p className="text-center text-sm text-green-700 mt-1">
           Erfolgreich gespeichert

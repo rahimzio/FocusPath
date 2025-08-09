@@ -31,6 +31,17 @@ const FrequencyReflection: React.FC<FrequencyReflectionProps> = ({ userId, date,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
+      const ct = response.headers.get("content-type") || "";
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`HTTP ${response.status} – ${text.slice(0, 120)}`);
+      }
+      if (!ct.includes("application/json")) {
+        const text = await response.text();
+        throw new Error(`Expected JSON, got ${ct}. Body: ${text.slice(0, 120)}`);
+      }
+      const _data = await response.json();
+
 
       if (!response.ok) {
         throw new Error("Fehler beim Speichern");

@@ -19,17 +19,28 @@ const ReflectionHistory: React.FC<ReflectionHistoryProps> = ({ userId }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchReflections() {
-      try {
-        const res = await fetch(`/api/frequencyReflection/getAll?userId=${userId}`);
-        const data = await res.json();
-        setReflections(data.reflections || []);
-      } catch (err) {
-        console.error("Fehler beim Laden der Reflexionen:", err);
-      } finally {
-        setLoading(false);
-      }
+async function fetchReflections() {
+  try {
+    const res = await fetch(`/api/frequencyReflection/getAll?userId=${userId}`);
+    const ct = res.headers.get("content-type") || "";
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`HTTP ${res.status} – ${text.slice(0,120)}`);
     }
+    if (!ct.includes("application/json")) {
+      const text = await res.text();
+      throw new Error(`Expected JSON, got ${ct}. Body: ${text.slice(0,120)}`);
+    }
+    const data = await res.json();
+    setReflections(data.reflections || []);
+  } catch (err) {
+    console.error("Fehler beim Laden der Reflexionen:", err);
+    setReflections([]); // robustes Fallback
+  } finally {
+    setLoading(false);
+  }
+}
+
     fetchReflections();
   }, [userId]);
 
