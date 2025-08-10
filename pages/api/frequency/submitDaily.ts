@@ -1,0 +1,37 @@
+import type { NextApiRequest, NextApiResponse } from "next";
+import { connectToDatabase } from "../db/mongo";
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ message: "Method not allowed" });
+  }
+
+  const { userId, date, items } = req.body as {
+    userId?: string;
+    date?: string;
+    items?: { id: string; label: string; didAvoid: boolean }[];
+  };
+
+  if (!userId || !date || !Array.isArray(items)) {
+    return res.status(400).json({ message: "Missing fields" });
+  }
+
+  try {
+    const { db } = await connectToDatabase();
+    await db.collection("appData").updateOne(
+      { userId, type: "avoidCheck", date },
+      {
+        $set: {
+          items,
+          completedAt: new Date()
+        }
+      },
+      { upsert: true }
+    );
+
+    return res.status(200).json({ message: "saved" });
+  } catch (error) {
+    console.error("Error saving avoid check", error);
+    return res.status(500).json({ message: "Internal Server Error" });
+  }
+}
