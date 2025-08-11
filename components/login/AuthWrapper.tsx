@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { useSession, signIn } from "next-auth/react";
 import { useRouter } from "next/router";
-
+import { toast } from "react-toastify";
+import { UserMe } from "@/utils/interface";
 interface Props {
   children: React.ReactNode;
 }
@@ -12,6 +13,8 @@ export const AuthWrapper = ({ children }: Props) => {
   const { data: session, status } = useSession();
   const [localLoading, setLocalLoading] = useState(true);
   const [autoLoginAttempted, setAutoLoginAttempted] = useState(false);
+  const [onboardingChecked, setOnboardingChecked] = useState(false);
+
   const router = useRouter();
 
   const publicPaths = [
@@ -51,7 +54,21 @@ export const AuthWrapper = ({ children }: Props) => {
     }
   }, [session, status, autoLoginAttempted, isPublicPath]);
 
-  if (status === "loading" || localLoading) {
+useEffect(() => {
+    if (!session?.user?.id || isPublicPath || router.pathname === "/onboarding") {
+      setOnboardingChecked(true);
+      return;
+    }
+    fetch(`/api/user/me?userId=${session.user.id}`)
+      .then(res => res.json())
+      .then((data: UserMe) => {
+        if (!data.onboardingCompleted) router.replace("/overview/onboarding");
+      })
+      .catch(() => toast.error("Konnte Benutzerstatus nicht prüfen"))
+      .finally(() => setOnboardingChecked(true));
+  }, [session, isPublicPath, router.pathname]);
+
+  if (status === "loading" || localLoading || (!onboardingChecked && !isPublicPath)) {
     return <div className="p-4 text-gray-700">⏳ Lade...</div>;
   }
 

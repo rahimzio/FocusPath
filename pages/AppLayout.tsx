@@ -5,6 +5,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { useRouter } from "next/router";
 import { Menu, LogOut } from "lucide-react";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import GettingStartedCard from "@/components/onboarding/GettingStartedCard";
 import { signOut } from "next-auth/react";
 export default function AppLayout({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -51,6 +52,9 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         <div className="flex justify-center px-4 sm:px-6 md:px-8">
           <TooltipProvider>
             <main className="w-full max-w-full sm:max-w-2xl md:max-w-4xl bg-white shadow-md rounded-xl p-4 sm:p-6 md:p-8 mt-6 mb-8">
+              <div className="flex justify-end mb-4">
+                <GettingStartedCard />
+              </div>
               {children}
             </main>
           </TooltipProvider>

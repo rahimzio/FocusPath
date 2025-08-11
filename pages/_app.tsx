@@ -7,6 +7,7 @@ import { useRouter } from "next/router";
 import { SettingsProvider } from "@/hooks/useSettings";
 import "react-toastify/dist/ReactToastify.css";
 import "./globals.css";
+import { OnboardingProvider } from "@/components/onboarding/OnboardingProvider";
 
 export default function MyApp({ Component, pageProps }: AppProps) {
   const router = useRouter();
@@ -16,7 +17,8 @@ export default function MyApp({ Component, pageProps }: AppProps) {
     "/login/register",
     "/login/forgot-password",
     "/login/reset-password",
-  ]; const isAuthPage = authPaths.includes(router.pathname);
+  ];
+  const isAuthPage = authPaths.includes(router.pathname);
 
   const content = (
     <>
@@ -28,9 +30,11 @@ export default function MyApp({ Component, pageProps }: AppProps) {
   return (
     <SessionProvider session={pageProps.session}>
       <SettingsProvider>
-        <AuthWrapper>
-          {isAuthPage ? content : <AppLayout>{content}</AppLayout>}
-        </AuthWrapper>
+        <OnboardingProvider>
+          <AuthWrapper>
+            {isAuthPage ? content : <AppLayout>{content}</AppLayout>}
+          </AuthWrapper>
+        </OnboardingProvider>
       </SettingsProvider>
     </SessionProvider>
   );

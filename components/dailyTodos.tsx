@@ -23,9 +23,12 @@ import TaskListTimeBased from "./todo/dailytodo/TimeTaskOrder";
 import TaskDetailModal from "./todo/dailytodo/TaskDetail";
 import TaskEditModal from "./todo/dailytodo/TaskEdit";
 import GoalEditModal from "./todo/dailytodo/GoalEdit";
+import ReflectionHistory from "./frequenz/ReflectionHistory";
 import useTaskDeletion, { handleDeleteSeries, confirmDeleteWithSeries, deleteSingleInstance } from "@/utils/todo/TaskDeletion";
 import { handleCheckSubTask as handleCheckSubTaskExternal, useSubtaskCompletion } from "@/utils/todo/taskStatus";
 import { getSession } from "next-auth/react";
+import AvoidChecklist from "./frequenz/avoidCheckList";
+import ReflectionBlocks from "./frequenz/ReflectionBlocks";
 function getWeekString(date: Date) {
   const firstDay = new Date(date.getFullYear(), 0, 1);
   const pastDays = Math.floor((+date - +firstDay) / 86400000);
@@ -121,7 +124,7 @@ const DailyTaskList = () => {
   async function handleEditGoal(e: React.FormEvent) {
     e.preventDefault();
     if (!editedGoal) return;
-    await fetch(`/api/goal/updateGoal?goalId=${editedGoal._id}`, {
+    await fetch(`/api/goals/updateGoal?goalId=${editedGoal._id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title: editedGoal.title, description: editedGoal.description }),
@@ -253,7 +256,8 @@ const DailyTaskList = () => {
           {budgetInfo}
         </p>
       )}
-
+ <AvoidChecklist userId={userId} date={selectedDate} />
+      <ReflectionBlocks userId={userId} date={selectedDate} />
       <p className="text-center text-sm text-[#20253b] font-medium rounded-xl shadow border-[#e5e5ea] font-wweight-600 py-2">
         Bisheriges Tages Rating <span className="underline">{dayScore}</span>
       </p>

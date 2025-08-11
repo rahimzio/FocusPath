@@ -54,11 +54,12 @@ export default function FinanceDashboard() {
     setIncomeTotal(total);
   }
 
-  async function loadExpenses() {
-    const res = await fetch("/api/finance/monthly");
-    const data = await res.json();
-    setExpenseTotal(data.totalExpenses || 0);
-  }
+async function loadExpenses() {
+  if (!userId) return;
+  const res = await fetch(`/api/finance/monthly?userId=${userId}`);
+  const data = await res.json();
+  setExpenseTotal(data.totalExpenses || 0);
+}
   const chartData = savings.map((s) => ({ month: s.month, amount: s.amount }));
 async function loadMetrics() {
     if (!userId) return;

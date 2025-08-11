@@ -706,3 +706,14 @@ export interface DailyScores {
   };
   createdAt: string;
 }
+
+export type AvoidItem = { id: string; label: string; active: boolean };
+export type AvoidDailyItem = { id: string; label: string; didAvoid: boolean };
+export type ReflectionBlock = "morning" | "afternoon" | "evening";
+
+export type UserMe = {
+  onboardingCompleted: boolean;
+  onboardingCompletedAt: string | null;
+  avoidItems: AvoidItem[];
+  timezone: string | null;
+};

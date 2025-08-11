@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Goal, Task } from "@/utils/interface";
-import { parseISO, isWithinInterval, startOfWeek, endOfWeek } from "date-fns";
+import { parseISO, isWithinInterval, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import GoalCard from "./GoalCard";
@@ -19,6 +19,10 @@ export default function GoalOverviewDashboard() {
   const [newEndDate, setNewEndDate] = useState("");
   const [filter, setFilter] = useState("all");
   const [openSheet, setOpenSheet] = useState(false);
+
+  // NEW: simple view switcher: goals | goals stat | goals history
+  type ViewMode = "goals" | "stats" | "history";
+  const [view, setView] = useState<ViewMode>("goals");
 
   useEffect(() => {
     const fetchGoals = async () => {
@@ -54,6 +58,7 @@ export default function GoalOverviewDashboard() {
       completedAt: goal.completedAt,
     });
   };
+
   const handleAddTask = () => {
     setEditedGoal((prev) => ({
       ...prev,
@@ -80,7 +85,6 @@ export default function GoalOverviewDashboard() {
     }));
   };
 
-
   const handleToggleCompletion = async (goal: Goal) => {
     const newProgress = goal.progress === 100 ? 0 : 100;
     const completedAt = newProgress === 100 ? new Date().toISOString() : null;
@@ -97,6 +101,7 @@ export default function GoalOverviewDashboard() {
       )
     );
   };
+
   const handleTaskChange = (index: number, field: string, value: any) => {
     setEditedGoal((prev) => {
       const tasks = [...(prev.tasks || [])];
@@ -111,6 +116,7 @@ export default function GoalOverviewDashboard() {
       tasks: (prev.tasks || []).filter((_, i) => i !== index),
     }));
   };
+
   const handleMove = (goal: Goal) => {
     setSelectedGoal(goal);
     setMoveMode(true);
@@ -161,6 +167,9 @@ export default function GoalOverviewDashboard() {
     const now = new Date();
     const weekStart = startOfWeek(now, { weekStartsOn: 1 });
     const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
+    const monthStart = startOfMonth(now);
+    const monthEnd = endOfMonth(now);
+
     const weekly: Goal[] = [];
     const monthly: Goal[] = [];
     const yearly: Goal[] = [];
@@ -175,10 +184,16 @@ export default function GoalOverviewDashboard() {
         return;
       }
       const type = goal.goalType || goal.type;
-      if (type === "weekly" && isWithinInterval(now, { start, end })) {
-        weekly.push(goal);
+      if (type === "weekly") {
+        // Nur Ziele der aktuellen Woche
+        if (isWithinInterval(weekStart, { start, end }) || isWithinInterval(weekEnd, { start, end }) || isWithinInterval(now, { start, end })) {
+          weekly.push(goal);
+        }
       } else if (type === "monthly") {
-        monthly.push(goal);
+        // Nur Ziele des aktuellen Monats
+        if (isWithinInterval(now, { start, end }) || isWithinInterval(monthStart, { start, end }) || isWithinInterval(monthEnd, { start, end })) {
+          monthly.push(goal);
+        }
       } else if (type === "yearly") {
         yearly.push(goal);
       } else if (type === "mental") {
@@ -194,37 +209,113 @@ export default function GoalOverviewDashboard() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-gray-800">Zielübersicht</h2>
-      <div className="flex justify-between items-center">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-gray-800">Zielübersicht</h2>
         <Button className="border-solid color-blue" onClick={() => setOpenSheet(true)}>Alle Ziele anzeigen</Button>
       </div>
 
-      <WeeklyGoalsDashboard
-        weeklyGoals={weekly}
-        onEdit={handleEdit}
-        onMove={handleMove}
-        onDelete={handleDelete}
-        onDuplicate={handleDuplicate}
-        onReflect={handleReflect}
-        onToggleComplete={handleToggleCompletion}
-      />
-      {mental.length > 0 && (
+      {/* Ansichtsschalter */}
+      <div className="flex gap-2 rounded-xl bg-muted p-1 w-fit">
+        <Button variant={view === "goals" ? "default" : "ghost"} onClick={() => setView("goals")} aria-pressed={view === "goals"}>goals</Button>
+        <Button variant={view === "stats" ? "default" : "ghost"} onClick={() => setView("stats")} aria-pressed={view === "stats"}>goals stat</Button>
+        <Button variant={view === "history" ? "default" : "ghost"} onClick={() => setView("history")} aria-pressed={view === "history"}>goals history</Button>
+      </div>
+
+      {/* CONTENT */}
+      {view === "goals" && (
+        <>
+          {/* Wochenziele (aktuelle Woche) */}
+          <WeeklyGoalsDashboard
+            weeklyGoals={weekly}
+            onEdit={handleEdit}
+            onMove={handleMove}
+            onDelete={handleDelete}
+            onDuplicate={handleDuplicate}
+            onReflect={handleReflect}
+            onToggleComplete={handleToggleCompletion}
+          />
+
+          {/* Monatsziele (aktueller Monat) */}
+          {monthly.length > 0 && (
+            <section className="space-y-4">
+              <h2 className="text-xl font-semibold">📅 Monatsziele (aktueller Monat)</h2>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {monthly.map((goal) => (
+                  <GoalCard
+                    key={goal._id}
+                    goal={goal}
+                    onEdit={handleEdit}
+                    onMove={handleMove}
+                    onDelete={handleDelete}
+                    onDuplicate={handleDuplicate}
+                    onReflect={handleReflect}
+                    onToggleComplete={handleToggleCompletion}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Mentale Ziele (optional) */}
+          {mental.length > 0 && (
+            <section className="space-y-4">
+              <h2 className="text-xl font-semibold">🧠 Mentale Ziele</h2>
+              {mental.map((goal) => (
+                <GoalCard
+                  key={goal._id}
+                  goal={goal}
+                  onEdit={handleEdit}
+                  onMove={handleMove}
+                  onDelete={handleDelete}
+                  onDuplicate={handleDuplicate}
+                  onReflect={handleReflect}
+                  onToggleComplete={handleToggleCompletion}
+                />
+              ))}
+            </section>
+          )}
+        </>
+      )}
+
+      {view === "stats" && (
         <section className="space-y-4">
-          <h2 className="text-xl font-semibold">🧠 Mentale Ziele</h2>
-          {mental.map((goal) => (
-            <GoalCard
-              key={goal._id}
-              goal={goal}
-              onEdit={handleEdit}
-              onMove={handleMove}
-              onDelete={handleDelete}
-              onDuplicate={handleDuplicate}
-              onReflect={handleReflect}
-              onToggleComplete={handleToggleCompletion}
-            />
-          ))}
+          <h3 className="text-xl font-semibold">Ziel-Statistiken (leicht)</h3>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <StatCard label="Wöchentliche Ziele (aktuell)" value={weekly.length} />
+            <StatCard label="Monatsziele (akt. Monat)" value={monthly.length} />
+            <StatCard label="Jahresziele" value={yearly.length} />
+            <StatCard label="Überfällig" value={past.length} />
+          </div>
         </section>
       )}
+
+      {view === "history" && (
+        <section className="space-y-2">
+          <h3 className="text-xl font-semibold">Goals History</h3>
+          <p className="text-sm text-muted-foreground">Hier kannst du später abgeschlossene und vergangene Ziele chronologisch einsehen. (Platzhalter)</p>
+          {/* Optional: einfache Liste bereits erledigter Ziele */}
+          <div className="space-y-2">
+            {goals
+              .filter((g) => g.progress === 100)
+              .sort((a, b) => (a.completedAt ? new Date(b.completedAt ?? 0).getTime() - new Date(a.completedAt ?? 0).getTime() : 0))
+              .slice(0, 5)
+              .map((goal) => (
+                <GoalCard
+                  key={goal._id}
+                  goal={goal}
+                  onEdit={handleEdit}
+                  onMove={handleMove}
+                  onDelete={handleDelete}
+                  onDuplicate={handleDuplicate}
+                  onReflect={handleReflect}
+                  onToggleComplete={handleToggleCompletion}
+                />
+              ))}
+          </div>
+        </section>
+      )}
+
+      {/* Manager Sheet bleibt verfügbar */}
       <FullGoalManagerSheet
         open={openSheet}
         onOpenChange={setOpenSheet}
@@ -403,6 +494,15 @@ export default function GoalOverviewDashboard() {
           </DialogContent>
         </Dialog>
       )}
+    </div>
+  );
+}
+
+function StatCard({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-2xl border p-4 shadow-sm bg-background">
+      <div className="text-sm text-muted-foreground">{label}</div>
+      <div className="text-2xl font-semibold">{value}</div>
     </div>
   );
 }

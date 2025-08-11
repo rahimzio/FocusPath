@@ -1,6 +1,6 @@
 import React from "react";
-import StepFormCurrent from "./StepFormCurrent";
-import StepFormIdeal from "./StepFormIdeal";
+import StepFormCurrent, { FrequencyCurrent } from "./StepFormCurrent";
+import StepFormIdeal, { FrequencyIdeal } from "./StepFormIdeal";
 import EveningReflectionCheck from "./EveningReflectionCheck";
 import FrequencyDayChart from "./FrequencyDayChart";
 import ConvictionCard from "./ConvictionCard";
@@ -95,10 +95,31 @@ export default function FrequenzOverviewDashboard() {
         <TabsContent value="components">
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-12 gap-4 sm:gap-6 min-w-0">
             <div className="col-span-1 md:col-span-1 xl:col-span-6 min-w-0">
-              <StepFormCurrent />
+              <StepFormCurrent value={{
+                beliefs: "",
+                convictionNow: 0,
+                perceptionSelf: "",
+                emotionalState: "",
+                focusLeaks: "",
+                defaultReactions: "",
+                defaultExpectations: ""
+              }} onChange={function (patch: Partial<FrequencyCurrent>): void {
+                throw new Error("Function not implemented.");
+              } } />
             </div>
             <div className="col-span-1 md:col-span-1 xl:col-span-6 min-w-0">
-              <StepFormIdeal />
+              <StepFormIdeal value={{
+                beliefsIdeal: "",
+                convictionTarget: 0,
+                desiredIdentity: "",
+                desiredEmotions: "",
+                desiredFocus: "",
+                responsePattern: "",
+                expectationsIdeal: "",
+                microEvidencePlan: undefined
+              }} onChange={function (patch: Partial<FrequencyIdeal>): void {
+                throw new Error("Function not implemented.");
+              } } />
             </div>
 
             <div className="col-span-1 md:col-span-2 xl:col-span-4 min-w-0">

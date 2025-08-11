@@ -55,7 +55,7 @@ const defaultItemsOriginal = [
   { title: "uni", url: "/overview/uni", icon: Inbox },
   { title: "calorin tracker", url: "/overview/calorin-tracker", icon: Inbox },
   { title: "Community", url: "/overview/community", icon: Inbox },
-  { title: "Settings", url: "/overview/Settings", icon: Settings },
+  { title: "Settings", url: "/Settings", icon: Settings },
 ];
 interface AppSidebarProps {
   mobileOpen: boolean;
@@ -65,6 +65,11 @@ interface AppSidebarProps {
 export function AppSidebar({ mobileOpen, setMobileOpen }: AppSidebarProps) {
   const [visibleItems, setVisibleItems] = useState(defaultItems);
   const { data: session } = useSession();
+  useEffect(() => {
+  const email = (session?.user?.email || "").toLowerCase();
+  setVisibleItems(email === "rahimzio11@gmail.com" ? defaultItemsAdmin : defaultItems);
+}, [session]);
+
   useEffect(() => {
     const email = session?.user?.email?.toLowerCase();
     const adminEmails = ["rahimzio11@gmail.com", "Rahimzio11@gmail.com"];

@@ -18,7 +18,7 @@ const AffirmationAnchor: React.FC<Props> = ({ userId }) => {
   useEffect(() => {
     async function fetchAffirmations() {
       try {
-        const res = await fetch(`/api/affirmation/list?userId=${userId ?? ""}`);
+        const res = await fetch(`/api/frequency/list?userId=${userId ?? ""}`);
         const data = await res.json();
         setAffirmations(data.affirmations || []);
       } catch (err) {
@@ -30,7 +30,7 @@ const AffirmationAnchor: React.FC<Props> = ({ userId }) => {
 
   async function saveAffirmation() {
     try {
-      await fetch("/api/affirmation/create", {
+      await fetch("/api/frequency/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),

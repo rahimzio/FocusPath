@@ -4,6 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button"; // ✅ neu für Add/Remove
+// Optional hübschere Labels: import { Badge } from "@/components/ui/badge";
 
 interface SettingsState {
   name: string | number | readonly string[] | undefined;
@@ -22,6 +24,8 @@ interface SettingsState {
   enableDayRating: boolean;
   progressMode: "even" | "weighted";
   compactMode: boolean;
+  categories: string[];
+  defaultCategory?: string;
 }
 
 const defaultSettings: SettingsState = {
@@ -40,18 +44,23 @@ const defaultSettings: SettingsState = {
   compactMode: false,
   name: undefined,
   trustReserveTank: undefined,
-  difficultyLevel: undefined
-};
-export default function SettingsPage() {
-   const [settings, setSettings] = useState<SettingsState>(defaultSettings);
+  difficultyLevel: undefined,
 
+  // ✅ NEU: Standardwert
+  categories: [],
+  defaultCategory: undefined
+};
+
+export default function SettingsPage() {
+  const [settings, setSettings] = useState<SettingsState>(defaultSettings);
 
   const [userId, setUserId] = useState<string>("");
   const [otherUsers, setOtherUsers] = useState<string[]>([]);
   const [newUser, setNewUser] = useState("");
+  const [newCategory, setNewCategory] = useState(""); // ✅ Eingabefeld für neue Kategorie
 
   useEffect(() => {
-        const stored = localStorage.getItem("settings");
+    const stored = localStorage.getItem("settings");
     if (stored) {
       try {
         setSettings({ ...defaultSettings, ...JSON.parse(stored) });
@@ -61,7 +70,7 @@ export default function SettingsPage() {
     getSession().then((session) => {
       if (session?.user?.id) {
         setUserId(session.user.id);
-              fetch(`/api/user/settings?userId=${session.user.id}`)
+        fetch(`/api/user/settings?userId=${session.user.id}`)
           .then((res) => res.json())
           .then((data) => {
             if (data.settings) {
@@ -83,6 +92,7 @@ export default function SettingsPage() {
       localStorage.setItem("settings", JSON.stringify(updated));
     }
   };
+
   const addUser = () => {
     const id = newUser.trim();
     if (id) {
@@ -102,7 +112,34 @@ export default function SettingsPage() {
     if (key === "language" && (window as any)?.i18n?.changeLanguage) {
       (window as any).i18n.changeLanguage(value);
     }
-  }
+  };
+
+  // ✅ Kategorie hinzufügen (keine Duplikate, Trim, Länge begrenzen)
+  const handleAddCategory = () => {
+    const raw = newCategory.trim();
+    if (!raw) return;
+    const name = raw.slice(0, 48); // kleine Sicherheitsgrenze
+    if (settings.categories.map(c => c.toLowerCase()).includes(name.toLowerCase())) {
+      setNewCategory("");
+      return;
+    }
+    const updated = { ...settings, categories: [...settings.categories, name] } as SettingsState;
+    setSettings(updated);
+    saveSettings(updated);
+    setNewCategory("");
+  };
+
+  // ✅ Kategorie entfernen (setzt defaultCategory zurück, falls nötig)
+  const handleRemoveCategory = (name: string) => {
+    const filtered = settings.categories.filter((c) => c !== name);
+    const updated: SettingsState = {
+      ...settings,
+      categories: filtered,
+      defaultCategory: settings.defaultCategory === name ? undefined : settings.defaultCategory
+    };
+    setSettings(updated);
+    saveSettings(updated);
+  };
 
   return (
     <div className="max-w-2xl mx-auto p-6 bg-gray-50 dark:bg-[#1c1c1e] text-gray-900 dark:text-white rounded-xl shadow-md">
@@ -113,6 +150,7 @@ export default function SettingsPage() {
           <TabsTrigger value="general">Allgemein</TabsTrigger>
           <TabsTrigger value="tasks">Aufgaben</TabsTrigger>
           <TabsTrigger value="progress">Fortschritt</TabsTrigger>
+          <TabsTrigger value="categories">Kategorien</TabsTrigger> {/* ✅ Neu */}
           <TabsTrigger value="account">Konto</TabsTrigger>
         </TabsList>
 
@@ -120,7 +158,9 @@ export default function SettingsPage() {
         <TabsContent value="general">
           <div className="space-y-4">
             <div>
-              {(["startPage", "language", "darkMode", "weekStart", "timeFormat"] as (keyof SettingsState)[]).map((key) => (
+              {(
+                ["startPage", "language", "darkMode", "weekStart", "timeFormat"] as (keyof SettingsState)[]
+              ).map((key) => (
                 <Select
                   key={key}
                   onValueChange={(val) => handleChange(key, val)}
@@ -128,6 +168,7 @@ export default function SettingsPage() {
                 />
               ))}
             </div>
+
             <Select
               onValueChange={(val) => handleChange("language", val)}
               defaultValue={settings.language}
@@ -155,6 +196,18 @@ export default function SettingsPage() {
               </SelectContent>
             </Select>
 
+            <Select
+              onValueChange={(val) => handleChange("weekStart", val)}
+              defaultValue={settings.weekStart}
+            >
+              <SelectTrigger className="bg-white dark:bg-[#2c2c2e] text-black dark:text-white">
+                <SelectValue placeholder="Wochenstart" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="monday">Montag</SelectItem>
+                <SelectItem value="sunday">Sonntag</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </TabsContent>
 
@@ -200,7 +253,7 @@ export default function SettingsPage() {
               type="number"
               min={0}
               max={10}
-              value={settings.trustReserveTank}
+              value={settings.trustReserveTank ?? ""}
               onChange={(e) => handleChange("trustReserveTank", Number(e.target.value))}
             />
           </div>
@@ -232,12 +285,75 @@ export default function SettingsPage() {
           </div>
         </TabsContent>
 
+        {/* ✅ Kategorien */}
+        <TabsContent value="categories">
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm opacity-80">Neue Kategorie</label>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="z. B. Studium, Fitness, Deep Work…"
+                  value={newCategory}
+                  onChange={(e) => setNewCategory(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleAddCategory();
+                    }
+                  }}
+                />
+                <Button onClick={handleAddCategory}>Hinzufügen</Button>
+              </div>
+              <p className="text-xs opacity-70">Duplikate werden automatisch verhindert.</p>
+            </div>
+
+            {settings.categories.length > 0 ? (
+              <div className="space-y-2">
+                <label className="text-sm opacity-80">Deine Kategorien</label>
+                <ul className="space-y-2">
+                  {settings.categories.map((cat) => (
+                    <li key={cat} className="flex items-center justify-between rounded-lg px-3 py-2 bg-white dark:bg-[#2c2c2e]">
+                      <span className="truncate">{cat}</span>
+                      <div className="flex items-center gap-2">
+                        {/* Standardkategorie wählen */}
+                        <Select
+                          onValueChange={(val) => handleChange("defaultCategory", val)}
+                          defaultValue={settings.defaultCategory ?? ""}
+                        >
+                          <SelectTrigger className="w-40 bg-white dark:bg-[#1f1f21] text-black dark:text-white">
+                            <SelectValue placeholder="Standardkategorie" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="">Keine</SelectItem>
+                            {settings.categories.map((c) => (
+                              <SelectItem key={c} value={c}>{c}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+
+                        <Button
+                          variant="destructive"
+                          onClick={() => handleRemoveCategory(cat)}
+                        >
+                          Entfernen
+                        </Button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <p className="text-sm opacity-70">Noch keine Kategorien angelegt.</p>
+            )}
+          </div>
+        </TabsContent>
+
         {/* Konto */}
         <TabsContent value="account">
           <div className="space-y-4">
             <Input
               placeholder="Name"
-              value={settings.name}
+              value={settings.name ?? ""}
               onChange={(e) => handleChange("name", e.target.value)}
             />
 
