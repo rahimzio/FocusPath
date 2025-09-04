@@ -1,157 +1,155 @@
-// components/FrequencyDayChart.tsx
-import React, { useState } from "react";
+'use client';
+
+import * as React from 'react';
 import {
+  ResponsiveContainer,
   LineChart,
   Line,
-  BarChart,
-  Bar,
   XAxis,
   YAxis,
-  Tooltip,
   CartesianGrid,
-  ResponsiveContainer,
-  TooltipProps,
-  Cell,
-} from "recharts";
+  Tooltip,
+  ReferenceLine,
+} from 'recharts';
 
-// Frequenz-Snapshot
-interface FrequencySnapshot {
-  date: string; // YYYY-MM-DD
-  morningFrequency: number;
-  eveningFrequency: number;
+type SeriesPoint = { date: string; taskScore?: number; convTarget?: number; moodAvg?: number };
+
+function fmtDate(d: string) {
+  const [y, m, day] = d.split('-');
+  return `${day}.${m}.`;
 }
 
-interface FrequencyDayChartProps {
-  snapshots: FrequencySnapshot[];
-}
-
-// Farblogik je nach Frequenz
-function getColorByFrequency(score: number): string {
-  if (score <= 39) return "#f87171"; // Rot
-  if (score <= 69) return "#facc15"; // Gelb
-  if (score <= 89) return "#34d399"; // Grün
-  return "#fef08a"; // Weiß-Gold
-}
-
-// Textbeschreibung je Frequenz
-function getFrequencyLevel(score: number): string {
-  if (score <= 39) return "Niedrig (Rot)";
-  if (score <= 69) return "Neutral (Gelb)";
-  if (score <= 89) return "Hoch (Grün)";
-  return "Transzendent (Weiß-Gold)";
-}
-
-// Eigene Tooltip-Komponente
-const CustomTooltip = ({ active, payload, label }: TooltipProps<any, any>) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="bg-white p-4 rounded shadow-md border text-sm text-gray-700">
-        <p className="font-semibold mb-2">{label}</p>
-        {payload.map((entry: any, index: number) => (
-          <div key={index}>
-            {entry.name}: {entry.value} → {getFrequencyLevel(entry.value)}
-          </div>
-        ))}
-      </div>
-    );
+function movingAvg(arr: number[], window = 7) {
+  const out: (number | null)[] = [];
+  let sum = 0;
+  for (let i = 0; i < arr.length; i++) {
+    const v = Number.isFinite(arr[i]) ? arr[i] : NaN;
+    sum += v;
+    if (i >= window) sum -= Number.isFinite(arr[i - window]) ? arr[i - window] : NaN;
+    if (i >= window - 1) {
+      const a = sum / window;
+      out.push(Number.isFinite(a) ? a : null);
+    } else {
+      out.push(null);
+    }
   }
-  return null;
-};
+  return out;
+}
 
-// Eigene Dot-Komponente für LineChart
-const CustomDot = ({ cx, cy, payload, dataKey }: any) => {
-  if (cx === undefined || cy === undefined) return null;
-  const frequency = payload[dataKey];
-  const color = getColorByFrequency(frequency);
+export default function FrequencyDayChart({
+  userId,
+  days = 28,
+  end,
+  title = 'Daily Frequency (Score %)',
+  onRunRollup, // optional: zeigt Button im Empty-State
+}: {
+  userId: string;
+  days?: 7 | 14 | 28;
+  end?: string;
+  title?: string;
+  onRunRollup?: () => void;
+}) {
+  const [series, setSeries] = React.useState<SeriesPoint[]>([]);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (!userId) return;
+    let abort = false;
+    (async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const q = new URLSearchParams({
+          userId,
+          days: String(days),
+          ...(end ? { end } : {}),
+        }).toString();
+        const r = await fetch(`/api/frequency/series?${q}`);
+        const j = await r.json();
+        if (abort) return;
+        if (!j?.ok) throw new Error(j?.error || `HTTP ${r.status}`);
+        setSeries(Array.isArray(j.series) ? j.series : []);
+      } catch (e: any) {
+        if (!abort) setError(e?.message || 'Fehler beim Laden');
+      } finally {
+        if (!abort) setLoading(false);
+      }
+    })();
+    return () => {
+      abort = true;
+    };
+  }, [userId, days, end]);
+
+  // EMPTY-STATE: keine Daten
+  const isEmpty = !loading && !error && series.length === 0;
+
+  const values = series.map((p) => (typeof p.taskScore === 'number' ? p.taskScore : NaN));
+  const ma7 = movingAvg(values, 7);
+
+  const data = series.map((p, i) => ({
+    date: p.date,
+    score: Number.isFinite(values[i]) ? values[i] : undefined,
+    ma7: Number.isFinite(ma7[i] ?? NaN) ? (ma7[i] as number) : undefined,
+  }));
 
   return (
-    <circle
-      cx={cx}
-      cy={cy}
-      r={4}
-      stroke={color}
-      strokeWidth={3}
-      fill="white"
-    />
-  );
-};
-
-const FrequencyDayChart: React.FC<FrequencyDayChartProps> = ({ snapshots }) => {
-  const [chartType, setChartType] = useState<"line" | "bar">("line");
-
-  return (
-    <div className="bg-white p-6 rounded-lg shadow-md">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-2xl font-semibold text-gray-800">Frequenzverlauf der letzten 7 Tage</h2>
-        <select
-          value={chartType}
-          onChange={(e) => setChartType(e.target.value as "line" | "bar")}
-          className="p-2 border rounded"
-        >
-          <option value="line">Kurve</option>
-          <option value="bar">Balkendiagramm</option>
-        </select>
-      </div>
-
-      <ResponsiveContainer width="100%" height={300}>
-        {chartType === "line" ? (
-          <LineChart data={snapshots}>
-            <XAxis dataKey="date" />
-            <YAxis domain={[0, 100]} />
-            <Tooltip content={<CustomTooltip />} />
-            <CartesianGrid stroke="#eee" strokeDasharray="5 5" />
-            <Line
-              type="monotone"
-              dataKey="morningFrequency"
-              stroke="#34d399"
-              name="Morgens"
-              dot={<CustomDot dataKey="morningFrequency" />}
-            />
-            <Line
-              type="monotone"
-              dataKey="eveningFrequency"
-              stroke="#60a5fa"
-              name="Abends"
-              dot={<CustomDot dataKey="eveningFrequency" />}
-            />
-          </LineChart>
+    <div className="rounded-xl border bg-white p-4">
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-base font-semibold">{title}</h3>
+        {loading ? (
+          <span className="text-[10px] text-gray-500">Lade…</span>
+        ) : error ? (
+          <span className="text-[10px] text-rose-600">{error}</span>
         ) : (
-          <BarChart data={snapshots}>
-            <XAxis dataKey="date" />
-            <YAxis domain={[0, 100]} />
-            <Tooltip content={<CustomTooltip />} />
-            <CartesianGrid stroke="#eee" strokeDasharray="5 5" />
-            <Bar dataKey="morningFrequency" name="Morgens">
-              {snapshots.map((entry, index) => (
-                <Cell key={`morning-${index}`} fill={getColorByFrequency(entry.morningFrequency)} />
-              ))}
-            </Bar>
-            <Bar dataKey="eveningFrequency" name="Abends">
-              {snapshots.map((entry, index) => (
-                <Cell key={`evening-${index}`} fill={getColorByFrequency(entry.eveningFrequency)} />
-              ))}
-            </Bar>
-          </BarChart>
+          <span className="text-[10px] text-gray-500">Letzte {days} Tage</span>
         )}
-      </ResponsiveContainer>
-
-      {/* Farblegende */}
-      <div className="flex gap-4 mt-6 text-sm">
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded-full bg-red-400"></div> <span>0–39: Niedrig</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded-full bg-yellow-400"></div> <span>40–69: Neutral</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded-full bg-green-400"></div> <span>70–89: Hoch</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded-full bg-yellow-100"></div> <span>90–100: Transzendent</span>
-        </div>
       </div>
+
+      {/* EMPTY-STATE UI */}
+      {isEmpty ? (
+        <div className="rounded-lg border border-dashed p-6 text-sm text-gray-600 flex items-center justify-between gap-3">
+          <div>
+            <div className="font-medium text-gray-800 mb-1">Noch keine Tageswerte vorhanden.</div>
+            <div>
+              Erledige heute ein paar DOs/DON’Ts oder führe einmal das tägliche Rollup aus, um die ersten
+              Punkte zu sehen.
+            </div>
+          </div>
+          {typeof onRunRollup === 'function' && (
+            <button
+              onClick={onRunRollup}
+              className="px-3 py-2 rounded border bg-white hover:bg-gray-50 text-sm"
+              title="Tägliches Rollup jetzt berechnen"
+            >
+              Rollup ausführen
+            </button>
+          )}
+        </div>
+      ) : (
+        <ResponsiveContainer width="100%" height={260}>
+          <LineChart data={data}>
+            <CartesianGrid stroke="#eee" strokeDasharray="5 5" />
+            <XAxis dataKey="date" tickFormatter={fmtDate} />
+            <YAxis domain={[0, 100]} />
+            <Tooltip
+              contentStyle={{ fontSize: 12 }}
+              formatter={(v: any, key: string) =>
+                key === 'ma7' ? [`${Number(v).toFixed(1)}%`, '7T Ø'] : [`${Number(v).toFixed(1)}%`, 'Score']
+              }
+              labelFormatter={(l) => `Datum: ${l}`}
+            />
+            <ReferenceLine y={50} stroke="#9ca3af" strokeDasharray="3 3" />
+            <Line type="monotone" dataKey="score" name="Score" stroke="#111827" dot={false} strokeWidth={2} />
+            <Line type="monotone" dataKey="ma7" name="7T Ø" stroke="#4b5563" dot={false} strokeWidth={2} />
+          </LineChart>
+        </ResponsiveContainer>
+      )}
+
+      <p className="mt-2 text-[11px] text-gray-600">
+        Score = Tages-Frequenz (0–100) aus deinen DO/DON’T-Erledigungen. Die graue Linie zeigt den rollierenden
+        7-Tage-Durchschnitt.
+      </p>
     </div>
   );
-};
-
-export default FrequencyDayChart;
+}

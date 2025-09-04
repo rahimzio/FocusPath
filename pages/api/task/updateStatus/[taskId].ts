@@ -1,11 +1,13 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { ObjectId } from 'mongodb';
 import { connectToDatabase } from '../../db/mongo';
+import { recalcGoalProgress } from '@/lib/server/recalcGoalProgress';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'PUT') {
     return res.status(405).json({ message: 'Methode nicht erlaubt' });
   }
+await recalcGoalProgress((req as any).body?.goalId);
 
   const { taskId } = req.query;
   const { status } = req.body;

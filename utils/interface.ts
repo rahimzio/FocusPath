@@ -4,7 +4,404 @@
  */
 
 import { FileType2Icon } from "lucide-react";
-import { ObjectId } from "mongodb";
+
+// utils/interface.ts  (ergänzen)
+
+// --- A/B/C Game Grundtypen ---
+export type GameGrade = "A" | "B" | "C";
+
+// Ein einzelner Game-Faktor, so wie er in der "trading"-Collection gespeichert wird
+export interface GameLibraryItem {
+  _id: string;          // Stringified ObjectId
+  recordType: "gameLibrary";
+  userId: string;
+  label: string;        // z.B. "Plan befolgt"
+  game: GameGrade;      // "A" | "B" | "C"
+  points: number;       // A=3, B=2, C=1 (überschreibbar)
+  active: boolean;      // default: true
+  tags?: string[];
+  archived?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+// API-Response von /api/trading/gameLibrary
+export interface GameLibraryResponse {
+  items: GameLibraryItem[];
+  nextCursor?: string | null;
+}
+
+// Für die UI: aufbereitete Listen je Grade (so erwartet von TradeEntryForm)
+export interface GameLibrary {
+  A: string[]; // Labels der A-Faktoren
+  B: string[]; // Labels der B-Faktoren
+  C: string[]; // Labels der C-Faktoren
+}
+
+export type AccountType = "bank" | "broker" | "exchange" | "wallet";
+
+export type FinanceKind =
+  | "income"
+  | "expense"
+  | "saving"
+  | "saving_goal"
+  | "account"
+  | "transaction"
+  | "symbol"          // Mapping für Preise (CoinGecko/Alpha Vantage)
+  | "weekly_budget"   // falls genutzt
+  | "price_snapshot"  // optional: tägliche Preise in derselben Collection
+  | "price_latest"    // optional: letzter Preis je Symbol
+  | "weekly_metrics"; // optional: wöchentliche KPIs
+export interface PortfolioAccount {
+  _id?: string;
+  userId: string;
+  name: string;            // z.B. "N26", "Binance Main", "Trade Republic"
+  provider?: string;       // Freitext / App-Name
+  type: AccountType;
+  baseCurrency: string;    // z.B. "EUR"
+  createdAt: string;
+  updatedAt: string;
+}
+export interface FinanceAccount extends FinanceBase {
+  kind: "account";
+  userId: string;
+  name: string;
+  provider?: string;
+  type: AccountType;
+  baseCurrency: string; // "EUR" etc.
+}
+export type AssetClass = "cash" | "crypto" | "stock" | "etf" | "other";
+export interface FinanceBase {
+  _id?: string;
+  kind: FinanceKind;
+  userId?: string;     // global=optional (z. B. symbol)
+  createdAt: string;
+  updatedAt: string;
+  archived?: boolean;      // ⬅️ neu
+  archivedAt?: string;  
+}
+export type TransactionKind =
+  | "cash_deposit" | "cash_withdrawal"
+  | "asset_buy" | "asset_sell"
+  | "asset_transfer_in" | "asset_transfer_out"
+  | "cash_transfer_in" | "cash_transfer_out";
+export interface FinanceSaving extends FinanceBase {
+  kind: "saving";
+  userId: string;
+  month: string;       // "YYYY-MM"
+  amount: number;
+  note?: string;
+}
+
+export interface FinanceTransaction extends FinanceBase {
+  kind: "transaction";
+  userId: string;
+  accountId: string;     // _id von FinanceAccount (String)
+  date: string;          // ISO
+  transactionKind: TransactionKind;
+  note?: string;
+
+  // Asset-Daten (für asset_*)
+  asset?: { class: AssetClass; symbol: string; name?: string };
+  units?: number;        // bei asset_*
+  pricePerUnit?: number; // bei asset_buy/sell
+  fee?: number;          // optional, in Account-Währung
+  cashAmount?: number;   // cash_* oder asset_* (Preis*Units +/- Fee)
+}
+export interface FinancePriceSnapshot extends FinanceBase {
+  kind: "price_snapshot";
+  userId?: string;
+  class: AssetClass | "fx";
+  symbol: string;
+  date: string;          // "YYYY-MM-DD" (Berlin)
+  price: { eur?: number; usd?: number };
+  provider: "coingecko" | "alphavantage";
+  meta?: any;
+}
+export interface FinanceSymbol extends FinanceBase {
+  kind: "symbol";
+  userId?: string; // null/global
+  class: AssetClass;
+  symbol: string;         // "BTC", "AAPL", "VWCE"
+  name?: string;
+  providers?: { coingeckoId?: string; alphaTicker?: string };
+}
+
+export interface FinancePriceLatest extends FinanceBase {
+  kind: "price_latest";
+  userId?: string;
+  class: AssetClass | "fx";
+  symbol: string;
+  asOfDate: string;      // "YYYY-MM-DD"
+  price: { eur?: number; usd?: number };
+  provider: string;
+}
+
+export type FinanceDoc =
+  | FinanceIncome | FinanceExpense | FinanceSaving | FinanceSavingGoal
+  | FinanceAccount | FinanceTransaction | FinanceSymbol
+  | FinancePriceSnapshot | FinancePriceLatest | FinanceWeeklyMetrics;
+export interface FinanceWeeklyMetrics extends FinanceBase {
+  kind: "weekly_metrics";
+  userId: string;
+  week: string;          // "YYYY-ww"
+  savingRate: number;
+  expenseGrowth: number;
+  investmentROI: number;
+  emergencyFund: { current: number; target: number };
+  netWorth?: number;
+}
+export interface FinanceSavingGoal extends FinanceBase {
+  kind: "saving_goal";
+  userId: string;
+  title: string;
+  targetAmount: number;
+  currentAmount: number;
+  monthlyContribution?: number;
+  deadline?: string;   // ISO (optional)
+}
+export interface FinanceExpense extends FinanceBase {
+  kind: "expense";
+  userId: string;
+  amount: number;
+  dueDate: string;     // ISO
+  category?: string;
+  note?: string;
+}
+export interface FinanceIncome extends FinanceBase {
+  kind: "income";
+  userId: string;
+  month: string;       // "YYYY-MM"
+  amount: number;
+  source?: string;
+  note?: string;
+}
+export interface PortfolioTransaction {
+  _id?: string;
+  userId: string;
+  accountId: string;
+  date: string;            // ISO
+  note?: string;
+
+  // Klassischer Portfolio-Event
+  kind:
+    | "cash_deposit"     // externer Zufluss (zählt als Ersparnis)
+    | "cash_withdrawal"  // externer Abfluss
+    | "asset_buy"
+    | "asset_sell"
+    | "asset_transfer_in"
+    | "asset_transfer_out"
+    | "cash_transfer_in"
+    | "cash_transfer_out";
+
+  // Asset-Daten (für asset_* Events)
+  asset?: {
+    class: AssetClass;    // crypto/stock/etf/other
+    symbol: string;       // "BTC", "AAPL", "VWCE"
+    name?: string;
+  };
+
+  // Beträge
+  units?: number;         // Stück/Coins (bei asset_* und transfers)
+  pricePerUnit?: number;  // Preis in account.baseCurrency (bei asset_buy/sell)
+  fee?: number;           // optional in account.baseCurrency
+  cashAmount?: number;    // Bar-Betrag in account.baseCurrency (bei cash_* oder asset_*)
+
+  createdAt: string;
+  updatedAt: string;
+}
+import type { ObjectId} from 'mongodb';
+export type MagnifyMaintainMode = 'maintain' | 'magnify';
+export interface FrequencySmoothingCfg {
+  windowDays: number           // e.g., 14 or 21
+  alpha: number                // ~ 2/(N+1), e.g., 0.12 for 14d, 0.09 for 21d
+  maxDailyStep: {              // hard caps per rollup
+    freqPct: number            // e.g., 4 %-Punkte max Veränderung pro Tag
+    convPts: number            // e.g., 0.1 Punkte Conviction pro Tag
+  }
+  kConv: number                // Tagesimpuls für Conviction (klein, z. B. 0.4)
+  magnifyAlphaBoost: number    // wenn in Magnify → alpha * (1 + boost), z. B. 0.15 (15%)
+  magnifyStreakThreshold: number // ab wie vielen positiven Tagen Magnify aktiv wird (z. B. 7)
+}
+
+export interface FrequencyMetricsSmoothed {
+  frequencySmoothed?: number   // 0..100, EWMA
+  convictionSmoothed?: number  // 0..10, EWMA (um Baseline herum)
+  lastUpdateDate?: string      // YYYY-MM-DD des letzten Rollups
+  mmState?: {                  // aktueller Modus + Streaks
+    mode: MagnifyMaintainMode
+    streakPos: number
+    streakNeg: number
+  }
+}
+
+// Erweitere dein bestehendes Frequency-Dokument (FrequencyDoc / FrequencyDocV2)
+// Beispiel (füge Felder hinzu, ohne das bestehende Interface zu brechen):
+export interface FrequencyDocSmoothingExtension {
+  metrics?: {
+    alignmentScore?: number
+    frequencyScore?: number
+    lastDailyMoodScore?: number
+    updatedAt: Date
+    // NEW (smoothed)
+    frequencySmoothed?: number
+    convictionSmoothed?: number
+    lastUpdateDate?: string
+    mmState?: { mode: MagnifyMaintainMode; streakPos: number; streakNeg: number }
+  }
+  smoothing?: FrequencySmoothingCfg
+}
+
+export type TimeOfDay = 'morning' | 'noon' | 'evening'
+
+export type BaseMoodPreference = {
+  label: string
+  preference: 'gern' | 'egal' | 'nicht'
+}
+
+export interface FrequencyDocV2 /* extends import('mongodb').Document */ {
+  _id?: ObjectId
+  type: 'frequency'
+  userId: string
+  version?: number // now 2
+  base?: {
+    baseFrequency: number
+    baseConviction: number
+    selfView: string[]
+    emotion: string[]
+    focusLeaks: string[]
+    defaultReactions: string[]
+    expectations: string[]
+    baseMood?: string // optional default
+    updatedAt: Date
+    createdAt?: Date
+  }
+  models?: {
+    current?: { tags?: string[]; routine?: string[]; rules?: string[] } | null
+    ideal?:   { tags?: string[]; routine?: { text: string; priority?: number; ease?: number }[]; rules?: { text: string; priority?: number }[] } | null
+  }
+  // NEW: preferences for moods + anchors lists
+  baseMoodPreferences?: BaseMoodPreference[]
+  frequencyAnchors?: { kind: 'music'|'breath'|'place'|'contact'|'other'; label: string; ref?: string }[]
+  concentrationAnchors?: { label: string; note?: string }[]
+
+  taskTemplates?: { name: string; points: number; isDont: boolean }[]
+  metrics?: { alignmentScore?: number; frequencyScore?: number; lastDailyMoodScore?: number; updatedAt: Date }
+  createdAt: Date
+  updatedAt: Date
+}
+
+// appData events (no auto-creation of collection!)
+export interface BaseMoodLog /* extends import('mongodb').Document */ {
+  _id?: ObjectId
+  type: 'frequency_baseMood_log'
+  userId: string
+  date: string // YYYY-MM-DD
+  timeOfDay: TimeOfDay
+  moods: string[]
+  score: number // computed via preference weights
+  createdAt: Date
+}
+
+export interface AnchorCheckin /* extends import('mongodb').Document */ {
+  _id?: ObjectId
+  type: 'anchor_checkin'
+  userId: string
+  date: string // YYYY-MM-DD
+  kind: 'frequency' | 'concentration'
+  label: string
+  done: boolean
+  createdAt: Date
+}
+
+export interface DailySummary /* extends import('mongodb').Document */ {
+  _id?: ObjectId
+  type: 'frequency_daily_summary'
+  userId: string
+  date: string
+  moodAvg: number
+  moodCount: number
+  anchorsDone?: number
+  concentrationDone?: number
+  createdAt: Date
+}
+export type FrequencyBase = {
+  baseFrequency: number;          // 0..10
+  baseConviction: number;         // 0..10
+  selfView: string[];
+  emotion: string[];
+  focusLeaks: string[];
+  defaultReactions: string[];
+  expectations: string[];
+  updatedAt: Date;
+  createdAt?: Date;
+};
+
+export type FrequencyTaskTemplate = {
+  name: string;
+  points: number;                 // 1..10
+  isDont: boolean;                // DO(false) / DON'T(true)
+};
+
+export interface FrequencyDoc {
+  _id?: ObjectId;
+  type: 'frequency';              // discriminator
+  userId: string;
+  version?: number;
+  base?: FrequencyBase;
+  models?: {
+    current?: FrequencyCurrent | null;
+    ideal?: FrequencyIdeal | null;
+  };
+  // Optional, nur Vorlagen (keine Instanzen):
+  taskTemplates?: FrequencyTaskTemplate[];
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+// Tasks (Instanzen) gehen in appData, als „frequency_task“ markiert.
+export interface FrequencyTaskInstance {
+  _id?: ObjectId;
+  type: 'frequency_task';
+  userId: string;
+  name: string;
+  points: number;                 // 1..10
+  isDont: boolean;
+  frequency: 'daily';
+  timebased: boolean;             // i.d.R. false
+  category: 'Frequenz' | string;
+  status: 'open' | 'done';
+  createdAt: Date;
+  updatedAt: Date;
+};
+export type FrequencyBasePayload = {
+  userId: string;
+  baseFrequency: number;   // 0..10
+  baseConviction: number;  // 0..10
+  selfView: string[];
+  emotion: string[];
+  focusLeaks: string[];
+  defaultReactions: string[];
+  expectations: string[];
+};
+
+export type FrequencyCurrent = {
+  convictionNow?: number; // 0..10
+  baseline?: number;      // 0..100
+  emo?: string[];
+  leaks?: string[];
+  patterns?: string[];          // 0..100 (aggregiert)
+  tags?: string[];
+  blockers?: string[];
+};
+
+export type FrequencyIdeal = {
+  convictionTarget?: number; // 0..10
+  habits?: string[];
+  antiHabits?: string[];
+  rules?: string[];
+  routine?: string[];
+};
 export interface User {
   _id: string;
   name: string;
@@ -21,7 +418,16 @@ export interface User {
 
   onboardingStep?: number;
   importantFields?: string[];
-
+  baseFrequency?: number; // 0–10
+  frequencyProfile?: {
+    selfView?: string[];
+    emotion?: string[];
+    focusLeaks?: string[];
+    defaultReactions?: string[];
+    expectations?: string[];
+    currentModel?: Partial<import('../components/frequenz/StepFormCurrent').FrequencyCurrent>;
+    idealModel?: Partial<import('../components/frequenz/StepFormIdeal').FrequencyIdeal>;
+  };
   // Für jeden Tag speichern wir nun { avg: number; rating: string }
   dailyRatingsAverage?: {
     [date: string]: {
@@ -49,6 +455,7 @@ export interface User {
   };
 
   trustReserveTank?: number;
+  categories?: string[];
 
   subscription?: 'free' | 'pro' | 'enterprise';
   linkedApps?: string[];
@@ -138,16 +545,16 @@ export interface GoalDocument {
  * ------------------------------------- */
 
 export interface Task {
+  category: string;
   userId?: string;
   _id: string;
   id?: string;
   name: string;
   description: string;
   points: number;
-  status: "incomplete" | "completed" | "in-progress" | "on-hold";
-  dueDate: string;          // ISO-String
-  frequency: "once" | "daily" | "weekly" | "monthly" | "yearly";
-  category: string;
+  status?: TaskStatus;
+     // ISO-String
+  frequency?: TaskFrequency;
   linkedApps: string[];
   timebased: boolean;
   time: string;             // "08:00"
@@ -173,7 +580,8 @@ export interface Task {
 /**
  * Goals im App-Kontext.
  * Hier kann _id ein string sein.
- */
+ */export type GoalType = "once" | "daily" | "weekly" | "monthly" | "yearly" | "mental";
+
 export interface Goal {
   userId?: string;
   _id: string;
@@ -186,8 +594,8 @@ export interface Goal {
   endDate: string;
   startDate: string;
   category?: string;
- type: "once" | "daily" | "weekly" | "monthly" | "yearly" | "mental" | "none";
-  goalType: "once" | "daily" | "weekly" | "monthly" | "yearly" | "mental" | "none";
+  goalType?: GoalType; // bevorzugt
+  type?: GoalType; 
   completedAt?: string;
   updatedAt: string;
   subGoals: Goal[];
@@ -197,6 +605,17 @@ export interface Goal {
     value: any;
   };
 }
+export type TaskStatus =
+  | "todo"
+  | "in_progress"
+  | "done"
+  // Legacy / tolerierte Varianten:
+  | "complete"
+  | "completed"
+  | "incomplete"
+  | "open"
+  | string;
+export type TaskFrequency = "once" | "daily" | "weekly" | "monthly" | "yearly";
 
 /**
  * Optionales Interface, falls du
@@ -214,14 +633,13 @@ export interface GoalWithProgress extends Goal {
 
 
 export interface CreateTaskBody {
+  category: string;
   userId?: string;
   name: string;
   description: string;
   points: number;
-  status?: "incomplete";
   dueDate: string;
-  frequency: "once" | "daily" | "weekly" | "monthly" | "yearly";
-  category: string;
+  frequency?: TaskFrequency;
   linkedApps?: string[];
   timebased?: boolean;
   time?: string;
@@ -231,6 +649,7 @@ export interface CreateTaskBody {
   duration?: string;
   daysOfWeek?: number[];
   interval?: number;
+  status?: TaskStatus;
 }
 export interface SubTask {
   userId?: string;
@@ -240,8 +659,8 @@ export interface SubTask {
   points?: number;
   dueDate?: string;   // Fälligkeitsdatum
   time?: string;      // Uhrzeit
-  showInDaily?: boolean; // Häkchen
-  status: "incomplete" | "completed" | "in-progress" | "on-hold";
+  showInDaily?: boolean; // Häkchen  weight?: number;
+  status?: TaskStatus;
 }
 
 /**
@@ -344,77 +763,150 @@ export interface Post {
   createdBy: string;
   options?: PollOption[];
   likes?: string[];
+}export interface CreateGoalBody {
+  userId: string;
+  title: string;
+  description?: string;
+
+  startDate: string; // ISO yyyy-mm-dd
+  endDate: string;   // ISO yyyy-mm-dd
+
+  goalType: GoalType;
+  type?: GoalType;   // fallback
+
+  category?: string;
+  tasks?: CreateTaskBody[];
+
+  // Optional sofort gesetzt:
+  subGoals?: Goal[];   // selten beim Create
+  weight?: number;
+}export interface GetGoalsResponse {
+  goals: Goal[];
+}
+
+export interface CreateGoalResponse {
+  goal: Goal;
+}
+
+export interface OkResponse {
+  ok: true;
 }
 
 export interface Account {
   _id?: string;
   userId: string;
+  name?: string;
+  broker?: string;
+  currency?: string;          // "USD" | "EUR" | …
+  startingBalance?: number;   // optional
+  riskPerTrade?: number;      // % optional
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export type Grade = "A" | "B" | "C";
+export type BiasExec = "RR" | "RW" | "WR" | "WW";
+export type SessionKey = "Asia" | "London" | "NewYork" | "Overlap";
+
+export interface Concept {
   name: string;
-  type: 'Live' | 'Demo';
-  currency: string;
-  startBalance: number;
-  createdAt: string;
+  direction?: "bullish" | "bearish" | "neutral";
+  timeframe?: string;
+  note?: string;
 }
 
 export interface TradeEntry {
   _id?: string;
   accountId?: string;
   userId: string;
-  date: string; // Format: YYYY-MM-DD
+  date: string;                // YYYY-MM-DD
   symbol: string;
-  setup: string;
-  entry: number;
-  exit: number;
-  stopLoss: number;
-  positionSize: number;
-  result: "win" | "loss" | "BE";
-  pnl: number;
-  rating: number; // 1–10
-  screenshotUrl?: string;
-  // bereits vorhanden
-  notes?: string;
-  /* … weitere bestehende Felder … */
 
-  // NEU für dein Formular
-  /** Name der gewählten Strategie */
+  // Meta / Strategie
+  setup?: string;
   strategy?: string;
-  /** Buy oder Sell */
+  strategy_name?: string;
+  strategy_result?: "win" | "loss";
+
+  // Ausführung
   tradeType?: "buy" | "sell";
-  /** Lot-Größe */
+  entry?: number;
+  exit?: number;
   lotSize?: number;
-  /** Potenzieller Verlust (wenn Stop Loss getroffen) */
+  pnl?: number;
+  rating?: number;
+
+  // Risiko & Ziele
+  stopLoss?: number;           // legacy
+  stopPrice?: number;          // kanonisch
+  targetPrice?: number;
   potentialLoss?: number;
-  /** Risk/Reward-Ratio, z.B. "1:2" */
   riskReward?: string;
-  /** Alle ausgewählten Confluences */
-  confluences?: string[];
-    tags?: string[];
-  ruleViolations?: string[];
-  emotions?: string;
+
+  // Ergebnis
+  result: "win" | "loss" | "BE"| "ongoing";
+
+  // Zeiten / Session
   entryTime?: string;
   exitTime?: string;
-    strategyId?: string;
-  /** Name der Strategie zum Zeitpunkt des Trades */
-  strategy_name?: string;
-  /** Ergebnis der Strategie (win/loss) */
-  strategy_result?: "win" | "loss";
-  linkedGoalId?: string;
-    /** Optional short text summarising the trade */
-  tradeSummaryText?: string;
-  /** Notes from the reflection panel */
-  reflectionNotes?: string;
-  /** Combined string of all trade fields for later embeddings */
-  embeddingSourceText?: string;
-   emotionBefore?: string;             // z. B. "Angst", "Gier"
-  triggerEvent?: string;              // Freitext
-  mentalMistake?: string;             // z. B. "SL verschoben"
-  performanceState?: "A" | "B" | "C"; // A/B/C-Game Einschätzung
+  startTime?: string;
+  endTime?: string;
+  durationMin?: number;
+  session?: SessionKey;
+
+  // Kontext / Qualität
+  confluences?: string[];
+  tags?: string[];
+  ruleViolations?: string[];
+  concepts?: Concept[];
+  viewTimeframes?: string[];
+  entryTimeframe?: string;
+  rangeDefined?: boolean;
+  rangeNote?: string;
+  location?: string;
+
+  // Bias & Fehler
+  tradingMistakes?: string[];
+  biasExecution?: BiasExec;
+  outcomeFlags?: { breakEven?: boolean; stopHit?: boolean };
+
+  // Mentales
+  emotionBefore?: string;
+  triggerEvent?: string;
+  mentalMistake?: string;
+  performanceState?: Grade;
   followedSetup?: boolean;
   respectedStopLoss?: boolean;
   managedRisk?: boolean;
-  disciplineScore?: number;           // 0–100 (aus 3 Checkboxes berechnet)
+  disciplineScore?: number;
   tiltDetected?: boolean;
+
+  // Game
+  gameComputed?: Grade;
+  gameSelf?: Grade;
+
+  // Linking
+  strategyId?: string;
+  linkedGoalId?: string;
+
+  // Texte
+  tradeSummaryText?: string;
+  reflectionNotes?: string;
+  embeddingSourceText?: string;
+
+  // Lifecycle
+  status?: "draft" | "final";
+  completed?: boolean;
+  missing?: string[];
+  createdAt?: string;
+  updatedAt?: string;
+
+  // Media
+  screenshotUrl?: string;
+
+  notes?: string[];
 }
+
 
 
 
@@ -442,7 +934,16 @@ export interface Chapter {
   title: string;
   units: Unit[];
 }
-
+export interface GameItem {
+  _id?: string;
+  userId?: string | null;
+  label: string;
+  grade: Grade;
+  score: number;
+  active?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
 export interface OnlineModule {
   _id: string;
   userId: string;

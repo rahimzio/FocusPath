@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import { connectToDatabase } from "../db/mongo";
 import { ObjectId } from "mongodb";
+import { recalcGoalProgress } from "@/lib/server/recalcGoalProgress";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "PATCH" && req.method !== "POST") {
@@ -21,12 +22,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       { _id: new ObjectId(taskId), type: "task", userId },
       { $set: { status } }
     );
+await recalcGoalProgress((req as any).body?.goalId);
 
     if (result.modifiedCount === 1) {
       return res.status(200).json({ message: "Status erfolgreich aktualisiert" });
     } else {
       return res.status(404).json({ message: "Aufgabe nicht gefunden oder nicht geändert" });
     }
+
   } catch (error) {
     console.error("❌ Fehler beim Aktualisieren des Status:", error);
     return res.status(500).json({ message: "Fehler beim Aktualisieren des Status" });

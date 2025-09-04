@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from "next";
 import { ObjectId } from "mongodb";
 import { connectToDatabase } from "../db/mongo";
 import { TaskDocument } from "@/utils/interface";
+import { recalcGoalProgress } from "@/lib/server/recalcGoalProgress";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "PUT") {
@@ -59,6 +60,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     updateFields,
   });
 
+await recalcGoalProgress((req as any).body?.goalId);
 
     if (result.modifiedCount === 0) {
       return res.status(404).json({ message: "Task not found or not updated" });

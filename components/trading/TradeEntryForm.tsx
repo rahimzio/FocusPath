@@ -1,38 +1,138 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { useForm, FormProvider } from "react-hook-form";
-import { TradeEntry,Account } from "@/utils/interface";
+import React, { useMemo, useEffect } from "react";
+import { FormProvider, useForm, useFieldArray } from "react-hook-form";
 import useSWR from "swr";
+import { TradeEntry, Account, GameLibrary } from "@/utils/interface";
+
 import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-  CardFooter,
+  Card, CardHeader, CardTitle, CardContent, CardFooter,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
-  FormField,
-  FormItem,
-  FormLabel,
-  FormControl,
-  FormMessage,
+  FormField, FormItem, FormLabel, FormControl, FormMessage,
 } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
 import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
+  Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
 } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
-import { AspectRatio } from "@/components/ui/aspect-ratio";
-import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from "recharts";
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+
+import TEFGeneral from "./trade-entry/TEFGeneral";
+import TEFStrategy from "./trade-entry/TEFStrategy";
+
+const fetcher = (url: string) => fetch(url).then((r) => r.json());
+
+/* --- Konstanten --- */
+const SESSIONS = ["Asia", "London", "NewYork", "Overlap"] as const;
+type SessionKey = (typeof SESSIONS)[number];
+
+type BiasExec = "RR" | "RW" | "WR" | "WW";
+
+/* Fallback-Library für mentale Fehler */
+const DEFAULT_EMOTION_LIBRARY: { name: string; items: string[] }[] = [
+  { name: "Angst", items: ["Exit zu früh", "Trade verpasst", "Nicht geklickt"] },
+  { name: "Gier", items: ["Overtrading", "Zu spät rein", "Zu viele Adds"] },
+  { name: "Wut", items: ["Revenge", "Plan ignoriert", "SL verschoben"] },
+  { name: "Overconfidence", items: ["Size zu groß", "Kein SL gesetzt"] },
+  { name: "Undiszipliniert", items: ["Regelbruch", "Ablenkung", "Impulsiv"] },
+];
+
+function computeGameScore(opts: {
+  biasExecution?: BiasExec;
+  followedSetup?: boolean;
+  respectedStopLoss?: boolean;
+  managedRisk?: boolean;
+  conceptsCount?: number;
+  session?: SessionKey;
+  result?: "win" | "loss" | "BE" | "ongoing";
+  breakEven?: boolean;
+  stopHit?: boolean;
+  mistakes?: string[];
+}) {
+  let score = 0;
+  if (opts.biasExecution === "RR") score += 8 + 6;
+  if (opts.biasExecution === "RW") score += 8;
+  if (opts.biasExecution === "WR") score += 6;
+  if (opts.followedSetup) score += 5;
+  if (opts.respectedStopLoss) score += 5;
+  if (opts.managedRisk) score += 5;
+  const conf = Math.min(5, Math.max(0, opts.conceptsCount ?? 0));
+  score += conf * 1;
+  if (opts.session) score += 2;
+  if (opts.result === "win") score += 2;
+  if (opts.stopHit || opts.result === "loss") score -= 2;
+
+  const mistakes = opts.mistakes ?? [];
+  const criticalSet = new Set(["SL verschoben", "Revenge", "Plan ignoriert", "Size zu groß"]);
+  let criticalCount = mistakes.filter((m) => criticalSet.has(m)).length;
+  criticalCount = Math.min(2, criticalCount);
+  score -= criticalCount * 5;
+
+  const grade = score >= 20 ? "A" : score >= 12 ? "B" : "C";
+  return { score, grade: grade as "A" | "B" | "C" };
+}
+
+/** Dauer in Minuten aus HH:mm */
+function minutesBetween(start?: string, end?: string) {
+  if (!start || !end) return 0;
+  const [sh, sm] = start.split(":").map(Number);
+  const [eh, em] = end.split(":").map(Number);
+  if ([sh, sm, eh, em].some((n) => Number.isNaN(n))) return 0;
+  return Math.max(0, (eh * 60 + em) - (sh * 60 + sm));
+}
+
+/** Pflichtfelder prüfen – Draft, wenn etwas fehlt */
+function computeMissingFields(values: any) {
+  const missing: string[] = [];
+  const need = {
+    accountId: !!values.accountId,
+    symbol: !!values.symbol,
+    tradeType: !!values.tradeType,
+    entry: Number.isFinite(Number(values.entry)),
+    exit: Number.isFinite(Number(values.exit)),
+    result: values.result && values.result !== "ongoing",
+  };
+  Object.entries(need).forEach(([k, ok]) => { if (!ok) missing.push(k); });
+
+  if (values.result === "BE") {
+    const i = missing.indexOf("pnl");
+    if (i >= 0) missing.splice(i, 1);
+  }
+  if (values.result === "ongoing") {
+    const i = missing.indexOf("result");
+    if (i >= 0) missing.splice(i, 1);
+  }
+  return missing;
+}
+
+type ConceptForm = {
+  name: string;
+  direction?: "bullish" | "bearish" | "neutral";
+  timeframe: string;
+  note?: string;
+};
+
+type PartialExitForm = {
+  label?: string;
+  price?: number;
+  percent?: number; // 0..100
+  at?: string;      // ISO-String oder ""
+  note?: string;
+};
+
+/** -------- A/B/C Game Library Item -------- */
+type GameItem = {
+  _id: string;
+  userId: string;
+  label: string;
+  game: "A" | "B" | "C";
+  points?: number; // default A=3, B=2, C=1
+  active?: boolean;
+  tags?: string[];
+};
 
 interface Props {
   date: string;
@@ -41,107 +141,495 @@ interface Props {
   initialData?: TradeEntry;
 }
 
-export default function TradeEntryForm({ date, userId, onCreated, initialData }: Props) {
-  // Initialize form
-  const methods = useForm<TradeEntry>({
+export default function TradeEntryForm({
+  date, userId, onCreated, initialData,
+}: Props) {
+  // --- Form Setup
+  const methods = useForm<TradeEntry & {
+    startTime?: string;
+    endTime?: string;
+    durationMin?: number;
+    session?: SessionKey;
+    outcomeFlags?: { breakEven?: boolean; stopHit?: boolean };
+    biasExecution?: BiasExec;
+    tradingMistakes?: string[];
+    emotionBefore?: string;
+    viewTimeframes?: string[];
+    entryTimeframe?: string;
+    concepts?: ConceptForm[];
+    location?: string;
+    gameComputed?: "A" | "B" | "C";
+    gameSelf?: "A" | "B" | "C";
+    gameItems?: string[];               // speichert Keys wie "A:Label"
+    gameCatalogScore?: number;          // Ø-Punkte (0..3)
+    gameCatalogGrade?: "A" | "B" | "C";
+    customMistake?: string;
+    strategyAdherence?: "yes" | "partial" | "no";
+    hasPartialExits?: boolean;
+    partialExits?: PartialExitForm[];
+  }>({
     defaultValues: {
       ...initialData,
       date,
       symbol: initialData?.symbol || "",
       accountId: initialData?.accountId || "",
-      entry: initialData?.entry || 0,
-      exit: initialData?.exit || 0,
-      pnl: initialData?.pnl || 0,
-      result: initialData?.result || "win",
-      setup: initialData?.setup || "",
+      entry: initialData?.entry ?? 0,
+      exit: initialData?.exit ?? 0,
+      pnl: initialData?.pnl ?? 0,
+      result: (initialData?.result as any) || "win",
       strategy_name: initialData?.strategy_name || "",
-      confluences: initialData?.confluences || [],
+      strategy: (initialData as any)?.strategy || initialData?.strategy_name || "",
       tradeType: initialData?.tradeType || "buy",
-      lotSize: initialData?.lotSize || 0,
-      potentialLoss: initialData?.potentialLoss || 0,
-      riskReward: initialData?.riskReward || "",
+      lotSize: (initialData as any)?.lotSize ?? undefined,
+      potentialLoss: (initialData as any)?.potentialLoss ?? undefined,
+      riskReward: (initialData as any)?.riskReward || "",
       notes: initialData?.notes || "",
-      emotionBefore: initialData?.emotionBefore || "",
-      triggerEvent: initialData?.triggerEvent || "",
-      mentalMistake: initialData?.mentalMistake || "",
-      performanceState: initialData?.performanceState || "A",
-      followedSetup: initialData?.followedSetup || false,
-      respectedStopLoss: initialData?.respectedStopLoss || false,
-      managedRisk: initialData?.managedRisk || false,
-      disciplineScore: initialData?.disciplineScore || 0,
-      } as unknown as TradeEntry,
+      emotionBefore: (initialData as any)?.emotionBefore || "Neutral",
+      followedSetup: (initialData as any)?.followedSetup || false,
+      respectedStopLoss: (initialData as any)?.respectedStopLoss || false,
+      managedRisk: (initialData as any)?.managedRisk || false,
+      disciplineScore: (initialData as any)?.disciplineScore || 0,
+      startTime: (initialData as any)?.startTime || "",
+      endTime: (initialData as any)?.endTime || "",
+      durationMin: (initialData as any)?.durationMin || 0,
+      session: (initialData as any)?.session || undefined,
+      outcomeFlags: (initialData as any)?.outcomeFlags || { breakEven: false, stopHit: false },
+      biasExecution: (initialData as any)?.biasExecution || undefined,
+      tradingMistakes: (initialData as any)?.tradingMistakes || [],
+      viewTimeframes: (initialData as any)?.viewTimeframes || [],
+      entryTimeframe: (initialData as any)?.entryTimeframe || "",
+      concepts: (initialData as any)?.concepts || [],
+      location: (initialData as any)?.location || "",
+      gameItems: (initialData as any)?.gameItems || [],
+      gameCatalogScore: (initialData as any)?.gameCatalogScore ?? 0,
+      gameCatalogGrade: (initialData as any)?.gameCatalogGrade || "B",
+      gameSelf: (initialData as any)?.gameSelf || undefined,
+      gameComputed: (initialData as any)?.gameComputed || undefined,
+      customMistake: "",
+      strategyAdherence: (initialData as any)?.strategyAdherence || undefined,
+      hasPartialExits: (initialData as any)?.hasPartialExits || false,
+      partialExits: Array.isArray((initialData as any)?.partialExits)
+        ? ((initialData as any)?.partialExits as any[]).map((p) => ({
+            label: p?.label ?? "",
+            price: Number.isFinite(Number(p?.price)) ? Number(p?.price) : undefined,
+            percent: Number.isFinite(Number(p?.percent)) ? Number(p?.percent) : undefined,
+            at: p?.at ?? "",
+            note: p?.note ?? "",
+          }))
+        : [],
+    } as any,
   });
+
   const { control, handleSubmit, watch, setValue } = methods;
-  const formValues = watch();
+  const v = watch();
 
-  // Discipline pie
-  const pieData = [
-    { name: 'Disziplin', value: formValues.disciplineScore || 0 },
-    { name: 'Fehler', value: 100 - (formValues.disciplineScore || 0) }
-  ];
-  const COLORS = ['#10b981', '#e5e7eb'];
+  // FieldArray für partialExits
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: "partialExits" as const,
+  });
 
-  const { data: accountData } = useSWR<{ accounts: Account[] }>(
+  const [pending, setPending] = React.useState(false);
+
+  // Accounts optional laden
+  useSWR<{ accounts: Account[] }>(
     userId ? `/api/trading/getAllAccounts?userId=${userId}` : null,
     fetcher
   );
-  const accounts = accountData?.accounts || [];
 
-  // Dropdown options
-  const [pairs, setPairs] = useState<string[]>([]);
-  const [setups, setSetups] = useState<string[]>([]);
-  const [strategies, setStrategies] = useState<string[]>([]);
-  const [confs, setConfs] = useState<string[]>([]);
+  // Emotions-Bibliothek
+  const { data: emoData } = useSWR<{ categories: { name: string; items: string[] }[] }>(
+    userId ? `/api/trading/emotion-library?userId=${userId}` : null,
+    fetcher
+  );
+  const emotionLibrary = emoData?.categories?.length ? emoData.categories : DEFAULT_EMOTION_LIBRARY;
+  const allMistakeChoices = useMemo(
+    () => Array.from(new Set(emotionLibrary.flatMap((c) => c.items.map(String)))),
+    [emotionLibrary]
+  );
 
+  /* -------- 🆕 A/B/C Game Library laden (richtige API-Struktur: { items }) -------- */
+ // 🆕 A/B/C Game Library laden (neues Response-Format: { items, nextCursor, summary })
+type GameLibItem = { _id: string; userId: string; label: string; game: "A" | "B" | "C"; points?: number; active?: boolean };
+
+const { data: gameLibRes, error: gameLibErr, isLoading: gameLibLoading } = useSWR<{
+  items: GameLibItem[];
+  nextCursor?: string | null;
+  summary?: any;
+}>(
+  userId ? `/api/trading/gameLibrary?userId=${userId}&active=true&limit=500` : null,
+  fetcher
+);
+
+// Sichtbares Logging zum Debuggen (kannst du später wieder entfernen)
+useEffect(() => {
+  if (userId) {
+    console.log("[TEF] gameLibrary response:", { count: gameLibRes?.items?.length ?? 0, items: gameLibRes?.items });
+    if (gameLibErr) console.warn("[TEF] gameLibrary error:", gameLibErr);
+  }
+}, [userId, gameLibRes, gameLibErr]);
+
+// Items → Gruppen A/B/C mappen
+const gameLib: GameLibrary = useMemo(() => {
+  const A: string[] = [], B: string[] = [], C: string[] = [];
+  const items = Array.isArray(gameLibRes?.items) ? gameLibRes!.items : [];
+  for (const it of items) {
+    if (!it?.label || !it?.game) continue;
+    if (it.game === "A") A.push(it.label);
+    else if (it.game === "B") B.push(it.label);
+    else if (it.game === "C") C.push(it.label);
+  }
+  return { A, B, C };
+}, [gameLibRes?.items]);
+
+  const gameItems = gameLibRes?.items ?? [];
+
+  const itemsByGrade = useMemo(() => {
+    return {
+      A: gameItems.filter((i) => i.game === "A"),
+      B: gameItems.filter((i) => i.game === "B"),
+      C: gameItems.filter((i) => i.game === "C"),
+    };
+  }, [gameItems]);
+
+  // Map für Punkte je Auswahl-Key ("A:Label" etc.)
+  const pointsMap = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const it of gameItems) {
+      const key = `${it.game}:${it.label}`;
+      const p = it.points ?? (it.game === "A" ? 3 : it.game === "B" ? 2 : 1);
+      m.set(key, p);
+    }
+    return m;
+  }, [gameItems]);
+
+  // Disziplin automatisch berechnen
   useEffect(() => {
-    setPairs(["EURUSD", "GBPUSD", "BTCUSD"]);
-    setSetups(["Breakout", "Reversal", "Trend"]);
-    setStrategies(["Scalping", "Swing", "Position"]);
-    setConfs(["Support", "Resistance", "Fibonacci", "RSI Divergence"]);
-  }, []);
+    const flags = [!!v.followedSetup, !!v.respectedStopLoss, !!v.managedRisk];
+    const percent = Math.round((flags.filter(Boolean).length / 3) * 100);
+    if (v.disciplineScore !== percent) {
+      setValue("disciplineScore", percent, { shouldDirty: true });
+    }
+  }, [v.followedSetup, v.respectedStopLoss, v.managedRisk, v.disciplineScore, setValue]);
 
-  const onSubmit = async (values: TradeEntry) => {
-    await fetch("/api/trading/create", {
-      method: initialData ? "PUT" : "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...values, userId }),
+  // Live-Game (Bias/Exec/Mistakes -> separater Heuristik-Score)
+  const gameComputedLive = useMemo(() => {
+    const r = computeGameScore({
+      biasExecution: v.biasExecution as BiasExec | undefined,
+      followedSetup: v.followedSetup,
+      respectedStopLoss: v.respectedStopLoss,
+      managedRisk: v.managedRisk,
+      conceptsCount: v.concepts?.length ?? 0,
+      session: v.session as SessionKey | undefined,
+      result: v.result,
+      breakEven: v.outcomeFlags?.breakEven,
+      stopHit: v.outcomeFlags?.stopHit,
+      mistakes: v.tradingMistakes,
     });
-    onCreated();
+    return r;
+  }, [
+    v.biasExecution,
+    v.followedSetup,
+    v.respectedStopLoss,
+    v.managedRisk,
+    v.concepts,
+    v.session,
+    v.result,
+    v.outcomeFlags?.breakEven,
+    v.outcomeFlags?.stopHit,
+    v.tradingMistakes,
+  ]);
+
+  // Mentale Fehler toggeln
+  const toggleMistake = (label: string) => {
+    const cur = Array.isArray(v.tradingMistakes) ? [...v.tradingMistakes] : [];
+    const idx = cur.findIndex((x) => x === label);
+    if (idx >= 0) cur.splice(idx, 1);
+    else cur.push(label);
+    setValue("tradingMistakes", cur, { shouldDirty: true });
   };
 
+  /* -------- 🆕 Game Items toggeln -------- */
+  const toggleGameItem = (grade: "A" | "B" | "C", label: string) => {
+    const cur = new Set<string>(Array.isArray(v.gameItems) ? v.gameItems : []);
+    const key = `${grade}:${label}`;
+    if (cur.has(key)) cur.delete(key);
+    else cur.add(key);
+    setValue("gameItems", Array.from(cur), { shouldDirty: true });
+  };
+
+  /* -------- 🆕 Score/Grade aus selektierten GameItems berechnen (Ø Punkte) -------- */
+  useEffect(() => {
+    const selected = Array.isArray(v.gameItems) ? v.gameItems : [];
+    const n = selected.length;
+    let sum = 0;
+    for (const k of selected) sum += pointsMap.get(k) ?? 0;
+    const avg = n > 0 ? sum / n : 0;
+    // Grade aus Ø-Punkten ableiten
+    const grade: "A" | "B" | "C" = avg >= 2.5 ? "A" : avg >= 1.5 ? "B" : "C";
+
+    if ((v.gameCatalogScore ?? 0) !== Number(avg.toFixed(2))) {
+      setValue("gameCatalogScore", Number(avg.toFixed(2)), { shouldDirty: true });
+    }
+    if (v.gameCatalogGrade !== grade) {
+      setValue("gameCatalogGrade", grade, { shouldDirty: true });
+    }
+  }, [v.gameItems, pointsMap, setValue, v.gameCatalogScore, v.gameCatalogGrade]);
+
+  // Prozent-Summe Partial Exits
+  const percentSum = useMemo(() => {
+    const arr = Array.isArray(v.partialExits) ? v.partialExits : [];
+    return arr.reduce((acc, it) => {
+      const n = Number(it?.percent);
+      return acc + (Number.isFinite(n) ? n : 0);
+    }, 0);
+  }, [v.partialExits]);
+
+  // SUBMIT (final/draft)
+  const onSubmit = async (values: any, forceStatus?: "final" | "draft") => {
+    setPending(true);
+    try {
+      const missing = computeMissingFields(values);
+
+      // ongoing ⇒ Draft + kein result übertragen
+      let forceDraftByOngoing = false;
+      if (values.result === "ongoing") {
+        forceDraftByOngoing = true;
+        values = { ...values };
+        delete values.result;
+      }
+
+      // Partial-Exits: Validierung Summe ≤ 100
+      if (values.hasPartialExits) {
+        const sum = (Array.isArray(values.partialExits) ? values.partialExits : []).reduce(
+          (acc: number, it: any) => {
+            const n = Number(it?.percent);
+            return acc + (Number.isFinite(n) ? n : 0);
+          },
+          0
+        );
+        if (sum > 100 + 1e-9) {
+          alert("Die Summe der Teil-Exit-Prozente darf 100% nicht überschreiten.");
+          setPending(false);
+          return;
+        }
+      }
+
+      const preferredGrade: "A" | "B" | "C" =
+        (values.gameCatalogGrade as "A" | "B" | "C" | undefined) ??
+        (values.gameSelf as "A" | "B" | "C" | undefined) ??
+        computeGameScore({
+          biasExecution: values.biasExecution,
+          followedSetup: values.followedSetup,
+          respectedStopLoss: values.respectedStopLoss,
+          managedRisk: values.managedRisk,
+          conceptsCount: values.concepts?.length ?? 0,
+          session: values.session,
+          result: values.result,
+          breakEven: values.outcomeFlags?.breakEven,
+          stopHit: values.outcomeFlags?.stopHit,
+          mistakes: values.tradingMistakes,
+        }).grade;
+
+      const num = (x: any, d = 0) => {
+        const n = Number(x);
+        return Number.isFinite(n) ? n : d;
+      };
+      const numOpt = (x: any) => {
+        const n = Number(x);
+        return Number.isFinite(n) ? n : undefined;
+      };
+      const strTrim = (x: any) => {
+        const s = typeof x === "string" ? x.trim() : "";
+        return s.length ? s : undefined;
+      };
+
+      const desiredStatus: "final" | "draft" =
+        forceStatus ?? (missing.length > 0 ? "draft" : "final");
+      const finalStatus: "final" | "draft" =
+        forceDraftByOngoing ? "draft" : desiredStatus;
+
+      // Partial-Exits sanitisieren
+      const partialExitsSan = Array.isArray(values.partialExits)
+        ? values.partialExits
+            .map((p: PartialExitForm, idx: number) => {
+              const label = strTrim(p?.label) ?? `TP ${idx + 1}`;
+              const price = numOpt(p?.price);
+              let percent = numOpt(p?.percent);
+              if (percent !== undefined) {
+                if (percent < 0) percent = 0;
+                if (percent > 100) percent = 100;
+              }
+              const at = strTrim(p?.at);
+              const note = strTrim(p?.note);
+              if (!label && price === undefined && percent === undefined && !at && !note) {
+                return null;
+              }
+              return { label: label ?? undefined, price, percent, at, note };
+            })
+            .filter(Boolean)
+        : undefined;
+
+      const payload: any = {
+        ...values,
+        userId,
+        entry: num(values.entry),
+        exit: num(values.exit),
+        pnl: num(values.pnl),
+        lotSize: numOpt(values.lotSize),
+        potentialLoss: numOpt(values.potentialLoss),
+        disciplineScore: num(values.disciplineScore),
+        rating: values?.rating !== undefined ? num(values.rating) : undefined,
+        durationMin: num(values.durationMin ?? minutesBetween(values.startTime, values.endTime)),
+        outcomeFlags: {
+          breakEven: !!values?.outcomeFlags?.breakEven,
+          stopHit: !!values?.outcomeFlags?.stopHit,
+        },
+        tradingMistakes: Array.isArray(values.tradingMistakes) ? values.tradingMistakes : [],
+        viewTimeframes: Array.isArray(values.viewTimeframes) ? values.viewTimeframes : [],
+        concepts: Array.isArray(values.concepts)
+          ? values.concepts.map((c: any) => ({
+              name: String(c?.name || ""),
+              direction: c?.direction || undefined,
+              timeframe: String(c?.timeframe || ""),
+              note: c?.note ? String(c.note) : undefined,
+            }))
+          : [],
+        gameItems: Array.isArray(values.gameItems) ? values.gameItems : [],
+        gameSelf: values.gameSelf ?? undefined,
+        gameCatalogScore: num(values.gameCatalogScore),
+        gameCatalogGrade: values.gameCatalogGrade ?? undefined,
+        gameComputed: preferredGrade,
+        strategy: values.strategy ?? values.strategy_name ?? undefined,
+        strategyAdherence: values.strategyAdherence ?? undefined,
+        hasPartialExits: !!values.hasPartialExits,
+        partialExits: values.hasPartialExits && partialExitsSan && partialExitsSan.length
+          ? partialExitsSan
+          : undefined,
+        missing,
+        status: finalStatus,
+        completed: finalStatus === "final",
+      };
+
+      if ((initialData as any)?._id) {
+        const resp = await fetch(`/api/trading/update?id=${(initialData as any)._id}&userId=${userId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!resp.ok) throw new Error(`Update fehlgeschlagen: ${resp.status}`);
+      } else {
+        const resp = await fetch("/api/trading/create", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!resp.ok) throw new Error(`Create fehlgeschlagen: ${resp.status}`);
+      }
+
+      onCreated();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setPending(false);
+    }
+  };
+
+  const onSubmitFinal = (vals: any) => onSubmit(vals, "final");
+  const onSubmitDraft = (vals: any) => onSubmit(vals, "draft");
+
+  /** ---------- UI ---------- */
   return (
     <FormProvider {...methods}>
-      <Card className="w-full">
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <CardHeader>
+      <Card className="w-full max-h-[85vh] flex flex-col">
+        <form onSubmit={handleSubmit(onSubmitFinal)} className="flex flex-col min-h-0">
+          {/* Header */}
+          <CardHeader className="flex items-center justify-between sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
             <CardTitle>{initialData ? "Trade bearbeiten" : "Neuer Trade"}</CardTitle>
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="text-sm">
+                Game: {(v.gameCatalogGrade as "A" | "B" | "C" | undefined) ?? v.gameSelf ?? gameComputedLive.grade}
+              </Badge>
+              <Badge variant="outline" className="text-sm">
+                Disziplin: {Math.round(Number(v.disciplineScore ?? 0))}%
+              </Badge>
+              {v.durationMin ? (
+                <Badge className="text-sm" variant="outline">
+                  Dauer: {v.durationMin} Min
+                </Badge>
+              ) : null}
+            </div>
           </CardHeader>
 
-          <CardContent>
+          {/* Content */}
+          <CardContent className="flex-1 min-h-0 overflow-y-auto px-4">
             <Tabs defaultValue="general" className="space-y-4">
-              <TabsList>
+              <TabsList className="flex w-full overflow-x-auto whitespace-nowrap">
                 <TabsTrigger value="general">General</TabsTrigger>
-                <TabsTrigger value="setup">Setup</TabsTrigger>
                 <TabsTrigger value="strategy">Strategie</TabsTrigger>
-                <TabsTrigger value="confluence">Confluences</TabsTrigger>
+                {/* 🆕 neuer Tab */}
+                <TabsTrigger value="trading-game">Trading Game</TabsTrigger>
               </TabsList>
 
-              <TabsContent value="general">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
- {/* Account, Symbol, tradeType, entry, exit, pnl, lotSize, potentialLoss, riskReward, notes */}
-                  <FormField control={control} name="accountId" render={({ field }) => (
+              {/* --- GENERAL --- */}
+              <TabsContent value="general" className="space-y-6">
+                <TEFGeneral userId={userId} />
+
+                {/* Zeiten & Session */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <FormField control={control} name="startTime" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Account</FormLabel>
+                      <FormLabel>Startzeit</FormLabel>
+                      <FormControl><Input type="time" {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={control} name="endTime" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Endzeit</FormLabel>
+                      <FormControl><Input type="time" {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={control} name="session" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Session</FormLabel>
                       <FormControl>
                         <Select value={field.value || ""} onValueChange={field.onChange}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Account wählen" />
-                          </SelectTrigger>
+                          <SelectTrigger className="w-full"><SelectValue placeholder="Session wählen" /></SelectTrigger>
                           <SelectContent>
-                            {accounts.map((a) => (
-                              <SelectItem key={a._id} value={a._id!}>
-                                {a.name}
-                              </SelectItem>
+                            {SESSIONS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                </div>
+
+                {/* Outcome & Bias */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <FormField control={control} name="outcomeFlags.breakEven" render={({ field }) => (
+                    <FormItem className="flex items-center gap-3">
+                      <FormControl><Checkbox checked={!!field.value} onCheckedChange={field.onChange} /></FormControl>
+                      <FormLabel className="m-0">Break Even</FormLabel>
+                    </FormItem>
+                  )} />
+                  <FormField control={control} name="outcomeFlags.stopHit" render={({ field }) => (
+                    <FormItem className="flex items-center gap-3">
+                      <FormControl><Checkbox checked={!!field.value} onCheckedChange={field.onChange} /></FormControl>
+                      <FormLabel className="m-0">Stop Hit</FormLabel>
+                    </FormItem>
+                  )} />
+                  <FormField control={control} name="biasExecution" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Bias/Execution</FormLabel>
+                      <FormControl>
+                        <Select value={field.value || ""} onValueChange={field.onChange}>
+                          <SelectTrigger className="w-full"><SelectValue placeholder="Bias wählen" /></SelectTrigger>
+                          <SelectContent>
+                            {(["RR", "RW", "WR", "WW"] as BiasExec[]).map((b) => (
+                              <SelectItem key={b} value={b}>{b}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -149,195 +637,164 @@ export default function TradeEntryForm({ date, userId, onCreated, initialData }:
                       <FormMessage />
                     </FormItem>
                   )} />
-                  <FormField control={control} name="symbol" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Währungspaar</FormLabel>
-                      <FormControl>
-                        <Select value={field.value || ""} onValueChange={field.onChange}>
-                          <SelectTrigger><SelectValue placeholder="Paar wählen"/></SelectTrigger>
-                          <SelectContent>{pairs.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
-                        </Select>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                  <FormField control={control} name="tradeType" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Buy / Sell</FormLabel>
-                      <FormControl>
-                        <Select value={field.value || "buy"} onValueChange={field.onChange}>
-                          <SelectTrigger><SelectValue placeholder="Typ wählen"/></SelectTrigger>
-                          <SelectContent><SelectItem value="buy">Buy</SelectItem><SelectItem value="sell">Sell</SelectItem></SelectContent>
-                        </Select>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                  <FormField control={control} name="entry" render={({ field }) => (
-                    <FormItem><FormLabel>Entry</FormLabel><FormControl><Input type="number" step="0.0001" {...field}/></FormControl><FormMessage/></FormItem>
-                  )} />
-                  <FormField control={control} name="exit" render={({ field }) => (
-                    <FormItem><FormLabel>Exit</FormLabel><FormControl><Input type="number" step="0.0001" {...field}/></FormControl><FormMessage/></FormItem>
-                  )} />
-                  <FormField control={control} name="pnl" render={({ field }) => (
-                    <FormItem><FormLabel>PnL</FormLabel><FormControl><Input type="number" step="0.01" {...field}/></FormControl><FormMessage/></FormItem>
-                  )} />
-                  <FormField control={control} name="lotSize" render={({ field }) => (
-                    <FormItem><FormLabel>Lot Size</FormLabel><FormControl><Input type="number" step="0.01" {...field}/></FormControl><FormMessage/></FormItem>
-                  )} />
-                  <FormField control={control} name="potentialLoss" render={({ field }) => (
-                    <FormItem><FormLabel>Potentieller Verlust</FormLabel><FormControl><Input type="number" step="0.01" {...field}/></FormControl><FormMessage/></FormItem>
-                  )} />
-                  <FormField control={control} name="riskReward" render={({ field }) => (
-                    <FormItem><FormLabel>Risk/Reward</FormLabel><FormControl><Input {...field} placeholder="z.B. 1:2"/></FormControl><FormMessage/></FormItem>
-                  )} />
-                  <FormField control={control} name="notes" render={({ field }) => (
-                    <FormItem><FormLabel>Notizen</FormLabel><FormControl><Textarea rows={3} {...field}/></FormControl><FormMessage/></FormItem>
-                  )} />
                 </div>
 
-                {/* Ergebnis & Mentale Faktoren & A/B/C Game & Disziplin */}
-                <FormField control={control} name="result" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Ergebnis</FormLabel>
-                    <FormControl>
-                      <Select value={field.value} onValueChange={v => field.onChange(v)}>
-                        <SelectTrigger><SelectValue placeholder="Result"/></SelectTrigger>
-                        <SelectContent><SelectItem value="win">Win</SelectItem><SelectItem value="loss">Loss</SelectItem><SelectItem value="BE">BE</SelectItem></SelectContent>
-                      </Select>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <details className="border rounded p-2">
-                  <summary className="cursor-pointer select-none">Mentale Faktoren</summary>
-                  <div className="mt-2 space-y-4">
-                    <FormField control={control} name="emotionBefore" render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Emotion vor dem Trade</FormLabel>
-                        <FormControl>
-                          <Select value={field.value} onValueChange={v => field.onChange(v)}>
-                            <SelectTrigger><SelectValue placeholder="Emotion wählen"/></SelectTrigger>
-                            <SelectContent><SelectItem value="Angst">Angst</SelectItem><SelectItem value="Gier">Gier</SelectItem><SelectItem value="Stress">Stress</SelectItem><SelectItem value="Ruhe">Ruhe</SelectItem></SelectContent>
-                          </Select>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-                    <FormField control={control} name="mentalMistake" render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Mentaler Fehler</FormLabel>
-                        <FormControl>
-                          <Select value={field.value} onValueChange={v => field.onChange(v)}>
-                            <SelectTrigger><SelectValue placeholder="Fehler wählen"/></SelectTrigger>
-                            <SelectContent><SelectItem value="SL verschoben">SL verschoben</SelectItem><SelectItem value="Overtrading">Overtrading</SelectItem><SelectItem value="FOMO">FOMO</SelectItem></SelectContent>
-                          </Select>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-                    <FormField control={control} name="performanceState" render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Performance State (A/B/C)</FormLabel>
-                        <FormControl>
-                          <Select value={field.value} onValueChange={v => field.onChange(v)}>
-                            <SelectTrigger><SelectValue placeholder="Rating wählen"/></SelectTrigger>
-                            <SelectContent><SelectItem value="A">A</SelectItem><SelectItem value="B">B</SelectItem><SelectItem value="C">C</SelectItem></SelectContent>
-                          </Select>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-                    <div className="grid grid-cols-3 gap-2">
-                      {([
-                        ["followedSetup", "Setup befolgt"],
-                        ["respectedStopLoss", "StopLoss respektiert"],
-                        ["managedRisk", "Risiko gemanagt"],
-                      ] as const).map(([key, label]) => (
-                        <FormField key={key} control={control} name={key} render={() => (
-                          <FormItem className="flex items-center gap-2">
-                            <FormControl>
-                              <Checkbox checked={formValues[key] as boolean} onCheckedChange={v => setValue(key, v === true)} />
-                            </FormControl>
-                            <FormLabel>{label}</FormLabel>
-                          </FormItem>
-                        )} />
-                      ))}
-                    </div>
+                {/* Mentale Fehler */}
+                <div className="space-y-2">
+                  <FormLabel>Mentale Fehler</FormLabel>
+                  <div
+                    className="flex flex-wrap gap-2"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {allMistakeChoices.map((m) => {
+                      const active = (v.tradingMistakes ?? []).includes(m);
+                      return (
+                        <button
+                          key={m}
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            toggleMistake(m);
+                          }}
+                          className={[
+                            "px-3 py-1 rounded-md text-sm border",
+                            active ? "bg-primary text-primary-foreground" : "bg-secondary"
+                          ].join(" ")}
+                          aria-pressed={active}
+                        >
+                          {m}
+                        </button>
+                      );
+                    })}
                   </div>
-                </details>
-
-                <AspectRatio ratio={1} className="w-24 mx-auto">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie data={pieData} dataKey="value" innerRadius={20} outerRadius={40}>
-                        {pieData.map((entry, index) => (
-                          <Cell key={index} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <div className="text-center mt-2 text-sm">
-                    Disziplin: {formValues.disciplineScore}%
-                  </div>
-                </AspectRatio>
-
+                  <FormField
+                    control={control}
+                    name="customMistake"
+                    render={({ field }) => (
+                      <FormItem className="mt-2">
+                        <FormLabel className="text-xs text-muted-foreground">Eigenen Punkt hinzufügen</FormLabel>
+                        <div className="flex gap-2">
+                          <FormControl>
+                            <Input
+                              placeholder="z. B. FOMO-ReEntry"
+                              value={field.value ?? ""}
+                              onChange={field.onChange}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  const val = String(field.value || "").trim();
+                                  if (val) {
+                                    toggleMistake(val);
+                                    field.onChange("");
+                                  }
+                                }
+                              }}
+                            />
+                          </FormControl>
+                          <button
+                            type="button"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              const val = String(field.value || "").trim();
+                              if (val) {
+                                toggleMistake(val);
+                                field.onChange("");
+                              }
+                            }}
+                            className="px-3 py-1 rounded-md text-sm border bg-background"
+                          >
+                            Hinzufügen
+                          </button>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+                </div>
               </TabsContent>
 
-              <TabsContent value="setup">
-                <FormField control={control} name="setup" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Setup</FormLabel>
-                    <FormControl>
-                      <Select value={field.value || ""} onValueChange={field.onChange}>
-                        <SelectTrigger><SelectValue placeholder="Setup wählen"/></SelectTrigger>
-                        <SelectContent>{setups.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-                      </Select>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-              </TabsContent>
-
+              {/* --- STRATEGY --- */}
               <TabsContent value="strategy">
-                <FormField control={control} name="strategy_name" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Strategie</FormLabel>
-                    <FormControl>
-                      <Select value={field.value || ""} onValueChange={field.onChange}>
-                        <SelectTrigger><SelectValue placeholder="Strategie wählen"/></SelectTrigger>
-                        <SelectContent>{strategies.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-                      </Select>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
+                <TEFStrategy userId={userId} />
               </TabsContent>
 
-              <TabsContent value="confluence">
-                <div className="grid grid-cols-2 gap-4">
-                  {confs.map(c => (
-                    <FormField key={c} control={control} name="confluences" render={() => (
-                      <FormItem className="flex items-center gap-2">
-                        <FormControl>
-                          <Checkbox checked={formValues.confluences?.includes(c)} onCheckedChange={checked => {
-                            const arr = formValues.confluences || [];
-                            const next = checked ? [...arr, c] : arr.filter(x => x !== c);
-                            setValue("confluences", next);
-                          }} />
-                        </FormControl>
-                        <FormLabel>{c}</FormLabel>
-                      </FormItem>
-                    )} />
+              {/* --- 🆕 TRADING GAME (A/B/C Faktoren) --- */}
+              <TabsContent value="trading-game" className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-muted-foreground">
+                    Wähle die erfüllten Faktoren – daraus wird Ø-Punkte & Game berechnet.
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={v.gameCatalogGrade === "A" ? "default" : v.gameCatalogGrade === "B" ? "secondary" : "outline"}>
+                      Game: {v.gameCatalogGrade ?? "-"}
+                    </Badge>
+                    <Badge variant="outline">Ø Punkte: {(v.gameCatalogScore ?? 0).toFixed(2)}</Badge>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {(["A","B","C"] as const).map((grade) => (
+                    <div key={grade} className="border rounded-lg p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="text-sm font-medium">{grade}-Game</div>
+                        <Badge variant={grade === "A" ? "default" : grade === "B" ? "secondary" : "outline"}>
+                          {grade === "A" ? "3 Punkte" : grade === "B" ? "2 Punkte" : "1 Punkt"}
+                        </Badge>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {itemsByGrade[grade].length === 0 && (
+                          <div className="text-xs text-muted-foreground">Keine Items.</div>
+                        )}
+                        {itemsByGrade[grade].map((it) => {
+                          const key = `${grade}:${it.label}`;
+                          const active = (v.gameItems ?? []).includes(key);
+                          return (
+                            <button
+                              key={key}
+                              type="button"
+                              className={[
+                                "px-2 py-1 text-xs rounded-md border",
+                                active ? "bg-primary text-primary-foreground" : "bg-secondary"
+                              ].join(" ")}
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => toggleGameItem(grade, it.label)}
+                              aria-pressed={active}
+                              title={it.label}
+                            >
+                              {it.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                   ))}
                 </div>
               </TabsContent>
             </Tabs>
           </CardContent>
 
-          <CardFooter className="flex justify-end">
-            <Button type="submit">Speichern</Button>
+          {/* Sticky Footer */}
+          <CardFooter className="mt-auto flex items-center justify-end gap-2 border-t p-4 bg-background">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => handleSubmit((vals) => onSubmit(vals, "draft"))()}
+              title="Speichert den Trade als unvollständig (Entwurf)"
+              disabled={pending}
+            >
+              Als Entwurf speichern
+            </Button>
+            <Button
+              type="submit"
+              title="Speichert als final – falls noch Pflichtfelder fehlen, wird automatisch als Entwurf gespeichert"
+              disabled={pending}
+            >
+              Speichern (Final)
+            </Button>
           </CardFooter>
         </form>
       </Card>

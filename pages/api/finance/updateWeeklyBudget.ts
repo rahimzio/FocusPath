@@ -1,63 +1,28 @@
-import { NextApiRequest, NextApiResponse } from "next";
+import type { NextApiRequest, NextApiResponse } from "next";
 import { connectToDatabase } from "../db/mongo";
-import { BudgetEntry } from "@/utils/interface";
+import { upsertFinance } from "@/lib/api/finance";
 
-function calcRating(budget: number, spent: number): "L" | "M" | "W" | "W+" {
-  if (spent > budget) return "L";
-  const ratio = spent / budget;
-  if (ratio === 1) return "W+";
-  if (ratio >= 0.85) return "W";
-  if (ratio >= 0.5) return "M";
-  return "L";
-}
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ message: "Method not allowed. Use POST." });
+  if (req.method !== "POST" && req.method !== "PATCH") {
+    return res.status(405).json({ message: "Use POST or PATCH." });
   }
 
-  const { userId, week, budget, spent, categories } = req.body as BudgetEntry;
-  if (!userId || !week || typeof budget !== "number" || typeof spent !== "number") {
-    return res.status(400).json({ message: "Missing required fields." });
+  const { userId, week, budget } = req.body as { userId?: string; week?: string; budget?: number };
+  if (!userId || !week || !(typeof budget === "number" && budget >= 0)) {
+    return res.status(400).json({ message: "Missing/invalid userId/week/budget" });
   }
-  const rating = calcRating(budget, spent);
 
   try {
     const { db } = await connectToDatabase();
-    const collection = db.collection<BudgetEntry>("budgetEntries");
-    const timestamp = new Date().toISOString();
-
-    const existing = await collection.findOne({ userId, week });
-    if (existing) {
-      await collection.updateOne(
-        { userId, week },
-        {
-          $set: {
-            budget,
-            spent,
-            categories,
-            rating,
-            updatedAt: timestamp,
-          },
-        }
-      );
-      return res.status(200).json({ message: "Budget updated" });
-    } else {
-      const entry: BudgetEntry = {
-        userId,
-        week,
-        budget,
-        spent,
-        rating,
-
-        categories: categories || [],
-        createdAt: timestamp,
-        updatedAt: timestamp,
-      };
-      await collection.insertOne(entry);
-      return res.status(201).json({ message: "Budget created" });
-    }
-  } catch (error: any) {
-    console.error("updateWeeklyBudget error", error);
+    await upsertFinance(
+      db,
+      { kind: "weekly_budget", userId, week },
+      { kind: "weekly_budget", userId, week, budget },
+      {}
+    );
+    return res.status(200).json({ ok: true });
+  } catch (e) {
+    console.error("updateWeeklyBudget", e);
     return res.status(500).json({ message: "Internal server error" });
   }
 }

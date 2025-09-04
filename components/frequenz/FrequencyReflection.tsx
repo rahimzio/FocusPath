@@ -1,5 +1,6 @@
 // components/FrequencyReflection.tsx
 import React, { useState } from "react";
+import { toast } from "react-toastify";
 
 interface FrequencyReflectionProps {
   userId: string;
@@ -23,6 +24,7 @@ const FrequencyReflection: React.FC<FrequencyReflectionProps> = ({ userId, date,
       timeOfDay,
       reflection,
       influence,
+      type: "frequency_reflection",
     };
 
     try {
@@ -31,30 +33,32 @@ const FrequencyReflection: React.FC<FrequencyReflectionProps> = ({ userId, date,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
+
       const ct = response.headers.get("content-type") || "";
-      if (!response.ok) {
-        const text = await response.text();
-        throw new Error(`HTTP ${response.status} – ${text.slice(0, 120)}`);
-      }
-      if (!ct.includes("application/json")) {
-        const text = await response.text();
-        throw new Error(`Expected JSON, got ${ct}. Body: ${text.slice(0, 120)}`);
-      }
-      const _data = await response.json();
+      const isJson = ct.includes("application/json");
+      const data = isJson ? await response.json() : await response.text();
 
-
-      if (!response.ok) {
-        throw new Error("Fehler beim Speichern");
+      if (!response.ok || (isJson && data?.ok === false)) {
+        const msg = (isJson ? data?.error : data) || `HTTP ${response.status}`;
+        throw new Error(String(msg));
       }
 
-      if (onSave) onSave();
-      alert("Reflexion gespeichert! 🙏");
+      onSave?.();
       setReflection("");
       setInfluence("");
 
+      try {
+        toast.success("Reflexion gespeichert! 🙏");
+      } catch {
+        alert("Reflexion gespeichert! 🙏");
+      }
     } catch (error) {
       console.error(error);
-      alert("Speichern fehlgeschlagen");
+      try {
+        toast.error("Speichern fehlgeschlagen");
+      } catch {
+        alert("Speichern fehlgeschlagen");
+      }
     } finally {
       setSaving(false);
     }
@@ -73,6 +77,7 @@ const FrequencyReflection: React.FC<FrequencyReflectionProps> = ({ userId, date,
             onChange={(e) => setReflection(e.target.value)}
             className="w-full p-2 border rounded"
             rows={3}
+            placeholder="z. B. ruhig und fokussiert – habe meine DOs gut geschafft."
             required
           />
         </div>
@@ -85,6 +90,7 @@ const FrequencyReflection: React.FC<FrequencyReflectionProps> = ({ userId, date,
             onChange={(e) => setInfluence(e.target.value)}
             className="w-full p-2 border rounded"
             rows={3}
+            placeholder="z. B. Handy weggelegt + 2× Deep-Work-Blöcke → klarer Kopf"
             required
           />
         </div>

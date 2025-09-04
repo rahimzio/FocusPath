@@ -1,77 +1,51 @@
-import React from "react";
-import SetExpensesPage from "./setExpenses"; // Importiere mit Großbuchstaben
-import FinancialSummary from "./financialSummary"; // Importiere die FinancialSummary-Komponente
-import { useEffect,useState } from "react";
-import { getSession } from "next-auth/react";
-import { toast } from "react-toastify";
+"use client";
+import { useCallback, useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
+import FinancialSummary from "./financialSummary";
 
-const [income, setIncome] = useState(0);
-const [expenses, setExpenses] = useState(0);
-const [savings, setSavings] = useState(0);
-const [userId, setUserId] = useState<string | null>(null);
+export default function FinanceOverview() {
+  const { data: session } = useSession();
+  const userId = (session as any)?.user?.id as string | undefined;
 
-  useEffect(() => {
-    getSession().then((session) => {
-      if (session?.user?.id) setUserId(session.user.id);
-      else toast.error("Fehlende Benutzer-Session.");
-    });
-  }, []);
+  const [income, setIncome] = useState(0);
+  const [expenses, setExpenses] = useState(0);
+  const [savings, setSavings] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
-useEffect(() => {
-  async function loadFinanceData() {
-    if (userId) {
-      const res = await fetch("/api/finance/overview");
+  const load = useCallback(async () => {
+    if (!userId) return;
+    setLoading(true);
+    setErr(null);
+    try {
+      const res = await fetch(`/api/finance/overview?userId=${userId}`);
+      if (!res.ok) throw new Error("Konnte Finanzübersicht nicht laden");
       const data = await res.json();
-      setIncome(data.income || 0);
-      setExpenses(data.expenses || 0);
-      setSavings(data.savings || 0);
-  }else{
-    setIncome(0);
-    setExpenses(0);
-    setSavings(0);
-  }}
-  loadFinanceData();
-}, []);
+      setIncome(Number(data.income ?? 0));
+      setExpenses(Number(data.expenses ?? 0));
+      setSavings(Number(data.savings ?? 0));
+    } catch (e: any) {
+      setErr(e?.message ?? "Unerwarteter Fehler");
+      setIncome(0); setExpenses(0); setSavings(0);
+    } finally {
+      setLoading(false);
+    }
+  }, [userId]);
 
-const FinanceOverview = () => {
+  useEffect(() => { load(); }, [load]);
+
+  if (!userId) return <p>Bitte einloggen…</p>;
+
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      <h1 className="text-3xl font-bold text-center text-blue-600 mb-6">
-        Finance Overview
-      </h1>
+    <div className="max-w-4xl mx-auto p-6 space-y-6">
+      <h1 className="text-3xl font-bold text-center">Finance Overview</h1>
 
-      {/* Finanzübersicht */}
-<FinancialSummary income={income} expenses={expenses} savings={savings} />
-
-      {/* Aktivitäten */}
-      <div className="bg-white shadow-lg rounded-lg p-6 mb-6">
-        <h2 className="text-2xl font-semibold text-gray-700 mb-4">
-          Recent Transactions
-        </h2>
-        <ul className="space-y-3">
-          <li className="flex justify-between">
-            <span className="text-gray-600">Deposit:</span>
-            <span className="text-green-600 font-semibold">+$1,000</span>
-          </li>
-          <li className="flex justify-between">
-            <span className="text-gray-600">Expense:</span>
-            <span className="text-red-600 font-semibold">
-              -$200 (Groceries)
-            </span>
-          </li>
-          <li className="flex justify-between">
-            <span className="text-gray-600">Investment:</span>
-            <span className="text-blue-600 font-semibold">
-              +$500 (Stock Purchase)
-            </span>
-          </li>
-        </ul>
-      </div>
-
-      {/* Komponente für Ausgaben hinzufügen */}
-      <SetExpensesPage />
+      {err && <p className="text-sm text-red-600">{err}</p>}
+      {loading ? (
+        <p>Lade…</p>
+      ) : (
+        <FinancialSummary income={income} expenses={expenses} savings={savings} />
+      )}
     </div>
   );
-};
-
-export default FinanceOverview;
+}

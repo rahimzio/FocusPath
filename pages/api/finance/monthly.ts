@@ -1,30 +1,30 @@
-import { NextApiRequest, NextApiResponse } from 'next';
-import { connectToDatabase } from '../db/mongo';
-import { expense } from '@/utils/interface';
+import type { NextApiRequest, NextApiResponse } from "next";
+import { connectToDatabase } from "../db/mongo";
+import { FINANCE_COLLECTION } from "@/lib/api/finance";
 
-const getMonthlyExpenses = async (req: NextApiRequest, res: NextApiResponse) => {
+function monthStart(d: Date) { return new Date(d.getFullYear(), d.getMonth(), 1); }
+function iso(d: Date) { return d.toISOString(); }
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== "GET") return res.status(405).json({ message: "Use GET." });
+
+  const { userId } = req.query;
+  if (!userId || typeof userId !== "string") return res.status(400).json({ message: "Missing userId" });
+
   try {
     const { db } = await connectToDatabase();
-    const collection = db.collection<expense>('expenses');
-
     const now = new Date();
-    const currentMonth = now.getMonth();
-    const start = new Date(now.getFullYear(), currentMonth, 1).toISOString();
-    const end = new Date(now.getFullYear(), currentMonth + 1, 1).toISOString();
+    const start = monthStart(now);
+    const end = monthStart(new Date(now.getFullYear(), now.getMonth() + 1, 1));
 
-    const expenses = await collection
-      .find({
-        dueDate: { $gte: start, $lt: end },
-      })
-      .toArray();
+    const agg = await db.collection(FINANCE_COLLECTION).aggregate([
+      { $match: { kind: "expense", userId, dueDate: { $gte: iso(start), $lt: iso(end) } } },
+      { $group: { _id: null, sum: { $sum: "$amount" } } },
+    ]).toArray();
 
-    const totalExpenses = expenses.reduce((acc, e) => acc + e.amount, 0);
-
-    return res.status(200).json({ expenses, totalExpenses });
-  } catch (error) {
-    console.error('Error retrieving monthly expenses:', error);
-    return res.status(500).json({ message: 'Error retrieving expenses' });
+    return res.status(200).json({ totalExpenses: agg[0]?.sum ?? 0 });
+  } catch (e) {
+    console.error("monthly", e);
+    return res.status(500).json({ message: "Internal server error" });
   }
-};
-
-export default getMonthlyExpenses;
+}

@@ -8,6 +8,9 @@ import SubtaskModal from "./subtaskModal";
 import NewGoalForm from "./createGoal";
 import { Task, Goal } from "@/utils/interface";
 
+// NEU: falls ein Goal ohne berechneten Progress reinkommt (Sicherheitsnetz)
+import { computeGoalProgress } from "@/utils/goals/progress";
+
 export default function GoalPage() {
   const {
     userId,
@@ -34,9 +37,22 @@ export default function GoalPage() {
     yearlyGoals,
   } = useGoalManager();
 
-  // ➡️ Neues Ziel hinzufügen und Goals-List sofort updaten
+  // ➡️ Neues Ziel hinzufügen: Progress sicher initialisieren (falls nicht gesetzt)
   const handleGoalCreated = (newGoal: Goal) => {
-    setGoals((prev) => [...prev, newGoal]);
+    const ensuredProgress =
+      typeof newGoal.progress === "number"
+        ? Math.max(0, Math.min(100, newGoal.progress))
+        : computeGoalProgress({
+            tasks: (newGoal as any).tasks,
+            subGoals: (newGoal as any).subGoals,
+          });
+
+    const goalForState: Goal = {
+      ...newGoal,
+      progress: ensuredProgress,
+    };
+
+    setGoals((prev) => [...prev, goalForState]);
   };
 
   return (
@@ -70,7 +86,7 @@ export default function GoalPage() {
       />
 
       <GoalContainerSection
-        title=""
+        title="Wochenziele"
         goals={weeklyGoals}
         onAddWeekly={handleAddWeeklyGoal}
         onGenerateDaily={handleGenerateDailyTasksForWeekGoal}

@@ -1,53 +1,179 @@
 // pages/api/trading/getByDate.ts
-import { NextApiRequest, NextApiResponse } from "next";
+import type { NextApiRequest, NextApiResponse } from "next";
 import { connectToDatabase } from "../db/mongo";
-import { TradeEntry } from "@/utils/interface";
+
+const toNum = (v: any, def?: number) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : def ?? undefined;
+};
+
+const needsCompositeIndex = (err: any) => {
+  const msg = String(err?.message || "");
+  return /composite index/i.test(msg) || /order by query/i.test(msg);
+};
+
+const s10 = (d?: string) => (d || "").slice(0, 10);
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  console.log("📥 /api/trading/getByDate aufgerufen", {
-    method: req.method,
-    query: req.query,
-  });
-
-  if (req.method !== "GET") {
-    return res.status(405).json({ message: "Method not allowed" });
-  }
-
-  const { date, userId, accountId } = req.query;
-
-  if (!date || typeof date !== "string" || !userId || typeof userId !== "string") {
-    console.error("❌ Fehlende Parameter:", { date, userId });
-    return res.status(400).json({ message: "Missing or invalid parameters" });
-  }
+  if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
 
   try {
     const { db } = await connectToDatabase();
-    console.log("✅ DB-Verbindung erfolgreich");
+    // ⚠️ Holt nur eine bestehende Collection. Kein createIndex/auto create!
+    const col = db.collection("trading");
 
-    const appData = db.collection("trading");
+    const {
+      userId,
+      date: dateRaw,
+      accountId,
+      strategy,
+      status,           // optional: 'draft' | 'final' | 'all'
+      includeArchived,  // optional: 'true' | 'false' (default false)
+      limit: limitRaw,  // optional
+    } = req.query as Record<string, string | undefined>;
 
-    const query: Record<string, unknown> = {
+    if (!userId) return res.status(400).json({ error: "userId ist erforderlich" });
+    if (!dateRaw) return res.status(400).json({ error: "date ist erforderlich (YYYY-MM-DD)" });
+
+    const date = s10(String(dateRaw));
+    const lim = Math.max(1, Math.min(1000, Number(limitRaw) || 200));
+
+    // Match inkl. Archiv/Lösch-Filter & optional account/strategy
+    const match: any = {
       type: "tradeEntry",
       userId,
-      date, // exakter Stringvergleich
+      date,
+      deleted: { $ne: true },
     };
 
-    if (accountId && typeof accountId === "string" && accountId !== "all") {
-      query.accountId = accountId;
+    // Archiv standardmäßig ausblenden
+    const allowArchived = includeArchived === "true";
+    if (!allowArchived) match.archived = { $ne: true };
+
+    // Zusätzliche Bedingungen sauber mit $and kombinieren
+    const andConds: any[] = [];
+
+    if (accountId) {
+      andConds.push({ accountId });
     }
+    if (strategy) {
+      andConds.push({ $or: [{ strategy }, { strategy_name: strategy }] });
+    }
+    if (status === "draft") {
+      andConds.push({ $or: [{ status: "draft" }, { completed: { $ne: true } }] });
+    } else if (status === "final") {
+      andConds.push({ $or: [{ status: "final" }, { completed: true }] });
+    }
+    if (andConds.length) match.$and = andConds;
 
-    console.log("🔍 Query:", query);
+    // bevorzugte Sortierung (chronologisch): startTime ↑, dann _id ↑
+    const sortSpec: Record<string, 1 | -1> = { startTime: 1, _id: 1 };
 
-    const trades = await appData
-      .find(query)
-      .project({ type: 0 })
-      .toArray() as TradeEntry[];
+    try {
+      const docs = await col.find(match).sort(sortSpec).limit(lim).toArray();
 
-    console.log("📊 Gefundene Trades:", trades.length);
+      const trades = docs.map(mapDocToTrade);
+      return res.status(200).json({ trades });
+    } catch (err: any) {
+      // Cosmos: fehlender Composite-Index → Fallback ohne ORDER BY + Sort in JS
+      if (!needsCompositeIndex(err)) {
+        console.error("❌ Fehler in /api/trading/getByDate (unbekannt):", err);
+        return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
+      }
 
-    return res.status(200).json({ trades });
-  } catch (err) {
-    console.error("❌ Fehler beim Abrufen der Trades:", err);
-    return res.status(500).json({ message: "Serverfehler beim Laden der Trades" });
+      const raw = await col.find(match).limit(Math.max(lim, 1000)).toArray();
+
+      // JS-Sort wie oben: startTime ↑, dann createdAt ↓ fallback, dann _id ↑
+      raw.sort((a: any, b: any) => {
+        const sa = typeof a?.startTime === "string" ? a.startTime : "\uffff";
+        const sb = typeof b?.startTime === "string" ? b.startTime : "\uffff";
+        const t = sa.localeCompare(sb);
+        if (t !== 0) return t;
+
+        // createdAt desc als sekundärer Anhaltspunkt (falls vorhanden)
+        const ca = String(b?.createdAt || "").localeCompare(String(a?.createdAt || ""));
+        if (ca !== 0) return ca;
+
+        // zuletzt _id asc (stabil)
+        return String(a?._id || "").localeCompare(String(b?._id || ""));
+      });
+
+      const trades = raw.slice(0, lim).map(mapDocToTrade);
+      return res.status(200).json({
+        trades,
+        note: "fallback: sorted in application (add composite index for ORDER BY)",
+      });
+    }
+  } catch (err: any) {
+    console.error("❌ Fehler in /api/trading/getByDate:", err);
+    return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
   }
+}
+
+/** Mapping eines DB-Dokuments auf das API-Shape */
+function mapDocToTrade(d: any) {
+  return {
+    _id: String(d._id),
+    userId: d.userId,
+    date: String(d.date ?? "").slice(0, 10),
+    type: d.type,
+
+    symbol: d.symbol ?? "",
+    accountId: d.accountId ?? undefined,
+
+    entry: toNum(d.entry),
+    exit: toNum(d.exit),
+    pnl: toNum(d.pnl, 0),
+    lotSize: toNum(d.lotSize),
+    potentialLoss: toNum(d.potentialLoss),
+    rating: toNum(d.rating),
+
+    result: d.result ?? "win",
+    tradeType: d.tradeType ?? "buy",
+
+    // Setup wurde in der UI entfernt, lassen wir hier neutral durch
+    setup: d.setup ?? "",
+    strategy: d.strategy ?? d.strategy_name ?? undefined,
+    strategy_name: d.strategy_name ?? d.strategy ?? undefined,
+    riskReward: d.riskReward ?? undefined,
+
+    notes: d.notes ?? "",
+
+    startTime: d.startTime ?? undefined,
+    endTime: d.endTime ?? undefined,
+    durationMin: toNum(d.durationMin, 0),
+    session: d.session ?? undefined,
+    outcomeFlags: {
+      breakEven: !!(d.outcomeFlags?.breakEven),
+      stopHit: !!(d.outcomeFlags?.stopHit),
+    },
+    biasExecution: d.biasExecution ?? undefined,
+    tradingMistakes: Array.isArray(d.tradingMistakes) ? d.tradingMistakes : [],
+
+    rangeDefined: !!d.rangeDefined,
+    rangeNote: d.rangeNote ?? "",
+    viewTimeframes: Array.isArray(d.viewTimeframes) ? d.viewTimeframes : [],
+    entryTimeframe: d.entryTimeframe ?? "",
+    concepts: Array.isArray(d.concepts) ? d.concepts : [],
+    location: d.location ?? "",
+
+    // Game / Game-Katalog
+    gameComputed: d.gameComputed ?? undefined,
+    gameSelf: d.gameSelf ?? undefined,
+    gameItems: Array.isArray(d.gameItems) ? d.gameItems.map(String) : [],
+    gameCatalogScore: toNum(d.gameCatalogScore, 0) ?? 0,
+    gameCatalogGrade: d.gameCatalogGrade ?? undefined,
+
+    // SL/TP
+    stopPrice: toNum(d.stopPrice),
+    targetPrice: toNum(d.targetPrice),
+
+    // Status
+    status: d.status ?? (d.completed ? "final" : "draft"),
+    completed: !!d.completed,
+    missing: Array.isArray(d.missing) ? d.missing : [],
+
+    createdAt: d.createdAt ?? undefined,
+    updatedAt: d.updatedAt ?? undefined,
+  };
 }

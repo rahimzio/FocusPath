@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from "react";
+// components/MonthlyGoalOverview.tsx
+import React, { useEffect, useMemo, useState } from "react";
 import { Goal } from "@/utils/interface";
 import {
   format,
@@ -20,6 +21,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { computeGoalProgress } from "@/utils/goals/progress";
+import { patchGoalProgress, updateGoal } from "@/lib/api/goal";
 
 interface Props {
   goals: Goal[];
@@ -28,9 +31,16 @@ interface Props {
 
 export default function MonthlyGoalOverview({ goals, onClose }: Props) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [localGoals, setLocalGoals] = useState<Goal[]>(goals);
   const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
   const [editMode, setEditMode] = useState(false);
   const [editedGoal, setEditedGoal] = useState<Partial<Goal>>({});
+  const [busyGoalId, setBusyGoalId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  // keep local copy in sync
+  useEffect(() => setLocalGoals(goals), [goals]);
 
   const handlePrevMonth = () => setCurrentMonth((prev) => subMonths(prev, 1));
   const handleNextMonth = () => setCurrentMonth((prev) => addMonths(prev, 1));
@@ -46,61 +56,138 @@ export default function MonthlyGoalOverview({ goals, onClose }: Props) {
       weeks.push({ start: current, end: weekEnd });
       current = new Date(current.setDate(current.getDate() + 7));
     }
-
     return weeks;
   };
 
-  const filteredGoals = goals.filter((goal) => {
-    const start = parseISO(goal.startDate);
-    return getMonth(start) === getMonth(currentMonth) && getYear(start) === getYear(currentMonth);
-  });
+  const filteredGoals = useMemo(
+    () =>
+      (localGoals || []).filter((goal) => {
+        const start = parseISO(goal.startDate);
+        return (
+          getMonth(start) === getMonth(currentMonth) &&
+          getYear(start) === getYear(currentMonth)
+        );
+      }),
+    [localGoals, currentMonth]
+  );
 
-  const weeks = getWeeksInMonth(currentMonth);
+  const weeks = useMemo(() => getWeeksInMonth(currentMonth), [currentMonth]);
+
+  const applyOptimisticProgress = (
+    goalId: string,
+    newProgress: number,
+    completedAt: string | null
+  ) => {
+    setLocalGoals((prev) =>
+      prev.map((g) =>
+        g._id === goalId
+          ? {
+              ...g,
+              progress: newProgress,
+              completedAt: completedAt ?? undefined,
+            }
+          : g
+      )
+    );
+  };
+
+  const rollbackProgress = (
+    goalId: string,
+    prevProgress: number,
+    prevCompletedAt?: string
+  ) => {
+    setLocalGoals((prev) =>
+      prev.map((g) =>
+        g._id === goalId
+          ? { ...g, progress: prevProgress, completedAt: prevCompletedAt }
+          : g
+      )
+    );
+  };
 
   const handleToggleCompletion = async (goal: Goal) => {
-    const newProgress = goal.progress === 100 ? 0 : 100;
+    if (!goal?._id) return;
+    const prevProgress = goal.progress ?? 0;
+    const prevCompletedAt = (goal as any).completedAt as string | undefined;
+
+    // Toggle 0 ↔ 100
+    const newProgress = prevProgress === 100 ? 0 : 100;
     const completedAt = newProgress === 100 ? new Date().toISOString() : null;
 
-    await fetch(`/api/goals/updateGoalProgress`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        goalId: goal._id,
-        progress: newProgress,
-        completedAt,
-      }),
-    });
+    setBusyGoalId(goal._id);
+    applyOptimisticProgress(goal._id, newProgress, completedAt);
 
-    alert("Zielstatus aktualisiert. Änderungen beim nächsten Laden sichtbar.");
+    try {
+      await patchGoalProgress(goal._id, newProgress, completedAt);
+      setMessage(
+        newProgress === 100
+          ? "Ziel als erledigt markiert."
+          : "Ziel wieder geöffnet."
+      );
+    } catch (e) {
+      console.error(e);
+      rollbackProgress(goal._id, prevProgress, prevCompletedAt);
+      setMessage("Fehler beim Aktualisieren. Änderungen wurden zurückgesetzt.");
+    } finally {
+      setBusyGoalId(null);
+    }
   };
 
   const openDialog = (goal: Goal, mode: "view" | "edit") => {
     setSelectedGoal(goal);
     setEditMode(mode === "edit");
     setEditedGoal({ title: goal.title, description: goal.description });
+    setMessage(null);
   };
 
   const handleSave = async () => {
-    if (!selectedGoal) return;
-    await fetch(`/api/goals/updateGoal?goalId=${selectedGoal._id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(editedGoal),
-    });
-    alert("Ziel wurde aktualisiert. Änderungen werden beim nächsten Laden sichtbar.");
-    setSelectedGoal(null);
-    setEditMode(false);
+    if (!selectedGoal?._id) return;
+    setSaving(true);
+
+    // Optimistisch spiegeln
+    const before = selectedGoal;
+    setLocalGoals((prev) =>
+      prev.map((g) =>
+        g._id === selectedGoal._id ? ({ ...g, ...editedGoal } as Goal) : g
+      )
+    );
+
+    try {
+      await updateGoal({ goalId: selectedGoal._id, ...editedGoal });
+      setMessage("Ziel gespeichert.");
+      setSelectedGoal(null);
+      setEditMode(false);
+    } catch (e) {
+      console.error(e);
+      // Rollback
+      setLocalGoals((prev) =>
+        prev.map((g) => (g._id === before._id ? before : g))
+      );
+      setMessage("Update fehlgeschlagen. Änderungen wurden zurückgesetzt.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
     <div className="fixed inset-0 bg-white z-50 overflow-y-auto p-6">
       <div className="flex justify-between items-center mb-6">
-        <button onClick={handlePrevMonth} className="text-blue-600">⏪</button>
+        <button onClick={handlePrevMonth} className="text-blue-600">
+          ⏪
+        </button>
         <h2 className="text-2xl font-bold">
           📅 Monatsziele: {format(currentMonth, "MMMM yyyy")}
         </h2>
-        <button onClick={handleNextMonth} className="text-blue-600">⏩</button>
+        <button onClick={handleNextMonth} className="text-blue-600">
+          ⏩
+        </button>
       </div>
+
+      {message && (
+        <div className="mb-4 text-sm rounded bg-emerald-50 border border-emerald-200 text-emerald-700 px-3 py-2">
+          {message}
+        </div>
+      )}
 
       {weeks.map((week, index) => {
         const weekGoals = filteredGoals.filter((goal) => {
@@ -108,46 +195,91 @@ export default function MonthlyGoalOverview({ goals, onClose }: Props) {
           return isWithinInterval(goalDate, { start: week.start, end: week.end });
         });
 
-        const completedCount = weekGoals.filter((g) => g.progress === 100).length;
-        const percentage = weekGoals.length > 0 ? Math.round((completedCount / weekGoals.length) * 100) : 0;
+        const completedCount = weekGoals.filter((g) => (g.progress ?? 0) >= 100)
+          .length;
+        const percentage =
+          weekGoals.length > 0
+            ? Math.round((completedCount / weekGoals.length) * 100)
+            : 0;
 
         return (
           <div key={index} className="border rounded p-3 shadow mb-6">
             <h4 className="font-semibold text-gray-700 mb-2">
-              Woche {index + 1}: {format(week.start, "dd.MM")} – {format(week.end, "dd.MM")} 
-              ({completedCount}/{weekGoals.length} erledigt – {percentage}%)
+              Woche {index + 1}: {format(week.start, "dd.MM")} –{" "}
+              {format(week.end, "dd.MM")} ({completedCount}/{weekGoals.length} erledigt
+              – {percentage}%)
             </h4>
             {weekGoals.length > 0 ? (
               <ul className="space-y-2">
-                {weekGoals.map((goal) => (
-                  <li key={goal._id} className={`border p-3 rounded bg-gray-50 ${goal.progress === 100 ? "opacity-60" : ""}`}>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={goal.progress === 100}
-                        onChange={() => handleToggleCompletion(goal)}
-                        className="h-4 w-4"
-                      />
-                      <span className="font-semibold text-gray-800">{goal.title}</span>
-                      <span className="text-sm text-gray-500">({goal.progress}%)</span>
-                    </div>
-                    <p className="text-sm text-gray-600">{goal.description}</p>
-                    <p className="text-xs text-gray-500">
-                      {format(parseISO(goal.startDate), "dd.MM.yyyy")} – {format(parseISO(goal.endDate), "dd.MM.yyyy")}
-                    </p>
-                    <div className="mt-2 flex gap-2">
-                      <Button variant="outline" onClick={() => openDialog(goal, "view")} className="text-sm bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700">
-                        🔍 Details
-                      </Button>
-                      <Button variant="outline" onClick={() => openDialog(goal, "edit")} className="text-sm bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700">
-                        ✏️ Bearbeiten
-                      </Button>
-                    </div>
-                  </li>
-                ))}
+                {weekGoals.map((goal) => {
+                  // falls Tasks/Subgoals am Goal hängen, können wir den UI-Progress live berechnen
+                  const derivedProgress =
+                    Array.isArray((goal as any).tasks) ||
+                    Array.isArray((goal as any).subGoals)
+                      ? computeGoalProgress(goal as any)
+                      : goal.progress ?? 0;
+
+                  const checked = (goal.progress ?? derivedProgress) >= 100;
+                  const disabled = busyGoalId === goal._id;
+
+                  return (
+                    <li
+                      key={goal._id}
+                      className={`border p-3 rounded bg-gray-50 ${
+                        checked ? "opacity-60" : ""
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          disabled={disabled}
+                          onChange={() => handleToggleCompletion(goal)}
+                          className="h-4 w-4"
+                        />
+                        <span className="font-semibold text-gray-800">
+                          {goal.title}
+                        </span>
+                        <span className="text-sm text-gray-500">
+                          ({checked ? 100 : derivedProgress}%)
+                        </span>
+                        {disabled && (
+                          <span className="ml-2 text-xs text-gray-500">
+                            speichere…
+                          </span>
+                        )}
+                      </div>
+                      {goal.description && (
+                        <p className="text-sm text-gray-600">{goal.description}</p>
+                      )}
+                      <p className="text-xs text-gray-500">
+                        {format(parseISO(goal.startDate), "dd.MM.yyyy")} –{" "}
+                        {format(parseISO(goal.endDate), "dd.MM.yyyy")}
+                      </p>
+                      <div className="mt-2 flex gap-2">
+                        <Button
+                          variant="outline"
+                          onClick={() => openDialog(goal, "view")}
+                          className="text-sm bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
+                        >
+                          🔍 Details
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => openDialog(goal, "edit")}
+                          className="text-sm bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700"
+                        >
+                          ✏️ Bearbeiten
+                        </Button>
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             ) : (
-              <p className="text-sm italic text-gray-500">Keine Ziele in dieser Woche.</p>
+              <p className="text-sm italic text-gray-500">
+                Keine Ziele in dieser Woche.
+              </p>
             )}
           </div>
         );
@@ -175,29 +307,54 @@ export default function MonthlyGoalOverview({ goals, onClose }: Props) {
                     className="border p-2 w-full rounded mb-3"
                   />
 
-                  <label className="block text-sm font-medium mb-1">Beschreibung</label>
+                  <label className="block text-sm font-medium mb-1">
+                    Beschreibung
+                  </label>
                   <textarea
                     value={editedGoal.description || ""}
                     onChange={(e) =>
-                      setEditedGoal((prev) => ({ ...prev, description: e.target.value }))
+                      setEditedGoal((prev) => ({
+                        ...prev,
+                        description: e.target.value,
+                      }))
                     }
                     className="border p-2 w-full rounded mb-4"
                   />
 
                   <div className="flex justify-end gap-2">
-                    <Button variant="outline" onClick={() => setEditMode(false)}>Abbrechen</Button>
-                    <Button onClick={handleSave}>Speichern</Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => setEditMode(false)}
+                      disabled={saving}
+                    >
+                      Abbrechen
+                    </Button>
+                    <Button onClick={handleSave} disabled={saving}>
+                      {saving ? "Speichern…" : "Speichern"}
+                    </Button>
                   </div>
                 </>
               ) : (
                 <>
-                  <p className="text-lg font-semibold mb-1">{selectedGoal.title}</p>
-                  <p className="text-sm text-gray-700 mb-2">{selectedGoal.description}</p>
+                  <p className="text-lg font-semibold mb-1">
+                    {selectedGoal.title}
+                  </p>
+                  {selectedGoal.description && (
+                    <p className="text-sm text-gray-700 mb-2">
+                      {selectedGoal.description}
+                    </p>
+                  )}
                   <p className="text-xs text-gray-500 mb-4">
-                    Zeitraum: {format(parseISO(selectedGoal.startDate), "dd.MM.yyyy")} – {format(parseISO(selectedGoal.endDate), "dd.MM.yyyy")}
+                    Zeitraum: {format(parseISO(selectedGoal.startDate), "dd.MM.yyyy")} –{" "}
+                    {format(parseISO(selectedGoal.endDate), "dd.MM.yyyy")}
                   </p>
                   <div className="flex justify-end gap-2">
-                    <Button variant="outline" onClick={() => setSelectedGoal(null)}>Schließen</Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => setSelectedGoal(null)}
+                    >
+                      Schließen
+                    </Button>
                     <Button onClick={() => setEditMode(true)}>Bearbeiten</Button>
                   </div>
                 </>
@@ -206,6 +363,12 @@ export default function MonthlyGoalOverview({ goals, onClose }: Props) {
           )}
         </DialogContent>
       </Dialog>
+
+      <div className="mt-6 flex justify-end">
+        <Button variant="outline" onClick={onClose}>
+          Schließen
+        </Button>
+      </div>
     </div>
   );
 }

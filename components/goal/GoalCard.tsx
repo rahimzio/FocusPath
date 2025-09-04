@@ -1,8 +1,9 @@
-import React, { useState } from "react";import { Goal } from "@/utils/interface";
+import React from "react";
+import { Goal } from "@/utils/interface";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Progress } from "@/components/ui/progress";
-import { Pencil, MoveRight, Trash2, Copy,CheckCircle2  } from "lucide-react";
+import { Pencil, MoveRight, Trash2, Copy, CheckCircle2 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -13,6 +14,8 @@ import {
   AlertDialogCancel,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { normalizeGoalType, computeGoalProgress } from "@/utils/goals/progress";
+
 interface GoalCardProps {
   goal: Goal;
   onEdit: (goal: Goal) => void;
@@ -23,47 +26,86 @@ interface GoalCardProps {
   onToggleComplete: (goal: Goal) => void;
 }
 
-const GoalCard: React.FC<GoalCardProps> = ({ goal, onEdit, onMove, onDelete, onDuplicate, onReflect,onToggleComplete  }) => {
-  const isExpired = new Date(goal.endDate) < new Date() && goal.progress < 100;
-  const type = goal.goalType || goal.type;
+const GoalCard: React.FC<GoalCardProps> = ({
+  goal,
+  onEdit,
+  onMove,
+  onDelete,
+  onDuplicate,
+  onReflect,
+  onToggleComplete,
+}) => {
+  const type = normalizeGoalType((goal as any).goalType || (goal as any).type);
 
-  const color =
-    type === "weekly" ? "border-blue-500" :
-    type === "monthly" ? "border-orange-500" :
-    type === "yearly" ? "border-purple-500" : "border-gray-300";
+  const colorClass =
+    type === "weekly"
+      ? "border-blue-500"
+      : type === "monthly"
+      ? "border-orange-500"
+      : type === "yearly"
+      ? "border-purple-500"
+      : type === "daily"
+      ? "border-emerald-500"
+      : type === "once"
+      ? "border-slate-400"
+      : type === "mental"
+      ? "border-pink-500"
+      : "border-gray-300";
 
-  const soon =
-    new Date(goal.endDate).getTime() - Date.now() < 3 * 86400000 &&
-    goal.progress < 100;
+  const hasStructure = Array.isArray((goal as any).tasks) || Array.isArray((goal as any).subGoals);
+  const derived = hasStructure ? computeGoalProgress(goal as any) : (goal.progress ?? 0);
+  const progress = Math.max(0, Math.min(100, typeof goal.progress === "number" ? goal.progress : derived));
+  const isDone = progress >= 100 || !!goal.completedAt;
+
+  const isExpired = new Date(goal.endDate) < new Date() && !isDone;
+  const soon = !isDone && new Date(goal.endDate).getTime() - Date.now() < 3 * 86400000;
 
   let progressTag: React.ReactNode = null;
-  if (goal.progress === 100) {
+  if (isDone) {
     progressTag = <span className="text-xs text-green-600">🏁 100%</span>;
-  } else if (goal.progress >= 80) {
-    progressTag = <span className="text-xs text-orange-600">🔥 {goal.progress}%</span>;
+  } else if (progress >= 80) {
+    progressTag = <span className="text-xs text-orange-600">🔥 {progress}%</span>;
   } else if (soon) {
     progressTag = <span className="text-xs text-yellow-600">🕓 Bald fällig</span>;
   }
 
   return (
-    <div className={`group relative hover:shadow-lg transition-shadow border-l-4 ${color} bg-white rounded-lg shadow-sm`}>      <div className="p-4">
-        <div className="flex justify-between items-center">
-          <h3 className="text-base font-semibold text-gray-800">
+    <div
+      className={`group relative isolate overflow-hidden transition-shadow border-l-4 ${colorClass} bg-white rounded-lg shadow-sm hover:shadow-lg ${
+        isDone ? "ring-1 ring-inset ring-green-200 bg-green-50" : ""
+      }`}
+    >
+      <div className="p-4">
+        <div className="flex justify-between items-start gap-2">
+          <h3 className={`text-base font-semibold text-gray-800 ${isDone ? "line-through text-gray-600" : ""}`}>
             {goal.title}
             {isExpired && <span className="text-xs text-red-500 ml-2">Abgelaufen</span>}
           </h3>
+
+          {(goal as any).category ? (
+            <span className="shrink-0 text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 border">
+              {(goal as any).category}
+            </span>
+          ) : null}
         </div>
 
-        <p className="text-sm text-muted-foreground mt-1">{goal.description}</p>
+        {goal.description && (
+          <p className={`text-sm mt-1 ${isDone ? "text-gray-500 line-through" : "text-muted-foreground"}`}>
+            {goal.description}
+          </p>
+        )}
 
         <div className="mt-2">
-          <Progress value={goal.progress} />
-          {progressTag && <div className="mt-1">{progressTag}</div>}
-          {goal.completedAt && (
-            <div className="mt-1 text-xs text-gray-500">
-              Erledigt am {new Date(goal.completedAt).toLocaleString()}
-            </div>
-          )}
+          <Progress value={isDone ? 100 : progress} aria-label={`Fortschritt ${isDone ? 100 : progress}%`} />
+          <div className="mt-1 flex items-center gap-2">
+            {progressTag}
+            <span className="text-xs text-gray-500">{isDone ? 100 : progress}%</span>
+            {goal.completedAt && (
+              <span className="text-xs text-gray-500">
+                · Erledigt am {new Date(goal.completedAt).toLocaleString()}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -71,44 +113,41 @@ const GoalCard: React.FC<GoalCardProps> = ({ goal, onEdit, onMove, onDelete, onD
         <TooltipProvider delayDuration={100}>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button size="icon" variant="ghost" onClick={() => onEdit(goal)}>
+              <Button size="icon" variant="ghost" onClick={() => onEdit(goal)} aria-label="Ziel bearbeiten">
                 <Pencil className="w-4 h-4" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>Bearbeiten</TooltipContent>
           </Tooltip>
 
- <Tooltip>
-          <TooltipTrigger asChild>
-            <Button size="icon" variant="ghost" onClick={() => onMove(goal)}>
-              <MoveRight className="w-4 h-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Verschieben</TooltipContent>
-        </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button size="icon" variant="ghost" onClick={() => onMove(goal)} aria-label="Ziel verschieben">
+                <MoveRight className="w-4 h-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Verschieben</TooltipContent>
+          </Tooltip>
 
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              size="icon"
-              variant="ghost"
-              onClick={() => onToggleComplete(goal)}
-            >
-              <CheckCircle2
-                className={`w-4 h-4 ${goal.progress === 100 ? "text-green-600" : ""}`}
-              />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            {goal.progress === 100 ? "Rückgängig" : "Abhaken"}
-          </TooltipContent>
-        </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => onToggleComplete(goal)}
+                aria-label={isDone ? "Als unerledigt markieren" : "Ziel abhaken"}
+              >
+                <CheckCircle2 className={`w-4 h-4 ${isDone ? "text-green-600" : ""}`} />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{isDone ? "Rückgängig" : "Abhaken"}</TooltipContent>
+          </Tooltip>
 
           <AlertDialog>
             <Tooltip>
               <TooltipTrigger asChild>
                 <AlertDialogTrigger asChild>
-                  <Button size="icon" variant="ghost">
+                  <Button size="icon" variant="ghost" aria-label="Ziel löschen">
                     <Trash2 className="w-4 h-4" />
                   </Button>
                 </AlertDialogTrigger>
@@ -130,7 +169,7 @@ const GoalCard: React.FC<GoalCardProps> = ({ goal, onEdit, onMove, onDelete, onD
 
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button size="icon" variant="ghost" onClick={() => onDuplicate(goal._id)}>
+              <Button size="icon" variant="ghost" onClick={() => onDuplicate(goal._id)} aria-label="Ziel duplizieren">
                 <Copy className="w-4 h-4" />
               </Button>
             </TooltipTrigger>
@@ -138,7 +177,7 @@ const GoalCard: React.FC<GoalCardProps> = ({ goal, onEdit, onMove, onDelete, onD
           </Tooltip>
         </TooltipProvider>
 
-        {goal.progress === 100 && onReflect && (
+        {isDone && onReflect && (
           <Button variant="outline" size="sm" onClick={() => onReflect(goal)}>
             Reflexion starten
           </Button>

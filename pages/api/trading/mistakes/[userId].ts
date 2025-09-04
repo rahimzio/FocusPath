@@ -1,53 +1,37 @@
-import { NextApiRequest, NextApiResponse } from "next";
-import { connectToDatabase } from "../../db/mongo";
-import { TradeEntry } from "@/utils/interface";
+import type { NextApiRequest, NextApiResponse } from "next";
+import { connectToDatabase } from "../../db/connectToDatabase";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== "GET") {
-    return res.status(405).json({ message: "Method not allowed" });
-  }
+  if (req.method !== "GET") return res.status(405).json({ message: "Method not allowed" });
 
   const { userId } = req.query;
+  const accountId =
+    typeof req.query.accountId === "string" && req.query.accountId.trim() !== "" ? req.query.accountId : undefined;
+  const strategy =
+    typeof req.query.strategy === "string" && req.query.strategy.trim() !== "" ? req.query.strategy : undefined;
+
   if (!userId || typeof userId !== "string") {
     return res.status(400).json({ message: "Missing userId" });
   }
 
-  const { db } = await connectToDatabase();
-  const collection = db.collection<TradeEntry>("trading");
+  try {
+    const { db } = await connectToDatabase();
+    const match: any = { userId, type: "tradeEntry", tradingMistakes: { $exists: true, $ne: [] } };
+    if (accountId) match.accountId = accountId;
+    if (strategy) match.strategy_name = strategy;
 
-  const data = await collection
-    .aggregate([
-      { $match: { userId, type: "tradeEntry" } },
-      {
-        $project: {
-          month: { $substr: ["$date", 0, 7] },
-          pnl: "$pnl",
-          rr: { $cond: [{ $gt: ["$stopLoss", 0] }, { $divide: [{ $subtract: ["$exit", "$entry"] }, { $abs: { $subtract: ["$entry", "$stopLoss"] } }] }, 0] },
-        },
-      },
-      {
-        $group: {
-          _id: "$month",
-          pnl: { $sum: "$pnl" },
-          rr: { $avg: "$rr" },
-        },
-      },
-      { $sort: { _id: 1 } },
-    ])
-    .toArray();
+    const pipeline = [
+      { $match: match },
+      { $unwind: "$tradingMistakes" },
+      { $group: { _id: "$tradingMistakes", count: { $sum: 1 } } },
+      { $project: { _id: 0, mistake_type: "$_id", count: 1 } },
+      { $sort: { count: -1, mistake_type: 1 } },
+    ] as any[];
 
-  let cumulative = 0;
-  let maxDrawdown = 0;
-  let peak = 0;
-  const months = data.map((d) => {
-    cumulative += d.pnl;
-    peak = Math.max(peak, cumulative);
-    const drawdown = cumulative - peak;
-    maxDrawdown = Math.min(maxDrawdown, drawdown);
-    return { month: d._id, pnl: d.pnl, cumulative };
-  });
-
-  const avgRiskReward = data.length ? data.reduce((s, d) => s + (d.rr || 0), 0) / data.length : 0;
-
-  return res.status(200).json({ months, maxDrawdown, avgRiskReward });
+    const data = await db.collection("trading").aggregate(pipeline).toArray();
+    return res.status(200).json(data);
+  } catch (e) {
+    console.error("mistakes endpoint error:", e);
+    return res.status(500).json({ message: "Internal server error" });
+  }
 }

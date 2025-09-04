@@ -1,103 +1,92 @@
 "use client";
+
 import useSWR from "swr";
 import React from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Stat, StatLabel, StatNumber } from "../ui/stat";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  AreaChart,
-  Area,
-} from "recharts";
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
-interface Props {
+type StatsData = {
+  count: number;
+  winrate: number;
+  avgPnl: number;
+  avgRating: number;
+  history?: { day: string; count: number; pnl?: number }[];
+};
+
+type Range = "week" | "month" | "all";
+interface TradeStatsOverviewProps {
   userId: string;
-  range?: "week" | "month";
+  range?: Range;
 }
 
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
+const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
-export default function TradeStatsOverview({ userId, range = "week" }: Props) {
-  // Lade Trading-Stats
-  const { data: stats } = useSWR(
-    userId ? `/api/trading/getStats?range=${range}&userId=${userId}` : null,
-    fetcher
-  );
-  // Lade mentale Stats (Disziplin, Tilt)
-  const { data: mental } = useSWR(
-    userId ? `/api/trading/mentalStats?userId=${userId}` : null,
-    fetcher
-  );
+export default function TradeStatsOverview({ userId, range = "month" }: TradeStatsOverviewProps) {
+  const [accountId, setAccountId] = React.useState<string | undefined>();
+  const [strategy, setStrategy] = React.useState<string | undefined>();
 
-  if (!stats || !mental) {
-    return <div className="flex justify-center p-8">Lade Statistik...</div>;
-  }
+  React.useEffect(() => {
+    const url = new URL(window.location.href);
+    setAccountId(url.searchParams.get("account") || undefined);
+    setStrategy(url.searchParams.get("strategy") || undefined);
 
-  // Beispielhafte PnL-Historie für Chart
-  const pnlHistory = stats.pnlHistory || stats.history || [];
+    const onAccount = (e: any) => setAccountId(e?.detail?.accountId || undefined);
+    const onStrategy = (e: any) => setStrategy(e?.detail?.name || undefined);
+    window.addEventListener("account-change", onAccount as EventListener);
+    window.addEventListener("strategy-select", onStrategy as EventListener);
+    return () => {
+      window.removeEventListener("account-change", onAccount as EventListener);
+      window.removeEventListener("strategy-select", onStrategy as EventListener);
+    };
+  }, []);
+
+  const qs = [
+    `range=${encodeURIComponent(range)}`,
+    `userId=${encodeURIComponent(userId)}`,
+    accountId ? `accountId=${encodeURIComponent(accountId)}` : null,
+    strategy ? `strategy=${encodeURIComponent(strategy)}` : null,
+  ].filter(Boolean).join("&");
+
+  const { data: stats, error } = useSWR<StatsData>(userId ? `/api/trading/getStats?${qs}` : null, fetcher);
+
+  if (error) return <div className="text-red-600">Fehler beim Laden.</div>;
+  if (!stats) return <div className="opacity-70">Lade…</div>;
+
+  const pnlSeries = stats.history?.map((h) => ({ day: h.day, pnl: h.pnl ?? 0 })) ?? [];
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Statistiken ({range === "week" ? "Woche" : "Monat"})</CardTitle>
+        <CardTitle>Trading Stats</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Statistische Übersicht */}
-        <div className="grid grid-cols-2 gap-4">
-          <Stat>
-            <StatLabel>Anzahl Trades</StatLabel>
-            <StatNumber>{stats.count}</StatNumber>
-          </Stat>
-          <Stat>
-            <StatLabel>Winrate</StatLabel>
-            <StatNumber>{Math.round(stats.winrate * 100)}%</StatNumber>
-          </Stat>
-          <Stat>
-            <StatLabel>Ø PnL</StatLabel>
-            <StatNumber>{stats.avgPnl.toFixed(2)}€</StatNumber>
-          </Stat>
-          <Stat>
-            <StatLabel>Ø Rating</StatLabel>
-            <StatNumber>{stats.avgRating.toFixed(1)}</StatNumber>
-          </Stat>
-          <Stat>
-            <StatLabel>Ø Disziplin</StatLabel>
-            <StatNumber>{Math.round(mental.avgDiscipline)}%</StatNumber>
-          </Stat>
-          <Stat>
-            <StatLabel>Tilt Events</StatLabel>
-            <StatNumber>{mental.tiltCount}</StatNumber>
-          </Stat>
+      <CardContent className="grid grid-cols-1 gap-6">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <Stat><StatLabel>Trades</StatLabel><StatNumber>{stats.count}</StatNumber></Stat>
+          <Stat><StatLabel>Winrate</StatLabel><StatNumber>{Math.round(stats.winrate * 100)}%</StatNumber></Stat>
+          <Stat><StatLabel>Ø PnL</StatLabel><StatNumber>{stats.avgPnl.toFixed(2)}€</StatNumber></Stat>
+          <Stat><StatLabel>Ø Rating</StatLabel><StatNumber>{stats.avgRating.toFixed(1)}</StatNumber></Stat>
         </div>
 
-        {/* PnL-Verlauf */}
-        <AspectRatio ratio={16 / 9} className="w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={pnlHistory} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id="pnlGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.6} />
-                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <XAxis dataKey="date" />
-              <YAxis />
-              <Tooltip />
-              <Area
-                type="monotone"
-                dataKey="pnl"
-                stroke="#3b82f6"
-                fillOpacity={1}
-                fill="url(#pnlGradient)"
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </AspectRatio>
+        {pnlSeries.length > 0 && (
+          <AspectRatio ratio={16 / 9}>
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={pnlSeries}>
+                <XAxis dataKey="day" />
+                <YAxis />
+                <Tooltip />
+                <defs>
+                  <linearGradient id="pnlGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.6} />
+                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <Area type="monotone" dataKey="pnl" fill="url(#pnlGradient)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </AspectRatio>
+        )}
       </CardContent>
     </Card>
   );

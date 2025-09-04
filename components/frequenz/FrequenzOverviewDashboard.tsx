@@ -1,85 +1,359 @@
-import React from "react";
-import StepFormCurrent, { FrequencyCurrent } from "./StepFormCurrent";
-import StepFormIdeal, { FrequencyIdeal } from "./StepFormIdeal";
-import EveningReflectionCheck from "./EveningReflectionCheck";
-import FrequencyDayChart from "./FrequencyDayChart";
-import ConvictionCard from "./ConvictionCard";
-import FrequencyRecommendations from "./FrequencyRecommendations";
-import FrequencyReflection from "./FrequencyReflection";
-import ReflectionHistory from "./ReflectionHistory";
-import TrustTankBar from "./TrustTankBar";
-import TrustTankHistoryChart from "./TrustTankHistoryChart";
-import AffirmationAnchor from "./tools/AffirmationAnchor";
-import FrequencyCompass from "./tools/FrequencyCompass";
-import ManifestationProofLog from "./tools/ManifestationProofLog";
-import MentalSceneLoop from "./tools/MentalSceneLoop";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useSession } from "next-auth/react";
+'use client';
 
-const demoSnapshots = [
-  { date: "2024-05-01", morningFrequency: 70, eveningFrequency: 65 },
-  { date: "2024-05-02", morningFrequency: 68, eveningFrequency: 72 },
-  { date: "2024-05-03", morningFrequency: 75, eveningFrequency: 70 },
-  { date: "2024-05-04", morningFrequency: 80, eveningFrequency: 78 },
-  { date: "2024-05-05", morningFrequency: 82, eveningFrequency: 79 },
-  { date: "2024-05-06", morningFrequency: 85, eveningFrequency: 81 },
-  { date: "2024-05-07", morningFrequency: 83, eveningFrequency: 84 },
-];
-
-const demoTrustHistory = [
-  { date: "2024-05-01", delta: 2 },
-  { date: "2024-05-02", delta: -1 },
-  { date: "2024-05-03", delta: 3 },
-  { date: "2024-05-04", delta: 1 },
-];
-
-const demoRecommendations = [
-  {
-    title: "Meditation",
-    description: "Täglich 10 Minuten am Morgen meditieren",
-    category: "Mindset" as const,
-    gapReason: "Dein Stresslevel ist erhöht",
-    basedOn: "self_belief",
-  },
-];
+import * as React from 'react';
+import EveningReflectionCheck from './EveningReflectionCheck';
+import FrequencyDayChart from './FrequencyDayChart';
+import ConvictionCard from './ConvictionCard';
+import FrequencyRecommendations from './FrequencyRecommendations';
+import FrequencyReflection from './FrequencyReflection';
+import ReflectionHistory from './ReflectionHistory';
+import TrustTankBar from './TrustTankBar';
+import { TrustTankHistoryChart } from './TrustTankHistoryChart';
+import AffirmationAnchor from './tools/AffirmationAnchor';
+import FrequencyCompass from './tools/FrequencyCompass';
+import ManifestationProofLog from './tools/ManifestationProofLog';
+import MentalSceneLoop from './tools/MentalSceneLoop';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useSession } from 'next-auth/react';
+import ResetAndOpenOnboarding from './resetOnboarding';
+import FrequencySettingsButton from './FrequencySettingsButton';
+import { BaseMoodCheckins } from './BaseMoodCheckins';
+import { AddCustomMood } from './AddCustomMood';
+import { AnchorsToday } from './AnchorsToday';
+import { generateRecommendationsFromOverview } from './recommendations';
+import TrendSparklines from './TrendSparklines';
 
 export default function FrequenzOverviewDashboard() {
   const { data: session } = useSession();
-  const userId = (session as any)?.user?.id ?? "demo-user";
-  const today = new Date().toISOString().slice(0, 10);
+  const userId = (session as any)?.user?.id ?? ''; // nur echte Daten; kein Demo-Fallback
+
+  const today = new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
+    .toISOString()
+    .slice(0, 10);
+
+  const [selectedDate, setSelectedDate] = React.useState<string>(today);
+
+  const [overview, setOverview] = React.useState<any | null>(null);
+  const [loadingOverview, setLoadingOverview] = React.useState(false);
+  const [toggling, setToggling] = React.useState<string | null>(null);
+
+  // Dev-Rollup UI-States
+  const [rolling, setRolling] = React.useState(false);
+  const [rollupMsg, setRollupMsg] = React.useState<string | null>(null);
+
+  async function refreshOverview() {
+    if (!userId) return;
+    setLoadingOverview(true);
+    try {
+      const q = new URLSearchParams({ userId }).toString();
+      const r = await fetch(`/api/frequency/overview?${q}`);
+      const j = await r.json();
+      if (j?.ok) setOverview(j);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingOverview(false);
+    }
+  }
+
+  React.useEffect(() => {
+    refreshOverview();
+  }, [userId]);
+
+  // abgeleitete Helfer
+  const templates = (overview?.templates as any[]) || [];
+  const todayTasks = (overview?.todayTasks as any[]) || [];
+  const doTasks = todayTasks.filter((t) => !t.isDont);
+  const dontTasks = todayTasks.filter((t) => t.isDont);
+
+  const smoothed = overview?.metricsSmoothed || {};
+  const preview = overview?.todayPreview || {};
+  const mm = smoothed?.mmState || null;
+
+  const trend = overview?.trend || null;
+  const baseConviction = overview?.frequency?.base?.baseConviction;
+
+  const dos = React.useMemo(
+    () => templates.filter((x: any) => !x.isDont).map((x: any) => ({ name: x.name, points: x.points ?? 1 })),
+    [templates]
+  );
+  const donts = React.useMemo(
+    () => templates.filter((x: any) => x.isDont).map((x: any) => ({ name: x.name, points: x.points ?? 1 })),
+    [templates]
+  );
+
+  const availableMoods: string[] = React.useMemo(() => {
+    const prefs = overview?.availableMoods as string[] | undefined;
+    return prefs && prefs.length ? prefs : ['ruhig', 'angespannt', 'klar', 'müde', 'fokussiert', 'gestresst'];
+  }, [overview]);
+
+  const frequencyAnchors =
+    (overview?.anchors?.frequencyAnchors as Array<{ label: string }> | undefined) ?? [];
+  const concentrationAnchors =
+    (overview?.anchors?.concentrationAnchors as Array<{ label: string }> | undefined) ?? [];
+
+  const recommendations = React.useMemo(() => generateRecommendationsFromOverview(overview), [overview]);
+
+  async function toggleTask(t: {
+    name: string;
+    points: number;
+    isDont: boolean;
+    status: 'open' | 'done';
+  }) {
+    setToggling(t.name);
+    try {
+      const r = await fetch('/api/frequency/toggleTaskStatus', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          name: t.name,
+          points: t.points,
+          isDont: t.isDont,
+          done: t.status !== 'done',
+        }),
+      });
+      const j = await r.json();
+      if (!j.ok) throw new Error(j.error || 'Fehler beim Speichern');
+
+      // Live-Vorschau (persistente Glättung via Daily-Rollup)
+      setOverview((prev: any) =>
+        prev
+          ? {
+              ...prev,
+              todayPreview: j.preview,
+              todayTasks: prev.todayTasks.map((x: any) =>
+                x.name === t.name ? { ...x, status: t.status === 'done' ? 'open' : 'done' } : x
+              ),
+            }
+          : prev
+      );
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setToggling(null);
+    }
+  }
+
+  // Dev-Button – Tages-Rollup (EWMA) anstoßen
+  async function runDailyRollup() {
+    if (!userId || rolling) return;
+    setRolling(true);
+    setRollupMsg(null);
+    try {
+      const url = `/api/cron/dailyRollup?userId=${encodeURIComponent(userId)}`;
+      const res = await fetch(url, { method: 'GET' });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.ok) {
+        throw new Error(data?.error || `HTTP ${res.status}`);
+      }
+      setRollupMsg(`Rollup OK für ${data.date} · processed: ${data.processed}`);
+      await refreshOverview();
+    } catch (err: any) {
+      console.error(err);
+      setRollupMsg(`Rollup Fehler: ${err?.message || String(err)}`);
+    } finally {
+      setRolling(false);
+    }
+  }
+
+  const fmtDelta = (v?: number | null, unit = '') =>
+    typeof v === 'number' ? `${v > 0 ? '+' : ''}${v.toFixed(1)}${unit}` : '—';
 
   return (
     <div className="mx-auto max-w-screen-xl px-3 sm:px-4 lg:px-6 py-4 space-y-6">
-      <h1 className="text-xl sm:text-2xl font-semibold">Frequenz Dashboard</h1>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <h1 className="text-xl sm:text-2xl font-semibold">Frequenz Dashboard</h1>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={runDailyRollup}
+            disabled={rolling}
+            className={`px-3 py-2 rounded border ${
+              rolling ? 'bg-gray-100 text-gray-500' : 'bg-white hover:bg-gray-50'
+            }`}
+            title="Tägliche Glättung (EWMA) jetzt berechnen"
+          >
+            {rolling ? 'Rollup…' : 'Tages-Rollup ausführen'}
+          </button>
+
+          <ResetAndOpenOnboarding userId={userId} />
+          <FrequencySettingsButton />
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-sm text-gray-700">Datum</label>
+          <input
+            type="date"
+            className="border rounded px-2 py-1 text-sm"
+            value={selectedDate}
+            onChange={(e) => setSelectedDate(e.target.value)}
+          />
+        </div>
+      </div>
+
+      {rollupMsg && <div className="text-xs text-gray-600 -mt-3">{rollupMsg}</div>}
+
+      {/* Echte Sparklines (Series API) */}
+      <div className="col-span-1 md:grid-cols-1 xl:col-span-6 min-w-0">
+        {userId && <TrendSparklines userId={userId} defaultDays={28} />}
+      </div>
+
+      {/* Smoothed vs. Heute Preview */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="rounded-xl border p-3 bg-white">
+          <div className="flex items-center justify-between">
+            <div className="text-sm font-medium">Frequency</div>
+            {mm && (
+              <span
+                className={`text-[10px] px-2 py-0.5 rounded-full border ${
+                  mm.mode === 'magnify'
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    : 'bg-gray-50 text-gray-700 border-gray-200'
+                }`}
+              >
+                {mm.mode === 'magnify' ? 'Magnify' : 'Maintain'} · {mm.streakPos || 0}↑/{mm.streakNeg || 0}↓
+              </span>
+            )}
+          </div>
+          <div className="mt-1 text-2xl font-semibold">
+            {typeof smoothed.frequencySmoothed === 'number' ? `${Math.round(smoothed.frequencySmoothed)}%` : '—'}
+          </div>
+          <div className="text-xs text-gray-600 mt-1">
+            Heute: {typeof preview.frequencyToday === 'number' ? `${Math.round(preview.frequencyToday)}%` : '—'}
+          </div>
+          {trend?.freq && (
+            <div className="mt-1 text-[10px] text-gray-600">
+              Δ7: <b>{fmtDelta(trend.freq.d7, '%')}</b> · Δ14: <b>{fmtDelta(trend.freq.d14, '%')}</b>
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-xl border p-3 bg-white">
+          <div className="text-sm font-medium">Conviction</div>
+          <div className="mt-1 text-2xl font-semibold">
+            {typeof smoothed.convictionSmoothed === 'number'
+              ? smoothed.convictionSmoothed.toFixed(1)
+              : typeof baseConviction === 'number'
+              ? baseConviction.toFixed(1)
+              : '—'}{' '}
+            / 10
+          </div>
+          <div className="text-xs text-gray-600 mt-1">
+            Heute:{' '}
+            {typeof preview.convictionToday === 'number' ? `${preview.convictionToday.toFixed(1)} / 10` : '—'}
+          </div>
+          {trend?.conviction && (
+            <div className="mt-1 text-[10px] text-gray-600">
+              Δ7: <b>{fmtDelta(trend.conviction.d7, ' / 10')}</b> · Δ14: <b>{fmtDelta(trend.conviction.d14, ' / 10')}</b>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Tägliche Aufgaben mit Checkboxes */}
+      <div className="rounded-xl border p-4 bg-white">
+        <h3 className="text-base font-semibold mb-3">Tägliche Frequenz-Aufgaben</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <div className="text-sm font-medium mb-2">DOs</div>
+            <ul className="space-y-1">
+              {doTasks.length ? (
+                doTasks.map((t) => (
+                  <li key={`do-${t.name}`} className="flex items-center justify-between rounded border px-2 py-1">
+                    <label className="inline-flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        disabled={toggling !== null}
+                        checked={t.status === 'done'}
+                        onChange={() => toggleTask(t)}
+                      />
+                      <span className={t.status === 'done' ? 'line-through text-gray-500' : ''}>{t.name}</span>
+                    </label>
+                    <span className="text-xs text-gray-600">+{t.points} P</span>
+                  </li>
+                ))
+              ) : (
+                <li className="text-sm text-gray-500">Keine DOs angelegt</li>
+              )}
+            </ul>
+          </div>
+
+          <div>
+            <div className="text-sm font-medium mb-2">DON’Ts</div>
+            <ul className="space-y-1">
+              {dontTasks.length ? (
+                dontTasks.map((t) => (
+                  <li
+                    key={`dont-${t.name}`}
+                    className="flex items-center justify-between rounded border px-2 py-1 ring-1 ring-red-300"
+                  >
+                    <label className="inline-flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        disabled={toggling !== null}
+                        checked={t.status === 'done'}
+                        onChange={() => toggleTask(t)}
+                      />
+                      <span className={t.status === 'done' ? 'line-through text-red-500' : ''}>⚠︎ {t.name}</span>
+                    </label>
+                    <span className="text-xs text-red-600">-{t.points} P</span>
+                  </li>
+                ))
+              ) : (
+                <li className="text-sm text-gray-500">Keine DON’Ts angelegt</li>
+              )}
+            </ul>
+          </div>
+        </div>
+        <div className="mt-3 text-xs text-gray-700">
+          Heute:{' '}
+          <b>{typeof preview.frequencyToday === 'number' ? `${Math.round(preview.frequencyToday)}%` : '—'}</b> ·
+          Conviction-Impuls:{' '}
+          <b>{typeof preview.convictionToday === 'number' ? preview.convictionToday.toFixed(1) : '—'}</b>
+        </div>
+      </div>
 
       <Tabs defaultValue="overview" className="space-y-4">
-        {/* TabsList mobil scrollbar, Desktop inline */}
         <TabsList className="w-full overflow-x-auto flex gap-2 sm:gap-3">
-          <TabsTrigger value="overview" className="shrink-0">Übersicht</TabsTrigger>
-          <TabsTrigger value="components" className="shrink-0">Komponenten</TabsTrigger>
+          <TabsTrigger value="overview" className="shrink-0">
+            Übersicht
+          </TabsTrigger>
+          <TabsTrigger value="components" className="shrink-0">
+            Komponenten
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview">
-          {/* 1 → 2 → 12 Spalten ab XL, mit gezielten col-spans */}
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-12 gap-4 sm:gap-6 min-w-0">
+            {/* echte Tages-Linie (Series API) */}
             <div className="col-span-1 md:col-span-2 xl:col-span-7 min-w-0">
-              <FrequencyDayChart snapshots={demoSnapshots} />
+              {userId && <FrequencyDayChart userId={userId} days={28} onRunRollup={runDailyRollup} />}
             </div>
 
             <div className="col-span-1 md:col-span-2 xl:col-span-5 min-w-0">
-              <TrustTankBar currentTrust={80} />
-            </div>
-
-            <div className="col-span-1 md:col-span-1 xl:col-span-6 min-w-0">
-              <TrustTankHistoryChart history={demoTrustHistory} />
-            </div>
-            <ConvictionCard userId={userId} />
-
-            <div className="col-span-1 md:col-span-1 xl:col-span-6 min-w-0">
-              <FrequencyRecommendations
-                recommendations={demoRecommendations}
-                userId={userId}
+              <TrustTankBar
+                baseConviction={baseConviction}
+                metrics={overview?.metrics}
+                smoothed={smoothed}
+                preview={preview}
+                trend={trend}
               />
+            </div>
+
+            {/* echte Historie – lädt automatisch /api/frequency/series */}
+            <div className="col-span-1 md:col-span-1 xl:col-span-6 min-w-0">
+              {userId && <TrustTankHistoryChart userId={userId} days={28} onRunRollup={runDailyRollup} />}
+            </div>
+
+            <ConvictionCard
+              userId={userId}
+              baseConviction={baseConviction}
+              smoothed={smoothed}
+              preview={preview}
+              trend={trend}
+            />
+
+            <div className="col-span-1 md:col-span-1 xl:col-span-6 min-w-0">
+              <FrequencyRecommendations recommendations={recommendations} userId={userId} />
             </div>
 
             <div className="col-span-1 md:col-span-1 xl:col-span-6 min-w-0">
@@ -94,36 +368,13 @@ export default function FrequenzOverviewDashboard() {
 
         <TabsContent value="components">
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-12 gap-4 sm:gap-6 min-w-0">
-            <div className="col-span-1 md:col-span-1 xl:col-span-6 min-w-0">
-              <StepFormCurrent value={{
-                beliefs: "",
-                convictionNow: 0,
-                perceptionSelf: "",
-                emotionalState: "",
-                focusLeaks: "",
-                defaultReactions: "",
-                defaultExpectations: ""
-              }} onChange={function (patch: Partial<FrequencyCurrent>): void {
-                throw new Error("Function not implemented.");
-              } } />
-            </div>
-            <div className="col-span-1 md:col-span-1 xl:col-span-6 min-w-0">
-              <StepFormIdeal value={{
-                beliefsIdeal: "",
-                convictionTarget: 0,
-                desiredIdentity: "",
-                desiredEmotions: "",
-                desiredFocus: "",
-                responsePattern: "",
-                expectationsIdeal: "",
-                microEvidencePlan: undefined
-              }} onChange={function (patch: Partial<FrequencyIdeal>): void {
-                throw new Error("Function not implemented.");
-              } } />
-            </div>
-
             <div className="col-span-1 md:col-span-2 xl:col-span-4 min-w-0">
-              <EveningReflectionCheck forbiddenBehaviors={[]} />
+              <EveningReflectionCheck
+                userId={userId}
+                date={selectedDate}
+                forbiddenBehaviors={donts.map((d) => d.name)}
+                dos={dos}
+              />
             </div>
             <div className="col-span-1 md:col-span-2 xl:col-span-4 min-w-0">
               <AffirmationAnchor userId={userId} />
@@ -131,7 +382,6 @@ export default function FrequenzOverviewDashboard() {
             <div className="col-span-1 md:col-span-2 xl:col-span-4 min-w-0 flex-col">
               <ManifestationProofLog />
             </div>
-
             <div className="col-span-1 md:col-span-2 xl:col-span-6 min-w-0">
               <FrequencyCompass
                 current={{ mindset: 70, emotion: 65, behavior: 68, body: 72 }}
@@ -141,6 +391,21 @@ export default function FrequenzOverviewDashboard() {
             <div className="col-span-1 md:col-span-2 xl:col-span-6 min-w-0">
               <MentalSceneLoop />
             </div>
+            {/* Custom Base-Mood + Check-ins + Anchors */}
+            <div className="col-span-1 md:col-span-2 xl:col-span-6 min-w-0">
+              <AddCustomMood userId={userId} onAdded={refreshOverview} />
+            </div>
+            <div className="col-span-1 md:col-span-2 xl:col-span-6 min-w-0">
+              <BaseMoodCheckins userId={userId} availableMoods={availableMoods} />
+            </div>
+            <div className="col-span-1 md:col-span-2 xl:col-span-12 min-w-0">
+              <AnchorsToday
+                userId={userId}
+                frequencyAnchors={frequencyAnchors}
+                concentrationAnchors={concentrationAnchors}
+              />
+            </div>
+            {loadingOverview && <div className="col-span-12 text-xs text-gray-500">Lade Übersicht…</div>}
           </div>
         </TabsContent>
       </Tabs>

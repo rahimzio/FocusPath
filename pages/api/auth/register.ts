@@ -48,6 +48,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       password: hashedPassword,
       userName: userName,
       createdAt: new Date().toISOString(),
+      categories: [],
     });
 
     const insertedUserId = result.insertedId.toString();
@@ -59,7 +60,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     await db.collection("appData").insertOne({
       type: "userConfig",
       userId: insertedUserId1,
-      categories: [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });

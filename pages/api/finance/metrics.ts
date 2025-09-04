@@ -1,62 +1,125 @@
-import { NextApiRequest, NextApiResponse } from "next";
+// pages/api/finance/metrics.ts
+import type { NextApiRequest, NextApiResponse } from "next";
 import { connectToDatabase } from "../db/mongo";
-import { IncomeEntry, expense, SavingEntry, SavingGoal } from "@/utils/interface";
+
+/**
+ * Collections (ggf. anpassen):
+ *  - incomeEntries:  { userId, month:"YYYY-MM", amount }
+ *  - expenses:       { userId, dueDate: ISO string, amount }
+ *  - savings:        { userId, month:"YYYY-MM", amount }   // falls bei dir "finance" heißt, unten umstellen
+ *  - portfolioTransactions:
+ *      { userId, accountId, kind:"cash_deposit"|..., date: ISO, cashAmount, ... }
+ */
+
+const SAVINGS_COLLECTION = "savings"; // <-- wenn deine Ersparnisse "finance" heißen, hier auf "finance" ändern
+
+function ym(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+function monthStart(d: Date) {
+  return new Date(d.getFullYear(), d.getMonth(), 1);
+}
+function iso(d: Date) {
+  return d.toISOString();
+}
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== "GET") {
-    return res.status(405).json({ message: "Method not allowed. Use GET." });
-  }
+  if (req.method !== "GET") return res.status(405).json({ message: "Use GET." });
 
   const { userId } = req.query;
-  if (!userId || typeof userId !== "string") {
-    return res.status(400).json({ message: "Missing or invalid userId" });
-  }
+  if (!userId || typeof userId !== "string") return res.status(400).json({ message: "Missing userId" });
 
   try {
     const { db } = await connectToDatabase();
-    const incomeCol = db.collection<IncomeEntry>("incomeEntries");
-    const expenseCol = db.collection<expense>("expenses");
-    const savingCol = db.collection<SavingEntry>("finance");
-    const goalCol = db.collection<SavingGoal>("savingGoals");
 
     const now = new Date();
-    const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-    const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const prevMonthStr = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, "0")}`;
+    const currYM = ym(now);
+    const currStart = monthStart(now);
+    const currEnd = monthStart(new Date(now.getFullYear(), now.getMonth() + 1, 1));
 
-    const currentIncome = await incomeCol.find({ userId, month: currentMonthStr }).toArray();
-    const startCurr = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-    const endCurr = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString();
-    const currentExpenses = await expenseCol
-      .find({ userId, dueDate: { $gte: startCurr, $lt: endCurr } })
-      .toArray();
-    const currentSavings = await savingCol.find({ userId, month: currentMonthStr }).toArray();
+    const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const prevYM = ym(prevDate);
+    const prevStart = monthStart(prevDate);
+    const prevEnd = monthStart(now);
 
-    const prevIncome = await incomeCol.find({ userId, month: prevMonthStr }).toArray();
-    const startPrev = new Date(prev.getFullYear(), prev.getMonth(), 1).toISOString();
-    const endPrev = new Date(prev.getFullYear(), prev.getMonth() + 1, 1).toISOString();
-    const prevExpenses = await expenseCol
-      .find({ userId, dueDate: { $gte: startPrev, $lt: endPrev } })
-      .toArray();
+    // 1) Einkommen (aktueller Monat)
+    const incomeAgg = await db.collection("incomeEntries").aggregate([
+      { $match: { userId, month: currYM } },
+      { $group: { _id: null, sum: { $sum: "$amount" } } },
+      { $project: { _id: 0, sum: 1 } },
+    ]).toArray();
+    const income = incomeAgg[0]?.sum ?? 0;
 
-    const incomeTotal = currentIncome.reduce((s, e) => s + e.amount, 0);
-    const savingsTotal = currentSavings.reduce((s, e) => s + e.amount, 0);
-    const savingRate = incomeTotal ? savingsTotal / incomeTotal : 0;
+    // 2) Ersparnisse (klassische Collection)
+    const savingAgg = await db.collection(SAVINGS_COLLECTION).aggregate([
+      { $match: { userId, month: currYM } },
+      { $group: { _id: null, sum: { $sum: "$amount" } } },
+      { $project: { _id: 0, sum: 1 } },
+    ]).toArray();
+    const savingsMonth = savingAgg[0]?.sum ?? 0;
 
-    const currExpTotal = currentExpenses.reduce((s, e) => s + e.amount, 0);
-    const prevExpTotal = prevExpenses.reduce((s, e) => s + e.amount, 0);
-    const expenseGrowth = prevExpTotal ? (currExpTotal - prevExpTotal) / prevExpTotal : 0;
+    // 3) NEU: Portfolio-Einzahlungen (cash_deposit) dieses Monats
+    const depositsAgg = await db.collection("portfolioTransactions").aggregate([
+      { $match: { userId, kind: "cash_deposit", date: { $gte: iso(currStart), $lt: iso(currEnd) } } },
+      { $group: { _id: null, sum: { $sum: "$cashAmount" } } },
+      { $project: { _id: 0, sum: 1 } }
+    ]).toArray();
+    const deposits = depositsAgg[0]?.sum ?? 0;
 
-    const investmentROI = 0; // Placeholder - no investment data yet
+    // Kombinierte Monats-Ersparnis
+    const saved = savingsMonth + deposits;
 
-    const emergencyGoal = await goalCol.findOne({ userId, title: /emergency/i });
-    const emergencyFundStatus = emergencyGoal
-      ? { current: emergencyGoal.currentAmount, target: emergencyGoal.targetAmount }
-      : { current: 0, target: 0 };
+    // 4) Ausgaben (aktuell & Vormonat)
+    const [expCurrAgg, expPrevAgg] = await Promise.all([
+      db.collection("expenses").aggregate([
+        { $match: { userId, dueDate: { $gte: iso(currStart), $lt: iso(currEnd) } } },
+        { $group: { _id: null, sum: { $sum: "$amount" } } },
+        { $project: { _id: 0, sum: 1 } },
+      ]).toArray(),
+      db.collection("expenses").aggregate([
+        { $match: { userId, dueDate: { $gte: iso(prevStart), $lt: iso(prevEnd) } } },
+        { $group: { _id: null, sum: { $sum: "$amount" } } },
+        { $project: { _id: 0, sum: 1 } },
+      ]).toArray(),
+    ]);
+    const expCurr = expCurrAgg[0]?.sum ?? 0;
+    const expPrev = expPrevAgg[0]?.sum ?? 0;
 
-    return res.status(200).json({ savingRate, expenseGrowth, investmentROI, emergencyFundStatus });
-  } catch (error) {
-    console.error("metrics", error);
+    // 5) Kennzahlen
+    const savingRate = income > 0 ? saved / income : 0;
+    const expenseGrowth = expPrev > 0 ? (expCurr - expPrev) / expPrev : 0;
+
+    // 6) Notgroschen-Ziel = 3 × Durchschnitt der letzten 3 vollen Monate (ohne aktuellen Monat)
+    const threeMonthsStart = new Date(now.getFullYear(), now.getMonth() - 3, 1);
+    const avgAgg = await db.collection("expenses").aggregate([
+      { $match: { userId, dueDate: { $gte: iso(threeMonthsStart), $lt: iso(prevEnd) } } },
+      { $addFields: { ym: { $substr: ["$dueDate", 0, 7] } } }, // "YYYY-MM"
+      { $group: { _id: "$ym", sum: { $sum: "$amount" } } },
+      { $group: { _id: null, avg: { $avg: "$sum" } } },
+      { $project: { _id: 0, avg: 1 } },
+    ]).toArray();
+    const avg3 = Number.isFinite(avgAgg[0]?.avg) ? avgAgg[0].avg : 0;
+    const emergencyTarget = Math.round(avg3 * 3);
+
+    // 7) Notgroschen-Stand = Summe aller "savings" historisch
+    const totalSavingsAgg = await db.collection(SAVINGS_COLLECTION).aggregate([
+      { $match: { userId } },
+      { $group: { _id: null, sum: { $sum: "$amount" } } },
+      { $project: { _id: 0, sum: 1 } },
+    ]).toArray();
+    const emergencyCurrent = totalSavingsAgg[0]?.sum ?? 0;
+
+    // Platzhalter: Investment-ROI
+    const investmentROI = 0;
+
+    return res.status(200).json({
+      savingRate,
+      expenseGrowth,
+      investmentROI,
+      emergencyFundStatus: { current: emergencyCurrent, target: emergencyTarget },
+    });
+  } catch (e) {
+    console.error("metrics", e);
     return res.status(500).json({ message: "Internal server error" });
   }
 }

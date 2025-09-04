@@ -1,29 +1,25 @@
-import { NextApiRequest, NextApiResponse } from "next";
+import type { NextApiRequest, NextApiResponse } from "next";
 import { connectToDatabase } from "../db/mongo";
-import { SavingEntry } from "@/utils/interface";
+import { FINANCE_COLLECTION } from "@/lib/api/finance";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== "GET") {
-    return res.status(405).json({ message: "Method not allowed. Use GET." });
-  }
-
-  const { userId } = req.query;
-  if (!userId || typeof userId !== "string") {
-    return res.status(400).json({ message: "Missing or invalid userId parameter." });
-  }
+  if (req.method !== "GET") return res.status(405).json({ message: "Use GET." });
+  const { userId, month } = req.query;
+  if (!userId || typeof userId !== "string") return res.status(400).json({ message: "Missing userId" });
 
   try {
     const { db } = await connectToDatabase();
-    const collection = db.collection<SavingEntry>("finance");
+    const q: any = { kind: "saving", userId };
+    if (typeof month === "string" && month) q.month = month;
 
-    const savings = await collection
-      .find({ userId })
-      .sort({ month: -1 })
+    const docs = await db.collection(FINANCE_COLLECTION)
+      .find(q, { projection: { month: 1, amount: 1, note: 1 } })
+      .sort({ month: 1 })
       .toArray();
 
-    return res.status(200).json({ savings });
-  } catch (error: any) {
-    console.error("getSavings error", error);
-    return res.status(500).json({ message: "Internal server error" });
+    res.status(200).json({ savings: docs.map(d => ({ month: d.month, amount: d.amount, note: d.note })) });
+  } catch (e) {
+    console.error("getSavings", e);
+    res.status(500).json({ message: "Internal server error" });
   }
 }

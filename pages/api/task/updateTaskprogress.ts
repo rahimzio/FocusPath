@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import { ObjectId } from "mongodb";
 import { connectToDatabase } from "../db/mongo";
+import { recalcGoalProgress } from "@/lib/server/recalcGoalProgress";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
@@ -39,6 +40,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         { $set: { status: "completed" } }
       );
     }
+await recalcGoalProgress((req as any).body?.goalId);
 
     return res.status(200).json({ message: "Fortschritt erfolgreich aktualisiert" });
   } catch (error) {

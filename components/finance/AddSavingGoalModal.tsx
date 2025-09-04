@@ -1,58 +1,166 @@
 "use client";
-import { useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Button } from "../ui/button";
+import { Button } from "@/components/ui/button";
 
 interface Props {
-    userId: string;
-    onSaved: () => void;
+  userId: string;
+  onSaved: () => void;
 }
 
 export default function AddSavingGoalModal({ userId, onSaved }: Props) {
-    const [open, setOpen] = useState(false);
-    const [title, setTitle] = useState("");
-    const [target, setTarget] = useState(0);
-    const [monthly, setMonthly] = useState(0);
-    const [deadline, setDeadline] = useState("");
+  const [open, setOpen] = useState(false);
 
-    async function handleSave() {
-        await fetch("/api/finance/createSavingGoal", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ userId, title, targetAmount: target, currentAmount: 0, monthlyContribution: monthly || undefined, deadline }),
-        });
-        setOpen(false);
-        setTitle("");
-        setTarget(0);
-        setMonthly(0);
-        setDeadline("");
-        onSaved();
+  const [title, setTitle] = useState("");
+  const [targetStr, setTargetStr] = useState("");
+  const [monthlyStr, setMonthlyStr] = useState("");
+  const [deadline, setDeadline] = useState("");
+
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // "12,50" -> 12.5
+  const parsedTarget = useMemo(() => {
+    const t = targetStr.trim();
+    if (!t) return NaN;
+    const num = Number(t.replace(",", "."));
+    return Number.isFinite(num) ? num : NaN;
+  }, [targetStr]);
+
+  const parsedMonthly = useMemo(() => {
+    const m = monthlyStr.trim();
+    if (!m) return null; // optional
+    const num = Number(m.replace(",", "."));
+    return Number.isFinite(num) ? num : null;
+  }, [monthlyStr]);
+
+  const isValid = useMemo(() => {
+    if (!userId) return false;
+    if (title.trim().length < 2) return false;
+    if (!Number.isFinite(parsedTarget) || parsedTarget <= 0) return false;
+    // deadline optional → kein Zwang
+    return true;
+  }, [userId, title, parsedTarget]);
+
+  const reset = useCallback(() => {
+    setTitle("");
+    setTargetStr("");
+    setMonthlyStr("");
+    setDeadline("");
+    setError(null);
+  }, []);
+
+  async function handleSave() {
+    if (!isValid || saving) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/finance/createSavingGoal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId,
+          title: title.trim(),
+          targetAmount: parsedTarget,
+          currentAmount: 0,
+          monthlyContribution: parsedMonthly ?? undefined, // optional
+          deadline: deadline || undefined,                 // optional
+        }),
+      });
+      if (!res.ok) {
+        const msg = await res.text().catch(() => "");
+        throw new Error(msg || "Fehler beim Anlegen des Sparziels");
+      }
+      onSaved();    // nur bei Erfolg
+      reset();
+      setOpen(false);
+    } catch (e: any) {
+      setError(e?.message ?? "Unerwarteter Fehler");
+    } finally {
+      setSaving(false);
     }
+  }
 
-    return (
-        <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-                <Button>Sparziele erstellen</Button>
-            </DialogTrigger>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Neues Sparziel</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                    <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Titel" />
-                    <Input type="number" value={target} onChange={(e) => setTarget(Number(e.target.value))} placeholder="Zielbetrag" />
-                    <Input type="number" value={monthly} onChange={(e) => setMonthly(Number(e.target.value))} placeholder="Monatliche Einzahlung (optional)" />
-                    <Input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
-                    <Button onClick={handleSave} className="w-full">Speichern</Button>
-                </div>
-            </DialogContent>
-        </Dialog>
-    );
+  function onKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    if (e.key === "Enter" && isValid && !saving) {
+      e.preventDefault();
+      handleSave();
+    }
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        setOpen(v);
+        if (!v) reset();
+      }}
+    >
+      <DialogTrigger asChild>
+        <Button>Sparziel erstellen</Button>
+      </DialogTrigger>
+
+      <DialogContent onKeyDown={onKeyDown}>
+        <DialogHeader>
+          <DialogTitle>Neues Sparziel</DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Titel</label>
+            <Input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="z. B. Notgroschen, Urlaub, Auto"
+              autoComplete="off"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Zielbetrag</label>
+            <Input
+              inputMode="decimal"
+              pattern="[0-9]*[.,]?[0-9]*"
+              placeholder="z. B. 3.000,00"
+              value={targetStr}
+              onChange={(e) => setTargetStr(e.target.value)}
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Monatliche Einzahlung (optional)</label>
+            <Input
+              inputMode="decimal"
+              pattern="[0-9]*[.,]?[0-9]*"
+              placeholder="z. B. 250,00"
+              value={monthlyStr}
+              onChange={(e) => setMonthlyStr(e.target.value)}
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Deadline (optional)</label>
+            <Input
+              type="date"
+              value={deadline}
+              onChange={(e) => setDeadline(e.target.value)}
+            />
+          </div>
+
+          {error && <p className="text-sm text-red-600">{error}</p>}
+
+          <Button
+            className="w-full"
+            onClick={handleSave}
+            disabled={!isValid || saving}
+          >
+            {saving ? "Speichern…" : "Speichern"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
 }

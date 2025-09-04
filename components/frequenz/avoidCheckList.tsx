@@ -1,88 +1,163 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import { toast } from "react-toastify";
-import { AvoidDailyItem, AvoidItem } from "@/utils/interface";
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
-import { Button } from "@/components/ui/button";
-import { Spinner } from "@/components/ui/spinner";
-import { AvatarProps } from "@radix-ui/react-avatar";
+import { useEffect, useMemo, useState } from 'react';
 
 interface Props {
   userId: string;
+  /** optional, wird aktuell nur zur Anzeige verwendet (toggle API schreibt auf "heute") */
   date: string;
 }
 
-export default function AvoidChecklist({ userId, date }: Props) {
-  const [items, setItems] = useState<AvoidDailyItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [dirty, setDirty] = useState(false);
+type DontItem = {
+  name: string;
+  points: number;
+  isDont: true;
+  /** didAvoid = true → NICHT getan (gut) / false → getan (schlecht) */
+  didAvoid: boolean;
+};
 
-  useEffect(() => {
+export default function AvoidChecklist({ userId, date }: Props) {
+  const [items, setItems] = useState<DontItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function load() {
     if (!userId) return;
     setLoading(true);
-    fetch(`/api/frequency/list?userId=${userId}`)
-      .then(r => r.json())
-      .then(d => {
-        const actives = (d.items || []).filter((x: AvoidItem) => x.active);
-        setItems(actives.map((x: AvoidItem) => ({ id: x.id, label: x.label, didAvoid: false })));
-      })
-      .catch(() => toast.error("Konnte Avoid-Liste nicht laden"))
-      .finally(() => setLoading(false));
-  }, [userId]);
+    setError(null);
+    try {
+      const q = new URLSearchParams({ userId, date }).toString();
+      const r = await fetch(`/api/frequency/overview?${q}`);
+      const j = await r.json();
+      if (!j?.ok) throw new Error(j?.error || `HTTP ${r.status}`);
 
-  function toggle(id: string, value: boolean) {
-    setItems(prev => prev.map(item => item.id === id ? { ...item, didAvoid: value } : item));
-    setDirty(true);
+      const todayTasks = Array.isArray(j.todayTasks) ? j.todayTasks : [];
+      const donts = todayTasks
+        .filter((t: any) => !!t.isDont)
+        .map((t: any) => ({
+          name: t.name,
+          points: Math.max(1, Number(t.points) || 1),
+          isDont: true as const,
+          // status === 'done' bedeutet: DON'T getan (schlecht) → didAvoid = false
+          didAvoid: t.status !== 'done',
+        })) as DontItem[];
+
+      setItems(donts);
+    } catch (e: any) {
+      console.error(e);
+      setError(e?.message || 'Fehler beim Laden');
+    } finally {
+      setLoading(false);
+    }
   }
 
-  async function save() {
-    setSaving(true);
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
+
+  const allAvoided = useMemo(() => items.length && items.every((i) => i.didAvoid), [items]);
+
+  async function toggle(name: string, nextDidAvoid: boolean) {
+    const it = items.find((x) => x.name === name);
+    if (!it) return;
+    setSavingKey(name);
+    setError(null);
     try {
-      await fetch("/api/avoid/submitDaily", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, date, items }),
+      // Mapping: didAvoid === true → Task bleibt "open"
+      // didAvoid === false → Task wird "done" (DON'T verfehlt)
+      const done = !nextDidAvoid;
+
+      const r = await fetch('/api/frequency/toggleTaskStatus', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, name: it.name, points: it.points, isDont: true, done }),
       });
-      toast.success("Avoid-Check gespeichert");
-      setDirty(false);
-    } catch {
-      toast.error("Speichern fehlgeschlagen");
+      const j = await r.json();
+      if (!j?.ok) throw new Error(j?.error || `HTTP ${r.status}`);
+
+      // Sofort UI aktualisieren
+      setItems((prev) =>
+        prev.map((x) => (x.name === name ? { ...x, didAvoid: nextDidAvoid } : x)),
+      );
+    } catch (e: any) {
+      console.error(e);
+      setError(e?.message || 'Fehler beim Speichern');
     } finally {
-      setSaving(false);
+      setSavingKey(null);
     }
   }
 
   if (loading) {
     return (
-      <Card className="p-4">
-        <CardContent className="flex justify-center"><Spinner /></CardContent>
-      </Card>
+      <div className="p-4 rounded-lg border bg-white">
+        <div className="text-sm text-gray-600">Lade DON’Ts…</div>
+      </div>
     );
   }
 
-  if (!items.length) return null;
+  if (!items.length) {
+    return null;
+  }
 
   return (
-    <Card className="mb-6">
-      <CardHeader className="pb-2">
-        <CardTitle>🚫 Dinge vermeiden (heute)</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {items.map(item => (
-          <div key={item.id} className="flex items-center justify-between">
-            <span>{item.label}</span>
-            <Switch checked={item.didAvoid} onCheckedChange={v => toggle(item.id, v)} />
+    <div className="mb-6 rounded-lg border bg-white">
+      <div className="px-4 pt-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-base font-semibold">🚫 Dinge vermeiden (heute)</h3>
+          <div className="text-[11px] text-gray-500">Datum: {date}</div>
+        </div>
+        <p className="text-xs text-gray-600 mt-1">
+          „Vermeiden“ = DON’T nicht getan. Umschalten aktualisiert sofort deine heutige Vorschau.
+        </p>
+      </div>
+
+      <div className="px-4 py-3 space-y-3">
+        {items.map((item) => (
+          <div
+            key={item.name}
+            className="flex items-center justify-between rounded border px-3 py-2"
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-sm">{item.name}</span>
+              <span className="text-[10px] text-red-600">-{item.points} P</span>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <label className="text-xs inline-flex items-center gap-1">
+                <input
+                  type="checkbox"
+                  checked={item.didAvoid}
+                  disabled={savingKey === item.name}
+                  onChange={(e) => toggle(item.name, e.target.checked)}
+                  aria-label={`${item.name} vermeiden`}
+                />
+                vermeiden
+              </label>
+            </div>
           </div>
         ))}
-      </CardContent>
-      <CardFooter>
-        <Button className="w-full" onClick={save} disabled={!dirty || saving}>
-          {saving ? "Speichern..." : "Speichern"}
-        </Button>
-      </CardFooter>
-    </Card>
+      </div>
+
+      <div className="px-4 pb-4 flex items-center justify-between">
+        <button
+          className="px-3 py-1.5 rounded border bg-white hover:bg-gray-50 text-sm"
+          onClick={load}
+          title="Aktualisieren"
+        >
+          Aktualisieren
+        </button>
+        <div className="text-[11px]">
+          {allAvoided ? (
+            <span className="text-emerald-600">Stark – alle DON’Ts vermieden!</span>
+          ) : (
+            <span className="text-gray-600">Einzelne Ausrutscher sind ok – wichtig ist die Linie.</span>
+          )}
+        </div>
+      </div>
+
+      {error && <div className="px-4 pb-4 text-[11px] text-rose-600">{error}</div>}
+    </div>
   );
 }

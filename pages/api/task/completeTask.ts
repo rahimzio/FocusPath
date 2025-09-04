@@ -3,6 +3,7 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import { connectToDatabase } from "../db/mongo";
 import { ObjectId } from "mongodb";
+import { recalcGoalProgress } from "@/lib/server/recalcGoalProgress";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   console.log("📥 Neue Anfrage bei /api/task/completeTask:", req.method);
@@ -53,6 +54,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         );
         console.log("✅ Alle Subtasks erledigt → Completion gespeichert:", completeResult);
       }
+await recalcGoalProgress((req as any).body?.goalId);
 
       return res.status(200).json({ message: "Subtask abgeschlossen." });
     }
