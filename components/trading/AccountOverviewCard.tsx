@@ -2,12 +2,24 @@
 
 import * as React from "react";
 import useSWR, { useSWRConfig } from "swr";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import {
+  Card, CardHeader, CardTitle, CardDescription, CardContent
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Account } from "@/utils/interface";
 
 type StatsData = {
@@ -61,8 +73,9 @@ export default function AccountOverviewCard({ userId }: { userId: string }) {
   const [accountId, setAccountId] = React.useState<string | undefined>();
   const [showDetails, setShowDetails] = React.useState(false);
 
-  // Deposit/Withdrawal UI state
-  const [adjKind, setAdjKind] = React.useState<"deposit"|"withdrawal">("deposit");
+  // Dialog-Steuerung & Felder
+  const [adjOpen, setAdjOpen] = React.useState(false);
+  const [adjKind, setAdjKind] = React.useState<"deposit" | "withdrawal">("deposit");
   const [adjAmount, setAdjAmount] = React.useState<string>("");
   const [adjNote, setAdjNote] = React.useState<string>("");
 
@@ -83,7 +96,9 @@ export default function AccountOverviewCard({ userId }: { userId: string }) {
   );
   const accounts = accData?.accounts ?? [];
   const acc = accounts.find((a) => a._id === accountId);
-  const curSymbol = currencySymbol(acc?.currency || (acc?.name?.toLowerCase().includes("eur") ? "EUR" : undefined));
+  const curSymbol = currencySymbol(
+    acc?.currency || (acc?.name?.toLowerCase().includes("eur") ? "EUR" : undefined)
+  );
 
   const qsWeek = React.useMemo(() => {
     if (!userId) return null;
@@ -145,6 +160,7 @@ export default function AccountOverviewCard({ userId }: { userId: string }) {
     if (!Number.isFinite(n)) return "–";
     const val = n.toFixed(2);
     return curSymbol ? `${val}${curSymbol}` : val;
+    // Hinweis: Darstellung "123.45€" beibehalten, da im Code bisher so genutzt.
   };
   const fmtPct = (n: number) => `${Math.round((n || 0) * 100)}%`;
 
@@ -180,9 +196,10 @@ export default function AccountOverviewCard({ userId }: { userId: string }) {
       alert(`Konnte ${adjKind === "deposit" ? "Einzahlung" : "Auszahlung"} nicht speichern:\n${t}`);
       return;
     }
+    // Erfolgreich -> Dialog schließen & SWR neu laden
     setAdjAmount("");
     setAdjNote("");
-    // SWR revalidieren
+    setAdjOpen(false);
     const prefix = `/api/trading/getAllAccounts?userId=${userId}`;
     await Promise.all([
       mutate((key) => typeof key === "string" && key.startsWith(prefix)),
@@ -192,20 +209,19 @@ export default function AccountOverviewCard({ userId }: { userId: string }) {
 
   async function deleteAccount() {
     if (!userId || !accountId) return;
-    // 3x Confirm
     if (!window.confirm("Account wirklich löschen?")) return;
     if (!window.confirm("Sicher? Dieser Vorgang kann nicht rückgängig gemacht werden.")) return;
     if (!window.confirm("Letzte Bestätigung: Account löschen?")) return;
 
-    const res = await fetch(`/api/trading/account/delete?userId=${encodeURIComponent(userId)}&accountId=${encodeURIComponent(accountId)}`, {
-      method: "DELETE",
-    });
+    const res = await fetch(
+      `/api/trading/account/delete?userId=${encodeURIComponent(userId)}&accountId=${encodeURIComponent(accountId)}`,
+      { method: "DELETE" }
+    );
     if (!res.ok) {
       const t = await res.text().catch(() => "");
       alert(`Konnte Account nicht löschen:\n${t}`);
       return;
     }
-    // URL bereinigen & SWR revalidieren
     try {
       const url = new URL(window.location.href);
       url.searchParams.delete("account");
@@ -220,9 +236,10 @@ export default function AccountOverviewCard({ userId }: { userId: string }) {
     ]);
   }
 
+  // Balance + Actions
   const balanceBox = (
-    <div className="rounded-md border p-3 flex items-center justify-between gap-3">
-      <div>
+    <div className="rounded-md border p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full max-w-full min-w-0 overflow-hidden">
+      <div className="min-w-0">
         <div className="text-sm text-muted-foreground">Aktueller Kontostand</div>
         <div className="text-lg font-semibold">
           {fmtPnL(Number(acc?.currentBalance ?? acc?.startingBalance ?? 0))}
@@ -231,34 +248,76 @@ export default function AccountOverviewCard({ userId }: { userId: string }) {
           Realized PnL: {fmtPnL(Number(acc?.realizedPnl ?? 0))}
         </div>
       </div>
-      <div className="flex items-center gap-2">
-        <select
-          className="border rounded px-2 py-1 text-sm"
-          value={adjKind}
-          onChange={(e) => setAdjKind(e.target.value as any)}
-        >
-          <option value="deposit">Einzahlung</option>
-          <option value="withdrawal">Auszahlung</option>
-        </select>
-        <Input
-          className="w-32"
-          type="number"
-          step="0.01"
-          inputMode="decimal"
-          placeholder="Betrag"
-          value={adjAmount}
-          onChange={(e) => setAdjAmount(e.target.value)}
-        />
-        <Textarea
-          className="w-44"
-          placeholder="Notiz (optional)"
-          value={adjNote}
-          onChange={(e) => setAdjNote(e.target.value)}
-        />
-        <Button variant="secondary" size="sm" onClick={performAdjustment}>
-          Speichern
-        </Button>
-        <Button variant="destructive" size="sm" onClick={deleteAccount}>
+
+      <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+        {/* Öffnet den Dialog */}
+        <Dialog open={adjOpen} onOpenChange={setAdjOpen}>
+          <DialogTrigger asChild>
+            <Button variant="secondary" size="sm" className="whitespace-nowrap" disabled={!acc}>
+              Ein-/Auszahlung
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Ein-/Auszahlung buchen</DialogTitle>
+              <DialogDescription>
+                Buche eine Einzahlung oder Auszahlung auf <b>{acc?.name || "Account"}</b>.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="grid gap-3 py-2">
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="adj-kind">Art</Label>
+                  <select
+                    id="adj-kind"
+                    className="border rounded px-2 py-2 text-sm w-full"
+                    value={adjKind}
+                    onChange={(e) => setAdjKind(e.target.value as "deposit" | "withdrawal")}
+                  >
+                    <option value="deposit">Einzahlung</option>
+                    <option value="withdrawal">Auszahlung</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="adj-amount">Betrag</Label>
+                  <Input
+                    id="adj-amount"
+                    type="number"
+                    step="0.01"
+                    inputMode="decimal"
+                    placeholder={`z. B. 1000${curSymbol || ""}`}
+                    value={adjAmount}
+                    onChange={(e) => setAdjAmount(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="adj-note">Notiz (optional)</Label>
+                <Textarea
+                  id="adj-note"
+                  placeholder="z. B. 'Refill nach Auszahlung', 'Steuern', …"
+                  value={adjNote}
+                  onChange={(e) => setAdjNote(e.target.value)}
+                  rows={3}
+                />
+              </div>
+            </div>
+
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => setAdjOpen(false)}>
+                Abbrechen
+              </Button>
+              <Button variant="secondary" onClick={performAdjustment}>
+                Speichern
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Button variant="destructive" size="sm" onClick={deleteAccount} className="whitespace-nowrap">
           Account löschen
         </Button>
       </div>
@@ -266,49 +325,51 @@ export default function AccountOverviewCard({ userId }: { userId: string }) {
   );
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <div>
-            <CardTitle>Account Überblick</CardTitle>
-            <CardDescription>
-              {acc ? `${acc.name || "Account"} • Währung: ${acc.currency || "—"}` : "Wähle einen Account (oben rechts / via StrategyPills)."}
+    <Card className="w-full max-w-full min-w-0 overflow-hidden">
+      <CardHeader className="w-full max-w-full min-w-0">
+        <div className="flex items-center justify-between gap-2 flex-wrap min-w-0">
+          <div className="min-w-0">
+            <CardTitle className="truncate">Account Überblick</CardTitle>
+            <CardDescription className="truncate">
+              {acc
+                ? `${acc.name || "Account"} • Währung: ${acc.currency || "—"}`
+                : "Wähle einen Account (oben rechts / via StrategyPills)."}
             </CardDescription>
           </div>
-          <div className="flex items-center gap-2">
-            {acc ? <Badge variant="outline">{acc._id}</Badge> : null}
+          <div className="flex items-center gap-2 flex-wrap">
+            {acc ? <Badge variant="outline" className="max-w-[50vw] truncate">{acc._id}</Badge> : null}
             {curSymbol ? <Badge variant="secondary">Currency: {curSymbol}</Badge> : null}
           </div>
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-6 w-full max-w-full min-w-0">
         {/* Kontostand + Aktionen */}
         {acc ? balanceBox : null}
 
         {/* KPIs */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="rounded-md border p-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full max-w-full min-w-0">
+          <div className="rounded-md border p-3 min-w-0">
             <div className="text-sm text-muted-foreground">Trades (Woche)</div>
             <div className="text-xl font-semibold">{weekStats?.count ?? 0}</div>
             <div className="text-xs">Winrate: {fmtPct(weekStats?.winrate ?? 0)}</div>
           </div>
-          <div className="rounded-md border p-3">
+          <div className="rounded-md border p-3 min-w-0">
             <div className="text-sm text-muted-foreground">PnL (Woche)</div>
-            <div className={`text-xl font-semibold ${weekStats && weekStats.avgPnl * weekStats.count < 0 ? "text-rose-600" : ""}`}>
-              {fmtPnL(weekStats ? weekStats.avgPnl * weekStats.count : 0)}
+            <div className={`text-xl font-semibold ${weekTotal < 0 ? "text-rose-600" : ""}`}>
+              {fmtPnL(weekTotal)}
             </div>
             <div className="text-xs">Ø/Trade: {fmtPnL(weekStats?.avgPnl ?? 0)}</div>
           </div>
-          <div className="rounded-md border p-3">
+          <div className="rounded-md border p-3 min-w-0">
             <div className="text-sm text-muted-foreground">Trades (Monat)</div>
             <div className="text-xl font-semibold">{monthStats?.count ?? 0}</div>
             <div className="text-xs">Winrate: {fmtPct(monthStats?.winrate ?? 0)}</div>
           </div>
-          <div className="rounded-md border p-3">
+          <div className="rounded-md border p-3 min-w-0">
             <div className="text-sm text-muted-foreground">PnL (Monat)</div>
-            <div className={`text-xl font-semibold ${monthStats && monthStats.avgPnl * monthStats.count < 0 ? "text-rose-600" : ""}`}>
-              {fmtPnL(monthStats ? monthStats.avgPnl * monthStats.count : 0)}
+            <div className={`text-xl font-semibold ${monthTotal < 0 ? "text-rose-600" : ""}`}>
+              {fmtPnL(monthTotal)}
             </div>
             <div className="text-xs">Ø/Trade: {fmtPnL(monthStats?.avgPnl ?? 0)}</div>
           </div>
@@ -317,19 +378,15 @@ export default function AccountOverviewCard({ userId }: { userId: string }) {
         <Separator />
 
         {/* Beste Strategie */}
-        <div className="rounded-md border p-3 flex items-center justify-between gap-3">
-          <div>
+        <div className="rounded-md border p-3 flex items-center justify-between gap-3 flex-wrap w-full max-w-full min-w-0">
+          <div className="min-w-0">
             <div className="text-sm text-muted-foreground">Beste Strategie (letzte 90 Tage)</div>
-            <div className="text-lg font-semibold">
-              {best ? best.name : isLoading ? "Lade…" : "—"}
-            </div>
+            <div className="text-lg font-semibold truncate">{best ? best.name : isLoading ? "Lade…" : "—"}</div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Badge variant="outline">Trades: {best?.count ?? 0}</Badge>
             <Badge variant="outline">Winrate: {fmtPct(best?.winrate ?? 0)}</Badge>
-            <Badge variant={best && best.pnl >= 0 ? "secondary" : "outline"}>
-              PnL: {fmtPnL(best?.pnl ?? 0)}
-            </Badge>
+            <Badge variant={best && best.pnl >= 0 ? "secondary" : "outline"}>PnL: {fmtPnL(best?.pnl ?? 0)}</Badge>
           </div>
         </div>
 
@@ -341,11 +398,14 @@ export default function AccountOverviewCard({ userId }: { userId: string }) {
             variant="outline"
             size="sm"
             onClick={() => {
-              const url = new URL(window.location.href);
-              if (accountId) url.searchParams.set("account", accountId);
-              window.history.replaceState({}, "", url.toString());
+              try {
+                const url = new URL(window.location.href);
+                if (accountId) url.searchParams.set("account", accountId);
+                window.history.replaceState({}, "", url.toString());
+              } catch {}
               window.dispatchEvent(new CustomEvent("account-change", { detail: { accountId } }));
             }}
+            className="whitespace-nowrap"
           >
             Filter fixieren
           </Button>
@@ -355,6 +415,7 @@ export default function AccountOverviewCard({ userId }: { userId: string }) {
             onClick={toggleDetails}
             aria-expanded={showDetails}
             aria-controls="account-details"
+            className="whitespace-nowrap"
           >
             {showDetails ? "Details schließen" : "Details öffnen"}
           </Button>
@@ -368,7 +429,7 @@ export default function AccountOverviewCard({ userId }: { userId: string }) {
         >
           <div className="mt-4 space-y-4">
             {/* Letzte Trades */}
-            <div className="rounded-md border p-3">
+            <div className="rounded-md border p-3 w-full max-w-full min-w-0 overflow-hidden">
               <div className="text-sm font-medium mb-2">Letzte Trades (max. 20)</div>
               {!recentRows.length ? (
                 <div className="text-sm opacity-70">{isLoading ? "Lade…" : "Keine Trades gefunden."}</div>

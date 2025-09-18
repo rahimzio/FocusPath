@@ -48,18 +48,15 @@ type Trade = {
   viewTimeframes?: string[];
   entryTimeframe?: string;
 
-  // Anzeige
   strategy?: string;
   riskReward?: string | number;
   confluences?: string[];
 
-  // RR-Fallback Inputs
   entry?: number;
   stopPrice?: number;
   targetPrice?: number;
   tradeType?: "buy" | "sell";
 
-  // (nicht mehr angezeigt, aber evtl. vorhanden)
   concepts?: Concept[];
   location?: string;
   rangeDefined?: boolean;
@@ -79,7 +76,6 @@ type Account = { _id: string; name?: string; currency?: string };
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 const STORAGE_KEY = "recapFilters_v3";
 
-/* UI helpers */
 function BiasBadge({ v }: { v?: BiasExec }) {
   const map: Record<BiasExec, string> = {
     RR: "Right Bias • Right Execution",
@@ -118,7 +114,6 @@ function currencySymbol(cur?: string) {
   return c;
 }
 
-/** Dauer aus HH:mm → Minuten (robust, auch über Mitternacht) */
 function minutesBetween(start?: string, end?: string) {
   if (!start || !end) return 0;
   const [sh, sm] = start.split(":").map(Number);
@@ -128,49 +123,22 @@ function minutesBetween(start?: string, end?: string) {
   const eTotal = eh * 60 + em;
   return eTotal >= sTotal ? (eTotal - sTotal) : (eTotal + 1440 - sTotal);
 }
-
-/** RR-Fallback bei fehlendem riskReward-String */
-function computeRR(
-  entry?: number,
-  stop?: number,
-  target?: number,
-  tradeType?: "buy" | "sell"
-): number | null {
-  if (
-    typeof entry !== "number" ||
-    typeof stop !== "number" ||
-    typeof target !== "number" ||
-    !tradeType
-  ) return null;
-
+function computeRR(entry?: number, stop?: number, target?: number, tradeType?: "buy" | "sell"): number | null {
+  if (typeof entry !== "number" || typeof stop !== "number" || typeof target !== "number" || !tradeType) return null;
   const isBuy = tradeType === "buy";
   const risk = isBuy ? (entry - stop) : (stop - entry);
   const reward = isBuy ? (target - entry) : (entry - target);
-
   if (!(risk > 0) || !(reward > 0)) return null;
   return reward / risk;
 }
 
-/* Datum/Monat helpers */
-function yyyymm(d: Date) {
-  const y = d.getUTCFullYear();
-  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
-  return `${y}-${m}`;
-}
-function firstOfMonth(ym: string) {
-  return `${ym}-01`;
-}
-function lastOfMonth(ym: string) {
-  const [y, m] = ym.split("-").map(Number);
-  const last = new Date(Date.UTC(y, m, 0));
-  const dd = String(last.getUTCDate()).padStart(2, "0");
-  return `${ym}-${dd}`;
-}
+function yyyymm(d: Date) { const y = d.getUTCFullYear(); const m = String(d.getUTCMonth() + 1).padStart(2, "0"); return `${y}-${m}`; }
+function firstOfMonth(ym: string) { return `${ym}-01`; }
+function lastOfMonth(ym: string) { const [y, m] = ym.split("-").map(Number); const last = new Date(Date.UTC(y, m, 0)); const dd = String(last.getUTCDate()).padStart(2, "0"); return `${ym}-${dd}`; }
 
 export default function TradeRecapList({ userId }: { userId: string }) {
   const { mutate } = useSWRConfig();
 
-  // Accounts (für Währungs-Badge)
   const { data: accData } = useSWR<{ accounts: Account[] }>(
     userId ? `/api/trading/getAllAccounts?userId=${userId}` : null,
     fetcher
@@ -181,7 +149,6 @@ export default function TradeRecapList({ userId }: { userId: string }) {
     return map;
   }, [accData]);
 
-  // Filter
   const [accountFilter, setAccountFilter] = React.useState<string | All>("ALL");
   const [strategyFilter, setStrategyFilter] = React.useState<string | All>("ALL");
   const [monthFilter, setMonthFilter] = React.useState<string | All>("ALL");
@@ -270,7 +237,6 @@ export default function TradeRecapList({ userId }: { userId: string }) {
     } catch {}
   }, [accountFilter, strategyFilter, monthFilter, sessionFilter, biasFilter, resultFilter, gradeFilter, mistakeQuery, onlyDrafts]);
 
-  // Server-Filter (SWR-Key)
   const recentKey = React.useMemo(() => {
     if (!userId) return null;
 
@@ -307,7 +273,6 @@ export default function TradeRecapList({ userId }: { userId: string }) {
 
   const { data, error } = useSWR<{ trades: Trade[]; nextCursor?: string | null }>(recentKey, fetcher);
 
-  // Clientseitige Filter
   const trades = React.useMemo(() => {
     if (!data?.trades) return [];
     return data.trades.filter((t) => {
@@ -371,7 +336,6 @@ export default function TradeRecapList({ userId }: { userId: string }) {
     applyMonthToUrl(null);
   };
 
-  // Edit-Dialog
   const [open, setOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<Trade | null>(null);
   const onEdit = (t: Trade) => { setEditing(t); setOpen(true); };
@@ -402,49 +366,87 @@ export default function TradeRecapList({ userId }: { userId: string }) {
     window.dispatchEvent(new CustomEvent("strategy-select", { detail: { name: val === "ALL" ? null : val } }));
   };
 
+  const [deletingId, setDeletingId] = React.useState<string | null>(null);
+  const deleteTrade = async (t: Trade) => {
+    if (!userId || !t?._id) return;
+    const first = window.confirm("Diesen Trade wirklich löschen?");
+    if (!first) return;
+    const second = window.confirm("Sicher? Dieser Vorgang kann nicht rückgängig gemacht werden.");
+    if (!second) return;
+
+    try {
+      setDeletingId(t._id);
+      const resp = await fetch(`/api/trading/deleteTrades?id=${encodeURIComponent(t._id)}&userId=${encodeURIComponent(userId)}`, {
+        method: "DELETE",
+      });
+      if (!resp.ok) {
+        const txt = await resp.text().catch(() => "");
+        alert(`Konnte Trade nicht löschen:\n${txt}`);
+        return;
+      }
+      if (recentKey) await mutate(recentKey);
+    } catch (e) {
+      console.error(e);
+      alert("Unbekannter Fehler beim Löschen.");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   if (error) return <div className="text-red-600">Fehler beim Laden.</div>;
   if (!data) return <div className="opacity-70">Lade…</div>;
 
   return (
     <>
-      <Card>
+      <Card className="w-full max-w-full min-w-0 overflow-hidden">
         {/* Header + Filter */}
-        <CardHeader className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <CardTitle>Trade Recap</CardTitle>
+        <CardHeader className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b w-full max-w-full min-w-0">
+          <div className="flex items-center justify-between gap-2 flex-wrap min-w-0">
+            <CardTitle className="truncate">Trade Recap</CardTitle>
 
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => stepMonth(-1)}>◀ Voriger Monat</Button>
-              <Button variant={monthFilter === "ALL" ? "default" : "outline"} size="sm" onClick={clearMonth}>
+            <div className="flex items-center gap-2 flex-wrap min-w-0">
+              <Button variant="outline" size="sm" className="h-8 px-2" onClick={() => stepMonth(-1)}>◀ Voriger Monat</Button>
+              <Button variant={monthFilter === "ALL" ? "default" : "outline"} size="sm" className="h-8 px-2" onClick={clearMonth}>
                 Alle Monate
               </Button>
-              <Button variant="outline" size="sm" onClick={() => stepMonth(+1)} disabled={disableNext}>
+              <Button variant="outline" size="sm" className="h-8 px-2" onClick={() => stepMonth(+1)} disabled={disableNext}>
                 Nächster Monat ▶
               </Button>
-              <Button variant="secondary" size="sm" onClick={() => {
-                const ym = yyyymm(new Date());
-                setMonthFilter(ym);
-                setDisableNext(true);
-                applyMonthToUrl(ym);
-              }}>
+              <Button
+                variant="secondary"
+                size="sm"
+                className="h-8 px-2"
+                onClick={() => {
+                  const ym = yyyymm(new Date());
+                  setMonthFilter(ym);
+                  setDisableNext(true);
+                  applyMonthToUrl(ym);
+                }}
+              >
                 Dieser Monat
               </Button>
-              <Button variant="secondary" size="sm" onClick={() => {
-                setSessionFilter("ALL");
-                setBiasFilter("ALL");
-                setResultFilter("ALL");
-                setGradeFilter("ALL");
-                setMistakeQuery("");
-                setOnlyDrafts(false);
-              }}>
+              <Button
+                variant="secondary"
+                size="sm"
+                className="h-8 px-2"
+                onClick={() => {
+                  setSessionFilter("ALL");
+                  setBiasFilter("ALL");
+                  setResultFilter("ALL");
+                  setGradeFilter("ALL");
+                  setMistakeQuery("");
+                  setOnlyDrafts(false);
+                }}
+              >
                 Filter zurücksetzen
               </Button>
-              <Badge variant={draftCount > 0 ? "secondary" : "outline"} title="Anzahl unvollständiger Trades">
+              <Badge className="h-6 px-2 text-xs" variant={draftCount > 0 ? "secondary" : "outline"} title="Anzahl unvollständiger Trades">
                 Entwürfe: {draftCount}
               </Badge>
               <Button
                 variant={onlyDrafts ? "default" : "outline"}
                 size="sm"
+                className="h-8 px-2 whitespace-nowrap"
                 onClick={() => setOnlyDrafts(v => !v)}
                 title="Zeige nur unvollständige (Entwurf) Trades"
               >
@@ -454,107 +456,115 @@ export default function TradeRecapList({ userId }: { userId: string }) {
           </div>
 
           {/* Filterleiste */}
-          <div className="mt-3 flex flex-wrap gap-2">
-            {/* Account */}
-            <Select value={accountFilter} onValueChange={(v) => onAccountSelect(v as string | All)}>
-              <SelectTrigger className="w-[170px]"><SelectValue placeholder="Account" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">Alle Accounts</SelectItem>
-                {(accData?.accounts ?? []).map((a) => (
-                  <SelectItem key={a._id} value={a._id}>{a.name || a._id}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 w-full max-w-full min-w-0">
+            <div className="w-full">
+              <Select value={accountFilter} onValueChange={(v) => onAccountSelect(v as string | All)}>
+                <SelectTrigger className="w-full"><SelectValue placeholder="Account" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">Alle Accounts</SelectItem>
+                  {(accData?.accounts ?? []).map((a) => (
+                    <SelectItem key={a._id} value={a._id}>{a.name || a._id}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-            {/* Monat */}
-            <Select
-              value={monthFilter}
-              onValueChange={(v) => {
-                setMonthFilter(v as string | All);
-                if (v === "ALL") {
-                  setDisableNext(false);
-                  applyMonthToUrl(null);
-                } else {
-                  const ym = String(v);
-                  setDisableNext(ym === yyyymm(new Date()));
-                  applyMonthToUrl(ym);
-                }
-              }}
-            >
-              <SelectTrigger className="w-[130px]"><SelectValue placeholder="Monat" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">Alle Monate</SelectItem>
-                {monthOptionsDerived.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <div className="w-full">
+              <Select
+                value={monthFilter}
+                onValueChange={(v) => {
+                  setMonthFilter(v as string | All);
+                  if (v === "ALL") {
+                    setDisableNext(false);
+                    applyMonthToUrl(null);
+                  } else {
+                    const ym = String(v);
+                    setDisableNext(ym === yyyymm(new Date()));
+                    applyMonthToUrl(ym);
+                  }
+                }}
+              >
+                <SelectTrigger className="w-full"><SelectValue placeholder="Monat" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">Alle Monate</SelectItem>
+                  {monthOptionsDerived.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
 
-            {/* Strategy */}
-            <Select value={strategyFilter} onValueChange={(v) => onStrategySelect(v as string | All)}>
-              <SelectTrigger className="w-[200px]"><SelectValue placeholder="Strategy" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">Alle Strategien</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="w-full">
+              <Select value={strategyFilter} onValueChange={(v) => onStrategySelect(v as string | All)}>
+                <SelectTrigger className="w-full"><SelectValue placeholder="Strategy" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">Alle Strategien</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-            {/* Session */}
-            <Select value={sessionFilter} onValueChange={(v) => setSessionFilter(v as SessionKey | All)}>
-              <SelectTrigger className="w-[130px]"><SelectValue placeholder="Session" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">Alle Sessions</SelectItem>
-                {SESSION_OPTIONS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <div className="w-full">
+              <Select value={sessionFilter} onValueChange={(v) => setSessionFilter(v as SessionKey | All)}>
+                <SelectTrigger className="w-full"><SelectValue placeholder="Session" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">Alle Sessions</SelectItem>
+                  {SESSION_OPTIONS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
 
-            {/* Bias */}
-            <Select value={biasFilter} onValueChange={(v) => setBiasFilter(v as BiasExec | All)}>
-              <SelectTrigger className="w-[210px]"><SelectValue placeholder="Bias/Execution" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">Alle</SelectItem>
-                <SelectItem value="RR">Right Bias – Right Execution</SelectItem>
-                <SelectItem value="RW">Right Bias – Wrong Execution</SelectItem>
-                <SelectItem value="WR">Wrong Bias – Right Execution</SelectItem>
-                <SelectItem value="WW">Wrong Bias – Wrong Execution</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="w-full">
+              <Select value={biasFilter} onValueChange={(v) => setBiasFilter(v as BiasExec | All)}>
+                <SelectTrigger className="w-full"><SelectValue placeholder="Bias/Execution" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">Alle</SelectItem>
+                  <SelectItem value="RR">Right Bias – Right Execution</SelectItem>
+                  <SelectItem value="RW">Right Bias – Wrong Execution</SelectItem>
+                  <SelectItem value="WR">Wrong Bias – Right Execution</SelectItem>
+                  <SelectItem value="WW">Wrong Bias – Wrong Execution</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-            {/* Result */}
-            <Select value={resultFilter} onValueChange={(v) => setResultFilter(v as Result | All)}>
-              <SelectTrigger className="w-[120px]"><SelectValue placeholder="Result" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">Alle</SelectItem>
-                <SelectItem value="win">Win</SelectItem>
-                <SelectItem value="loss">Loss</SelectItem>
-                <SelectItem value="BE">BE</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="w-full">
+              <Select value={resultFilter} onValueChange={(v) => setResultFilter(v as Result | All)}>
+                <SelectTrigger className="w-full"><SelectValue placeholder="Result" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">Alle</SelectItem>
+                  <SelectItem value="win">Win</SelectItem>
+                  <SelectItem value="loss">Loss</SelectItem>
+                  <SelectItem value="BE">BE</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-            {/* Game */}
-            <Select value={gradeFilter} onValueChange={(v) => setGradeFilter(v as Grade | All)}>
-              <SelectTrigger className="w-[120px]"><SelectValue placeholder="Game" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">Alle</SelectItem>
-                <SelectItem value="A">A</SelectItem>
-                <SelectItem value="B">B</SelectItem>
-                <SelectItem value="C">C</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="w-full">
+              <Select value={gradeFilter} onValueChange={(v) => setGradeFilter(v as Grade | All)}>
+                <SelectTrigger className="w-full"><SelectValue placeholder="Game" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">Alle</SelectItem>
+                  <SelectItem value="A">A</SelectItem>
+                  <SelectItem value="B">B</SelectItem>
+                  <SelectItem value="C">C</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-            <Input
-              className="w-[200px]"
-              placeholder="Mistake enthält…"
-              value={mistakeQuery}
-              onChange={(e) => setMistakeQuery(e.target.value)}
-            />
+            <div className="w-full">
+              <Input
+                className="w-full"
+                placeholder="Mistake enthält…"
+                value={mistakeQuery}
+                onChange={(e) => setMistakeQuery(e.target.value)}
+              />
+            </div>
           </div>
         </CardHeader>
 
-        <CardContent>
+        <CardContent className="w-full max-w-full min-w-0">
           {!trades.length && <div className="opacity-70">Keine Trades (Filter).</div>}
 
           {/* Liste */}
-          <div className="max-h-[600px] overflow-y-auto pr-2 space-y-6">
+          <div className="max-h-[600px] overflow-y-auto pr-2 space-y-6 w-full max-w-full min-w-0">
             {trades.map((t) => {
-              // Dauer robust
               const computedDuration =
                 typeof t.durationMin === "number" && t.durationMin > 0
                   ? t.durationMin
@@ -565,7 +575,6 @@ export default function TradeRecapList({ userId }: { userId: string }) {
               const cur = currencySymbol(acc?.currency);
               const pnl = Number.isFinite(t.pnl) ? Number(t.pnl) : 0;
 
-              // RR: String (oder Zahl) → String, sonst Fallback-Berechnung
               const rrStr = t.riskReward !== undefined && t.riskReward !== null
                 ? String(t.riskReward).trim()
                 : "";
@@ -575,10 +584,12 @@ export default function TradeRecapList({ userId }: { userId: string }) {
                 : computeRR(t.entry, t.stopPrice, t.targetPrice, t.tradeType);
               const rrLabel = rrFromString ?? (rrComputedNum ? rrComputedNum.toFixed(2) : null);
 
+              const isDeleting = deletingId === t._id;
+
               return (
-                <div key={t._id} className="rounded-lg border p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 flex-wrap">
+                <div key={t._id} className="rounded-lg border p-4 w/full max-w-full min-w-0">
+                  <div className="flex flex-wrap items-center justify-between gap-2 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap min-w-0">
                       <Badge variant="outline">{t.date}</Badge>
                       <Badge>{t.symbol}</Badge>
                       {(t.startTime || t.endTime || computedDuration > 0) ? (
@@ -589,7 +600,6 @@ export default function TradeRecapList({ userId }: { userId: string }) {
                       ) : null}
                       {t.session ? <Badge variant="outline">{t.session}</Badge> : null}
 
-                      {/* Result */}
                       {(() => {
                         const { variant, className } = resultBadgeProps(t.result);
                         return (
@@ -599,7 +609,6 @@ export default function TradeRecapList({ userId }: { userId: string }) {
                         );
                       })()}
 
-                      {/* PnL */}
                       <Badge
                         variant={pnl >= 0 ? "secondary" : "outline"}
                         className={pnl < 0 ? "text-rose-600 border-rose-500" : ""}
@@ -615,34 +624,43 @@ export default function TradeRecapList({ userId }: { userId: string }) {
                       )}
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <GameBadge computed={t.gameComputed} self={t.gameSelf} />
                       <Button
                         size="sm"
+                        className="h-8 px-2"
                         variant={isDraft ? "default" : "outline"}
                         onClick={() => onEdit(t)}
                         title={isDraft ? "Diesen Entwurf vervollständigen" : "Trade bearbeiten"}
                       >
                         {isDraft ? "Vervollständigen" : "Bearbeiten"}
                       </Button>
+                      <Button
+                        size="sm"
+                        className="h-8 px-2"
+                        variant="destructive"
+                        onClick={() => deleteTrade(t)}
+                        disabled={isDeleting}
+                        title="Diesen Trade löschen"
+                      >
+                        {isDeleting ? "Lösche…" : "Löschen"}
+                      </Button>
                     </div>
                   </div>
 
                   <Separator className="my-3" />
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {/* Bias / Execution */}
-                    <div className="space-y-2">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 min-w-0">
+                    <div className="space-y-2 min-w-0">
                       <div className="text-sm font-medium">Bias • Execution</div>
                       <BiasBadge v={t.biasExecution} />
-                      <div className="flex gap-3 text-sm">
+                      <div className="flex flex-wrap gap-3 text-sm">
                         {t.outcomeFlags?.breakEven ? <Badge variant="outline">Break Even</Badge> : null}
                         {t.outcomeFlags?.stopHit ? <Badge variant="outline">Stop (SL/SI)</Badge> : null}
                       </div>
                     </div>
 
-                    {/* Trading Mistakes */}
-                    <div className="space-y-2">
+                    <div className="space-y-2 min-w-0">
                       <div className="text-sm font-medium">Trading Mistakes</div>
                       <div className="flex flex-wrap gap-2">
                         {(t.tradingMistakes || []).map((m) => (
@@ -654,11 +672,10 @@ export default function TradeRecapList({ userId }: { userId: string }) {
                       </div>
                     </div>
 
-                    {/* Strategie & RR & Confluences */}
-                    <div className="space-y-2">
+                    <div className="space-y-2 min-w-0">
                       <div className="text-sm font-medium">Strategie & RR</div>
                       <div className="flex flex-wrap gap-2">
-                        {t.strategy ? <Badge variant="outline">{t.strategy}</Badge> : null}
+                        {t.strategy ? <Badge variant="outline" className="truncate max-w-full">{t.strategy}</Badge> : null}
                         {rrLabel ? <Badge variant="secondary">RR: {rrLabel}</Badge> : null}
 
                         {Array.isArray(t.confluences) && t.confluences.length > 0 ? (
@@ -671,8 +688,7 @@ export default function TradeRecapList({ userId }: { userId: string }) {
                       </div>
                     </div>
 
-                    {/* Timeframes (gesehen) */}
-                    <div className="space-y-2">
+                    <div className="space-y-2 min-w-0">
                       <div className="text-sm font-medium">Timeframes (gesehen)</div>
                       <div className="flex flex-wrap gap-2">
                         {(t.viewTimeframes || []).map((tf, i) => (
@@ -694,7 +710,7 @@ export default function TradeRecapList({ userId }: { userId: string }) {
 
       {/* Edit / Vervollständigen Dialog */}
       <Dialog open={open} onOpenChange={(o) => { if (!o) handleClose(); }}>
-        <DialogContent className="max-w-3xl p-0">
+        <DialogContent className="w-[95vw] sm:max-w-3xl p-0">
           <DialogHeader className="px-6 pt-6">
             <DialogTitle>{editing?.status === "draft" || !editing?.completed ? "Trade vervollständigen" : "Trade bearbeiten"}</DialogTitle>
           </DialogHeader>

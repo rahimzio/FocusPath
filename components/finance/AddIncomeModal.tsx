@@ -1,10 +1,16 @@
 "use client";
 import { useMemo, useState, useCallback } from "react";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogClose,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { X } from "lucide-react";
 
 interface Props {
   userId: string;
@@ -16,7 +22,6 @@ const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 export default function AddIncomeModal({ userId, onSaved }: Props) {
   const [open, setOpen] = useState(false);
 
-  // Betrag als String -> erlaubt "12,50"
   const [amountStr, setAmountStr] = useState("");
   const [note, setNote] = useState("");
   const [month, setMonth] = useState(() => {
@@ -70,7 +75,7 @@ export default function AddIncomeModal({ userId, onSaved }: Props) {
         const msg = await res.text().catch(() => "");
         throw new Error(msg || "Fehler beim Speichern der Einnahme");
       }
-      onSaved();       // nur bei Erfolg
+      onSaved();
       reset();
       setOpen(false);
     } catch (e: any) {
@@ -99,9 +104,16 @@ export default function AddIncomeModal({ userId, onSaved }: Props) {
         <Button>Einkommen eintragen</Button>
       </DialogTrigger>
 
-      <DialogContent onKeyDown={onKeyDown}>
+      <DialogContent onKeyDown={onKeyDown} className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Einkommen eintragen</DialogTitle>
+          <div className="flex items-center justify-between">
+            <DialogTitle>Einkommen eintragen</DialogTitle>
+            <DialogClose asChild>
+              <Button variant="ghost" size="icon" aria-label="Schließen">
+                <X className="w-5 h-5" />
+              </Button>
+            </DialogClose>
+          </div>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -122,6 +134,7 @@ export default function AddIncomeModal({ userId, onSaved }: Props) {
               placeholder="z. B. 2.500,00"
               value={amountStr}
               onChange={(e) => setAmountStr(e.target.value)}
+              autoFocus
             />
           </div>
 
@@ -137,13 +150,14 @@ export default function AddIncomeModal({ userId, onSaved }: Props) {
 
           {error && <p className="text-sm text-red-600">{error}</p>}
 
-          <Button
-            onClick={handleSave}
-            className="w-full"
-            disabled={!isValid || saving}
-          >
-            {saving ? "Speichern…" : "Speichern"}
-          </Button>
+          <div className="flex items-center justify-end gap-2">
+            <DialogClose asChild>
+              <Button variant="outline">Abbrechen</Button>
+            </DialogClose>
+            <Button onClick={handleSave} disabled={!isValid || saving}>
+              {saving ? "Speichern…" : "Speichern"}
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

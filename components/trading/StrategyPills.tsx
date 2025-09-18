@@ -22,11 +22,10 @@ export default function StrategyPills({ userId }: { userId: string }) {
   const [accountId, setAccountId] = useState<string | undefined>(undefined);
   const [active, setActive] = useState<string | "ALL">("ALL");
 
-  // 🆕 Draft-Confluences (kleiner Editor unten)
+  // Draft-Confluences
   const [confInput, setConfInput] = useState("");
   const [confDraft, setConfDraft] = useState<string[]>([]);
 
-  // Initial aus URL + Account-Events
   useEffect(() => {
     try {
       const url = new URL(window.location.href);
@@ -39,10 +38,8 @@ export default function StrategyPills({ userId }: { userId: string }) {
     const onAccount = (e: any) => setAccountId(e?.detail?.accountId || undefined);
     window.addEventListener("account-change", onAccount as EventListener);
 
-    // 🆕 Wenn Strategie erstellt wurde → neu laden & aktivieren
     const onCreated = (e: any) => {
       const name = e?.detail?.name as string | undefined;
-      // SWR neu validieren
       mutate(
         (key: any) => typeof key === "string" && key.startsWith("/api/trading/strategies"),
         undefined,
@@ -50,7 +47,6 @@ export default function StrategyPills({ userId }: { userId: string }) {
       );
       if (name) {
         setActive(name);
-        // URL/Filter broadcasten
         try {
           const url = new URL(window.location.href);
           url.searchParams.set("strategy", name);
@@ -58,12 +54,10 @@ export default function StrategyPills({ userId }: { userId: string }) {
         } catch {}
         window.dispatchEvent(new CustomEvent("strategy-select", { detail: { name } }));
       }
-      // Draft-Confluences nach Erstellung leeren
       setConfDraft([]);
     };
 
     window.addEventListener("strategy-created", onCreated as EventListener);
-
     return () => {
       window.removeEventListener("account-change", onAccount as EventListener);
       window.removeEventListener("strategy-created", onCreated as EventListener);
@@ -103,7 +97,7 @@ export default function StrategyPills({ userId }: { userId: string }) {
     }
   };
 
-  // 🆕 Confluence-Draft helpers
+  // Confluence-Draft helpers
   function addConf() {
     const s = confInput.trim();
     if (!s) return;
@@ -118,11 +112,12 @@ export default function StrategyPills({ userId }: { userId: string }) {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Strategies</CardTitle>
+    <Card className="w-full max-w-full min-w-0 overflow-hidden">
+      <CardHeader className="w-full max-w-full min-w-0">
+        <CardTitle className="truncate">Strategies</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
+
+      <CardContent className="space-y-4 w-full max-w-full min-w-0">
         {error && <div className="text-red-600">Fehler beim Laden.</div>}
         {isLoading && <div className="opacity-70">Lade…</div>}
         {!isLoading && strategies.length === 0 && (
@@ -130,7 +125,7 @@ export default function StrategyPills({ userId }: { userId: string }) {
         )}
 
         {/* Strategie-Pills */}
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 w-full max-w-full min-w-0">
           <Button
             size="sm"
             variant={active === "ALL" ? "default" : "secondary"}
@@ -140,8 +135,9 @@ export default function StrategyPills({ userId }: { userId: string }) {
               emitStrategy(undefined);
             }}
             aria-pressed={active === "ALL"}
+            className="min-w-0 max-w-full"
           >
-            Alle
+            <span className="truncate">Alle</span>
           </Button>
 
           {strategies.map((s) => {
@@ -154,24 +150,31 @@ export default function StrategyPills({ userId }: { userId: string }) {
                 key={s._id}
                 size="sm"
                 variant={selected ? "default" : "secondary"}
-                className={cn("border-0", selected && "ring-2 ring-offset-2")}
+                className={cn(
+                  "border-0 min-w-0 max-w-full px-3 py-2", // wichtig für Shrink & Truncate
+                  selected && "ring-2 ring-offset-2"
+                )}
                 style={style}
                 title={s.count ? `${s.name} (${s.count})` : s.name}
                 onClick={() => handleClick(s.name)}
                 aria-pressed={selected}
                 data-selected={selected ? "true" : "false"}
               >
-                {s.name}
-                {typeof s.count === "number" ? ` · ${s.count}` : ""}
+                {/* text muss truncaten können */}
+                <span className="truncate">
+                  {s.name}
+                  {typeof s.count === "number" ? ` · ${s.count}` : ""}
+                </span>
               </Button>
             );
           })}
         </div>
 
-        {/* 🆕 Confluence-Editor */}
-        <div className="rounded-md border p-3">
+        {/* Confluence-Editor (responsiv, kein Overflow) */}
+        <div className="rounded-md border p-3 w-full max-w-full min-w-0">
           <div className="text-sm font-medium mb-2">Confluences (Draft)</div>
-          <div className="flex gap-2 mb-2">
+
+          <div className="flex flex-col sm:flex-row gap-2 mb-2 w-full max-w-full min-w-0">
             <Input
               placeholder="Confluence eingeben und Enter…"
               value={confInput}
@@ -182,8 +185,9 @@ export default function StrategyPills({ userId }: { userId: string }) {
                   addConf();
                 }
               }}
+              className="w-full min-w-0"
             />
-            <Button type="button" variant="secondary" onClick={addConf}>
+            <Button type="button" variant="secondary" onClick={addConf} className="whitespace-nowrap">
               Hinzufügen
             </Button>
           </div>
@@ -191,10 +195,10 @@ export default function StrategyPills({ userId }: { userId: string }) {
           {confDraft.length === 0 ? (
             <div className="text-sm opacity-70">Noch keine Confluences hinzugefügt.</div>
           ) : (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 w-full max-w-full min-w-0">
               {confDraft.map((c, i) => (
-                <Badge key={`${c}-${i}`} variant="secondary" className="px-2">
-                  {c}
+                <Badge key={`${c}-${i}`} variant="secondary" className="px-2 max-w-full min-w-0">
+                  <span className="truncate">{c}</span>
                   <button
                     type="button"
                     className="ml-2 opacity-70 hover:opacity-100"
@@ -209,11 +213,11 @@ export default function StrategyPills({ userId }: { userId: string }) {
             </div>
           )}
 
-          <div className="flex justify-end gap-2 mt-3">
+          <div className="flex flex-col sm:flex-row justify-end gap-2 mt-3">
             <Button type="button" variant="outline" onClick={() => setConfDraft([])}>
               Leeren
             </Button>
-            <Button type="button" onClick={sendToBuilder}>
+            <Button type="button" onClick={sendToBuilder} className="whitespace-nowrap">
               In Strategie-Builder übernehmen
             </Button>
           </div>

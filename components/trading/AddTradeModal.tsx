@@ -1,3 +1,4 @@
+// AddTradeModal.tsx
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
@@ -6,13 +7,11 @@ import { Button } from "@/components/ui/button";
 import { mutate } from "swr";
 import TradeEntryForm from "./TradeEntryForm";
 
-type TradeDoc = any; // optional: genauer typisieren (z.B. aus "@/utils/interface")
+type TradeDoc = any;
 
 interface Props {
   userId: string;
-  /** Optional eigenes Trigger-Element; wenn nicht gesetzt, zeige Standard-Button */
   trigger?: React.ReactNode;
-  /** Optional: vorbefülltes Datum für einen neuen Trade (YYYY-MM-DD) */
   defaultDate?: string;
 }
 
@@ -22,25 +21,19 @@ export default function AddTradeModal({ userId, trigger, defaultDate }: Props) {
   const [initialData, setInitialData] = useState<TradeDoc | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const today = useMemo(() => {
-    return new Date().toISOString().slice(0, 10);
-  }, []);
-
+  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const dateForForm = initialData?.date ?? defaultDate ?? today;
 
   const refreshCaches = useCallback(() => {
-    // refresh relevante SWR keys
     mutate((key: string) => typeof key === "string" && key.startsWith("/api/trading/"));
   }, []);
 
-  // Öffnen Create
   const openCreate = () => {
     setMode("create");
     setInitialData(null);
     setOpen(true);
   };
 
-  // Öffnen Edit per Event
   useEffect(() => {
     const handler = async (e: Event) => {
       const custom = e as CustomEvent<{ id: string }>;
@@ -80,7 +73,8 @@ export default function AddTradeModal({ userId, trigger, defaultDate }: Props) {
         </DialogTrigger>
       )}
 
-      <DialogContent className="max-w-3xl">
+      {/* Responsives Modal: füllt ~95vw auf Phones */}
+      <DialogContent className="w-[95vw] sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>{mode === "edit" ? "Trade bearbeiten" : "Neuer Trade"}</DialogTitle>
         </DialogHeader>
@@ -88,12 +82,14 @@ export default function AddTradeModal({ userId, trigger, defaultDate }: Props) {
         {loading ? (
           <div className="p-6 opacity-70">Lade Trade…</div>
         ) : (
-          <TradeEntryForm
-            userId={userId}
-            date={dateForForm}
-            onCreated={onCreated}
-            initialData={initialData || undefined}
-          />
+          <div className="min-w-0">
+            <TradeEntryForm
+              userId={userId}
+              date={dateForForm}
+              onCreated={onCreated}
+              initialData={initialData || undefined}
+            />
+          </div>
         )}
       </DialogContent>
     </Dialog>

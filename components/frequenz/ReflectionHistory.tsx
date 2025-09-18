@@ -1,5 +1,5 @@
 'use client'
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 
 interface Reflection {
   _id: string
@@ -20,15 +20,22 @@ interface ReflectionHistoryProps {
 const PAGE_SIZE = 20
 
 export default function ReflectionHistory({ userId, initialDateFrom, initialDateTo }: ReflectionHistoryProps){
-  const today = useMemo(() => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0,10), [])
-  const [dateFrom, setDateFrom] = useState(initialDateFrom || today)
-  const [dateTo, setDateTo] = useState(initialDateTo || today)
+  const todayLocalISO = useMemo(() => {
+    const d = new Date()
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset())
+    return d.toISOString().slice(0,10)
+  }, [])
+
+  const [dateFrom, setDateFrom] = useState(initialDateFrom || todayLocalISO)
+  const [dateTo, setDateTo] = useState(initialDateTo || todayLocalISO)
   const [timeOfDay, setTimeOfDay] = useState<Reflection['timeOfDay'] | 'all'>('all')
   const [items, setItems] = useState<Reflection[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [page, setPage] = useState(0)
   const [hasMore, setHasMore] = useState(false)
+  const abortRef = useRef<AbortController | null>(null)
+  const sentinelRef = useRef<HTMLDivElement | null>(null)
 
   const qs = useMemo(() => {
     const p = new URLSearchParams({ userId, dateFrom, dateTo, limit: String(PAGE_SIZE), page: String(page) })
@@ -38,35 +45,75 @@ export default function ReflectionHistory({ userId, initialDateFrom, initialDate
 
   async function load(reset=false){
     if (!userId) return
+    abortRef.current?.abort()
+    const ctrl = new AbortController()
+    abortRef.current = ctrl
     setLoading(true); setError(null)
     try{
-      const res = await fetch(`/api/frequency/getReflection?${qs}`)
+      const res = await fetch(`/api/frequency/getReflection?${qs}`, { signal: ctrl.signal })
       const ct = res.headers.get('content-type') || ''
       if (!res.ok){
-        const text = await res.text(); throw new Error(`HTTP ${res.status} – ${text.slice(0,140)}`)
+        const text = await res.text().catch(()=> '')
+        throw new Error(`HTTP ${res.status}${text ? ' – ' + text.slice(0,140) : ''}`)
       }
       if (!ct.includes('application/json')){
-        const text = await res.text(); throw new Error(`Expected JSON, got ${ct}. Body: ${text.slice(0,140)}`)
+        const text = await res.text().catch(()=> '')
+        throw new Error(`Expected JSON, got ${ct}. ${text ? 'Body: ' + text.slice(0,140) : ''}`)
       }
       const data = await res.json()
       const list: Reflection[] = Array.isArray(data.reflections) ? data.reflections : []
       setItems(prev => reset ? list : [...prev, ...list])
       setHasMore(list.length === PAGE_SIZE)
-    }catch(e:any){ setError(e.message || 'Unbekannter Fehler'); setItems(prev => reset ? [] : prev) }
-    finally{ setLoading(false) }
+    }catch(e:any){
+      if (e?.name !== 'AbortError'){
+        setError(e?.message || 'Unbekannter Fehler')
+        setItems(prev => reset ? [] : prev)
+      }
+    }finally{
+      setLoading(false)
+    }
   }
 
   // initial + when filters change
-  useEffect(() => { setPage(0); load(true) // reset
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    setPage(0); load(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, dateFrom, dateTo, timeOfDay])
 
   // paginated loads
-  useEffect(() => { if (page>0) load(false) // append
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (page>0) load(false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page])
 
-  function fmtDate(iso:string){ try{ return new Intl.DateTimeFormat('de-DE',{ weekday:'short', day:'2-digit', month:'2-digit'}).format(new Date(iso)) }catch{ return iso } }
+  // Auto-load via IntersectionObserver
+  useEffect(() => {
+    if (!sentinelRef.current) return
+    const el = sentinelRef.current
+    const io = new IntersectionObserver((entries) => {
+      const [entry] = entries
+      if (entry.isIntersecting && hasMore && !loading) {
+        setPage(p => p + 1)
+      }
+    }, { root: null, rootMargin: '200px', threshold: 0 })
+    io.observe(el)
+    return () => io.disconnect()
+  }, [hasMore, loading])
+
+  function fmtDate(iso:string){
+    try{
+      const p = iso.split('T')[0]
+      return new Intl.DateTimeFormat('de-DE',{ weekday:'short', day:'2-digit', month:'2-digit'}).format(new Date(p))
+    }catch{ return iso }
+  }
+
+  const copy = async (text: string) => {
+    try {
+      await navigator?.clipboard?.writeText(text)
+    } catch {
+      // no-op; nicht in SSR o. privaten Browsern verfügbar
+    }
+  }
 
   return (
     <section className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border min-w-0">
@@ -79,16 +126,20 @@ export default function ReflectionHistory({ userId, initialDateFrom, initialDate
           <label className="block text-xs text-gray-600">bis</label>
           <input type="date" className="border rounded px-2 py-1 text-sm" value={dateTo} onChange={(e)=>setDateTo(e.target.value)} />
         </div>
-        <div className="flex items-center gap-1 text-sm">
+        <div className="flex items-center gap-1 text-sm" role="tablist" aria-label="Tageszeitfilter">
           <span className="text-gray-700">Tageszeit:</span>
           {(['all','morning','afternoon','evening'] as const).map(k => (
             <button key={k} type="button" onClick={()=>setTimeOfDay(k as any)}
-              className={`px-2 py-1 rounded border text-xs ${timeOfDay===k?'bg-black text-white border-black':'bg-white text-gray-900 border-gray-200'}`}>{k==='all'?'alle':k}</button>
+              className={`px-2 py-1 rounded border text-xs ${timeOfDay===k?'bg-black text-white border-black':'bg-white text-gray-900 border-gray-200'}`}
+              role="tab" aria-selected={timeOfDay === k}
+            >
+              {k==='all'?'alle':k}
+            </button>
           ))}
         </div>
       </div>
 
-      <div className="mt-4">
+      <div className="mt-4" aria-live="polite">
         {loading && !items.length ? (
           <p className="text-sm text-gray-600">Lade…</p>
         ) : error ? (
@@ -115,11 +166,13 @@ export default function ReflectionHistory({ userId, initialDateFrom, initialDate
                   <button
                     type="button"
                     className="px-2 py-1 rounded border text-xs hover:bg-gray-100"
-                    onClick={()=> navigator.clipboard?.writeText(`${entry.title? entry.title+" — ":""}${entry.reflection}`)}
+                    onClick={()=> copy(`${entry.title? entry.title+" — ":""}${entry.reflection}`)}
                   >Kopieren</button>
                 </div>
               </li>
             ))}
+            {/* Sentinel: autoload next page */}
+            <div ref={sentinelRef} />
           </ul>
         )}
       </div>

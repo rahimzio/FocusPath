@@ -27,7 +27,7 @@ type Props = { userId: string };
 
 type StatsResponse = {
   count: number;
-  winrate: number;   // 0..1
+  winrate: number;
   avgPnl: number;
   avgRating: number;
   history: { day: string; count: number; pnl: number }[];
@@ -45,12 +45,19 @@ export default function PerformanceChart({ userId }: Props) {
   const [accountId, setAccountId] = React.useState<string | undefined>();
   const [strategy, setStrategy] = React.useState<string | undefined>();
 
-  // NEU: Zeitraum/Metrik
   const [range, setRange] = React.useState<"week" | "month" | "all">("month");
   const [metric, setMetric] = React.useState<"pnl" | "count">("pnl");
   const [cumulative, setCumulative] = React.useState<boolean>(true);
 
-  // URL & Events lesen
+  // mobil erkennen -> Brush ausblenden (verhindert Overflows auf xs)
+  const [isMobile, setIsMobile] = React.useState(false);
+  React.useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 640);
+    onResize();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
   React.useEffect(() => {
     try {
       const url = new URL(window.location.href);
@@ -69,7 +76,6 @@ export default function PerformanceChart({ userId }: Props) {
     };
   }, []);
 
-  // SWR-Key → /api/trading/getStats
   const key = React.useMemo(() => {
     if (!userId) return null;
     const qs = [
@@ -98,11 +104,10 @@ export default function PerformanceChart({ userId }: Props) {
   const { data, error } = useSWR<StatsResponse>(key, fetcher);
 
   const count = toNumber(data?.count);
-  const winrate = toNumber(data?.winrate); // 0..1
+  const winrate = toNumber(data?.winrate);
   const avgPnl = toNumber(data?.avgPnl);
   const avgRating = toNumber(data?.avgRating);
 
-  // Verlauf + kumuliert
   const base = React.useMemo(() => {
     const rows = Array.isArray(data?.history) ? data!.history : [];
     let run = 0;
@@ -118,7 +123,6 @@ export default function PerformanceChart({ userId }: Props) {
     });
   }, [data]);
 
-  // Datensatz je nach Metrik
   const chartData = React.useMemo(() => {
     if (metric === "count") return base.map((d) => ({ day: d.day, value: d.count }));
     return base.map((d) => ({ day: d.day, value: cumulative ? d.cumPnl : d.pnl }));
@@ -131,22 +135,28 @@ export default function PerformanceChart({ userId }: Props) {
   if (!data) return <div className="opacity-70">Lade…</div>;
 
   return (
-    <Card>
-      <CardHeader className="flex items-center justify-between gap-3 flex-wrap">
-        <CardTitle className="flex items-center gap-2">
-          Performance
-          <Badge variant="secondary">{count} Trades</Badge>
-          <Badge variant="secondary">{Math.round(winrate * 100)}% Winrate</Badge>
-          <Badge variant="secondary">ØPnL {Number.isFinite(avgPnl) ? avgPnl.toFixed(2) : "—"}</Badge>
-          <Badge variant="secondary">ØRating {Number.isFinite(avgRating) ? avgRating.toFixed(2) : "—"}</Badge>
+    <Card className="w-full max-w-full min-w-0 overflow-hidden">
+      <CardHeader className="flex items-center justify-between gap-2 flex-wrap min-w-0">
+        <CardTitle className="flex items-center gap-2 min-w-0 truncate">
+          <span className="truncate">Performance</span>
+          <Badge variant="secondary" className="text-xs px-2 py-0.5 shrink-0">{count} Trades</Badge>
+          <Badge variant="secondary" className="text-xs px-2 py-0.5 shrink-0">
+            {Math.round(winrate * 100)}% Winrate
+          </Badge>
+          <Badge variant="secondary" className="text-xs px-2 py-0.5 shrink-0">
+            ØPnL {Number.isFinite(avgPnl) ? avgPnl.toFixed(2) : "—"}
+          </Badge>
+          <Badge variant="secondary" className="text-xs px-2 py-0.5 shrink-0">
+            ØRating {Number.isFinite(avgRating) ? avgRating.toFixed(2) : "—"}
+          </Badge>
         </CardTitle>
 
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
           {/* Range */}
           <div className="flex items-center gap-2">
             <Label htmlFor="perf-range" className="text-sm">Zeitraum</Label>
             <Select value={range} onValueChange={(v: "week" | "month" | "all") => setRange(v)}>
-              <SelectTrigger id="perf-range" className="w-[120px]">
+              <SelectTrigger id="perf-range" className="w-[110px] h-8 px-2">
                 <SelectValue placeholder="Range" />
               </SelectTrigger>
               <SelectContent>
@@ -161,7 +171,7 @@ export default function PerformanceChart({ userId }: Props) {
           <div className="flex items-center gap-2">
             <Label htmlFor="perf-metric" className="text-sm">Metrik</Label>
             <Select value={metric} onValueChange={(v: "pnl" | "count") => setMetric(v)}>
-              <SelectTrigger id="perf-metric" className="w-[140px]">
+              <SelectTrigger id="perf-metric" className="w-[120px] h-8 px-2">
                 <SelectValue placeholder="Metrik" />
               </SelectTrigger>
               <SelectContent>
@@ -171,7 +181,7 @@ export default function PerformanceChart({ userId }: Props) {
             </Select>
           </div>
 
-          {/* Kumuliert (nur bei PnL sinnvoll) */}
+          {/* Kumuliert */}
           <div className="flex items-center gap-2">
             <Checkbox
               id="perf-cum"
@@ -186,14 +196,14 @@ export default function PerformanceChart({ userId }: Props) {
         </div>
       </CardHeader>
 
-      <CardContent>
+      <CardContent className="w-full max-w-full min-w-0 overflow-x-hidden">
         {chartData.length === 0 ? (
           <div className="opacity-70">Keine Daten im gewählten Zeitraum.</div>
         ) : (
-          <AspectRatio ratio={16 / 9}>
+          <AspectRatio ratio={16 / 9} className="w-full min-w-0">
             <ResponsiveContainer width="100%" height="100%">
               {isPnl ? (
-                <AreaChart data={chartData} margin={{ top: 10, right: 20, left: 10, bottom: 10 }}>
+                <AreaChart data={chartData} margin={{ top: 10, right: 16, left: 8, bottom: 10 }}>
                   <defs>
                     <linearGradient id="pcGradient" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.6} />
@@ -201,8 +211,8 @@ export default function PerformanceChart({ userId }: Props) {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
-                  <XAxis dataKey="day" tickFormatter={fmtDate} minTickGap={24} />
-                  <YAxis tickFormatter={yTick} width={70} />
+                  <XAxis dataKey="day" tickFormatter={fmtDate} minTickGap={20} />
+                  <YAxis tickFormatter={yTick} width={64} />
                   <Tooltip
                     formatter={(value: any) => {
                       const n = toNumber(value);
@@ -220,20 +230,20 @@ export default function PerformanceChart({ userId }: Props) {
                     strokeWidth={2}
                     isAnimationActive
                   />
-                  <Brush dataKey="day" height={24} travellerWidth={8} />
+                  {!isMobile && <Brush dataKey="day" height={24} travellerWidth={8} />}
                 </AreaChart>
               ) : (
-                <BarChart data={chartData} margin={{ top: 10, right: 20, left: 10, bottom: 10 }}>
+                <BarChart data={chartData} margin={{ top: 10, right: 16, left: 8, bottom: 10 }}>
                   <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
-                  <XAxis dataKey="day" tickFormatter={fmtDate} minTickGap={24} />
-                  <YAxis tickFormatter={yTick} allowDecimals={false} width={50} />
+                  <XAxis dataKey="day" tickFormatter={fmtDate} minTickGap={20} />
+                  <YAxis tickFormatter={yTick} allowDecimals={false} width={56} />
                   <Tooltip
                     formatter={(value: any) => [String(value), "Trades"]}
                     labelFormatter={(label) => `Tag: ${label}`}
                     wrapperStyle={{ outline: "none" }}
                   />
                   <Bar dataKey="value" stroke="#10b981" fill="#10b981" radius={[4, 4, 0, 0]} />
-                  <Brush dataKey="day" height={24} travellerWidth={8} />
+                  {!isMobile && <Brush dataKey="day" height={24} travellerWidth={8} />}
                 </BarChart>
               )}
             </ResponsiveContainer>

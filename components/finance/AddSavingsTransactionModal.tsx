@@ -1,9 +1,12 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
+import { X } from "lucide-react";
 
 type Account = { accountId: string; name: string; baseCurrency: string };
 type Kind =
@@ -49,7 +52,6 @@ export default function AddSavingsTransactionModal({
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  // --- Suche (gratis APIs via /api/finance/searchAsset) ---
   const [searchTerm, setSearchTerm] = useState("");
   const [searching, setSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<Array<{
@@ -76,7 +78,6 @@ export default function AddSavingsTransactionModal({
     }
   }
 
-  // Accounts laden (GET /api/finance/accounts) – bevorzugt defaultAccountId
   useEffect(() => {
     if (!userId) return;
     (async () => {
@@ -98,7 +99,6 @@ export default function AddSavingsTransactionModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, refreshKey, defaultAccountId]);
 
-  // Defaults aus Props
   useEffect(() => { if (defaultKind) setKind(defaultKind); }, [defaultKind]);
   useEffect(() => { if (defaultAccountId) setAccountId(defaultAccountId); }, [defaultAccountId]);
   useEffect(() => {
@@ -109,7 +109,6 @@ export default function AddSavingsTransactionModal({
     }
   }, [defaultAsset]);
 
-  // Anforderungen je Transaktions-Typ
   const needsAsset = useMemo(() => kind.startsWith("asset_"), [kind]);
   const needsUnitsPrice = useMemo(() => kind === "asset_buy" || kind === "asset_sell", [kind]);
   const needsUnitsOnly = useMemo(() => kind === "asset_transfer_in" || kind === "asset_transfer_out", [kind]);
@@ -187,7 +186,6 @@ export default function AddSavingsTransactionModal({
 
       onSaved();
       setOpen(false);
-      // Reset (behalte Defaults aus Props beim nächsten Öffnen)
       setKind(defaultKind ?? "cash_deposit");
       setAssetSymbol(""); setAssetName("");
       setUnitsStr(""); setPriceStr(""); setCashStr("");
@@ -202,11 +200,19 @@ export default function AddSavingsTransactionModal({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild><Button>{triggerLabel}</Button></DialogTrigger>
-      <DialogContent>
-        <DialogHeader><DialogTitle>Transaktion erfassen</DialogTitle></DialogHeader>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <div className="flex items-center justify-between">
+            <DialogTitle>Transaktion erfassen</DialogTitle>
+            <DialogClose asChild>
+              <Button variant="ghost" size="icon" aria-label="Schließen">
+                <X className="w-5 h-5" />
+              </Button>
+            </DialogClose>
+          </div>
+        </DialogHeader>
 
         <div className="space-y-3">
-          {/* Account + Art */}
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="text-sm">Account</label>
@@ -224,7 +230,7 @@ export default function AddSavingsTransactionModal({
             <div>
               <label className="text-sm">Art</label>
               <Select value={kind} onValueChange={(v) => setKind(v as Kind)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Art wählen" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="cash_deposit">Einzahlung (Cash)</SelectItem>
                   <SelectItem value="cash_withdrawal">Auszahlung (Cash)</SelectItem>
@@ -237,8 +243,7 @@ export default function AddSavingsTransactionModal({
             </div>
           </div>
 
-          {/* Asset Felder */}
-          {needsAsset && (
+          { (kind.startsWith("asset_")) && (
             <div className="grid grid-cols-3 gap-2">
               <div>
                 <label className="text-sm">Asset-Klasse</label>
@@ -261,7 +266,6 @@ export default function AddSavingsTransactionModal({
                 <Input value={assetName} onChange={(e) => setAssetName(e.target.value)} placeholder="Bitcoin, Apple Inc." disabled={lockAsset} />
               </div>
 
-              {/* Suche */}
               {!lockAsset && (
                 <div className="col-span-3 flex gap-2 items-end">
                   <Input
@@ -293,14 +297,13 @@ export default function AddSavingsTransactionModal({
             </div>
           )}
 
-          {/* Units / Preis */}
-          {needsUnits && (
-            <div className={`grid ${needsUnitsPrice ? "grid-cols-2" : "grid-cols-1"} gap-2`}>
+          {(kind === "asset_buy" || kind === "asset_sell" || kind === "asset_transfer_in" || kind === "asset_transfer_out") && (
+            <div className={`grid ${kind === "asset_buy" || kind === "asset_sell" ? "grid-cols-2" : "grid-cols-1"} gap-2`}>
               <div>
                 <label className="text-sm">Units</label>
                 <Input inputMode="decimal" value={unitsStr} onChange={(e) => setUnitsStr(e.target.value)} placeholder="z. B. 0,01" />
               </div>
-              {needsUnitsPrice && (
+              {(kind === "asset_buy" || kind === "asset_sell") && (
                 <div>
                   <label className="text-sm">Preis/Unit</label>
                   <Input inputMode="decimal" value={priceStr} onChange={(e) => setPriceStr(e.target.value)} placeholder="z. B. 55.000,00" />
@@ -309,8 +312,7 @@ export default function AddSavingsTransactionModal({
             </div>
           )}
 
-          {/* Cash-Betrag */}
-          {needsCash && (
+          {(kind.startsWith("cash_") || kind === "asset_buy" || kind === "asset_sell") && (
             <div>
               <label className="text-sm">Cash-Betrag</label>
               <Input
@@ -335,9 +337,14 @@ export default function AddSavingsTransactionModal({
 
           {err && <p className="text-sm text-red-600">{err}</p>}
 
-          <Button onClick={handleSave} disabled={!isValid || saving} className="w-full">
-            {saving ? "Speichern…" : "Speichern"}
-          </Button>
+          <div className="flex items-center justify-end gap-2">
+            <DialogClose asChild>
+              <Button variant="outline">Abbrechen</Button>
+            </DialogClose>
+            <Button onClick={handleSave} disabled={!isValid || saving} className="min-w-28">
+              {saving ? "Speichern…" : "Speichern"}
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

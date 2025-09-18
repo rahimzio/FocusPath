@@ -10,20 +10,37 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { v4 as uuidv4 } from "uuid"; // Für die Erzeugung eindeutiger IDs
+import { v4 as uuidv4 } from "uuid";
+
+// ✅ Lokaler UI-Typ: macht Subtask-Titel optional, ohne dein globales Interface anfassen zu müssen
+type UISubTask = Omit<SubTask, "name"> & { name?: string };
+
 type Props = {
   onTaskCreated?: (newTask: Task) => Promise<void>;
-  userId:string;
+  userId: string;
+  /** kontrolliertes Öffnen (optional) */
+  open?: boolean;
+  /** State-Setter für kontrolliertes Öffnen (optional) */
+  onOpenChange?: (open: boolean) => void;
+  /** internen Trigger-Button verstecken (optional) */
+  hideTrigger?: boolean;
 };
+
 // Beispiel: Vordefinierte Goals
 const predefinedGoals: Goal[] = [
   // ... weitere Ziele
 ];
 
-export default function SheetWithCreateTask({ userId, onTaskCreated }: Props) {
+const SheetWithCreateTask: React.FC<Props> = ({
+  userId,
+  onTaskCreated,
+  open,
+  onOpenChange,
+  hideTrigger,
+}) => {
   // Hauptaufgaben-Objekt (ohne _id und subTasks)
   const [task, setTask] = useState<Omit<Task, "_id" | "subTasks">>({
-    userId:userId,
+    userId: userId,
     id: "",
     name: "",
     description: "",
@@ -42,10 +59,10 @@ export default function SheetWithCreateTask({ userId, onTaskCreated }: Props) {
     daysOfWeek: [],
     interval: 1,
   });
- 
+
   const [categories, setCategories] = useState<string[]>([]);
-  // Subtasks-Array
-  const [subTasks, setSubTasks] = useState<SubTask[]>([]);
+  // ✅ Subtasks-Array mit optionalem Titel
+  const [subTasks, setSubTasks] = useState<UISubTask[]>([]);
 
   // Liste aller Tasks (nur Demo)
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -69,7 +86,6 @@ export default function SheetWithCreateTask({ userId, onTaskCreated }: Props) {
       })
       .catch((error) => {
         console.error("Fehler beim Laden der Ziele", error);
-        // Bei Fehlern wird stattdessen auf die vordefinierten Ziele zurückgegriffen
         setGoals(predefinedGoals);
       });
   }, []);
@@ -85,12 +101,23 @@ export default function SheetWithCreateTask({ userId, onTaskCreated }: Props) {
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
 
+    // ✅ Subtasks säubern: komplett leere entfernen, Strings trimmen, leeren Namen als undefined senden
+    const cleanedSubTasks: SubTask[] = subTasks
+      .filter((s) => (s.name?.trim() || s.description?.trim()))
+      .map((s) => ({
+        ...s,
+        name: s.name?.trim() || undefined,
+        description: s.description?.trim() || "",
+      })) as SubTask[];
+
     const payload = {
       ...task,
       goalId: selectedGoalId || undefined,
-      subTasks,
+      subTasks: cleanedSubTasks,
     };
- console.log("📤 create task payload", payload);
+
+    console.log("📤 create task payload", payload);
+
     const response = await fetch("/api/task/createTask", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -102,10 +129,9 @@ export default function SheetWithCreateTask({ userId, onTaskCreated }: Props) {
       const insertedTask: Task = {
         _id: jsonData.taskId,
         ...task,
-        subTasks,
+        subTasks: cleanedSubTasks,
       };
 
-      // ✅ Callback aufrufen, wenn vorhanden
       if (onTaskCreated) {
         await onTaskCreated(insertedTask);
       }
@@ -115,7 +141,7 @@ export default function SheetWithCreateTask({ userId, onTaskCreated }: Props) {
 
       // Formular zurücksetzen
       setTask({
-        userId:userId,
+        userId: userId,
         id: "",
         name: "",
         description: "",
@@ -140,13 +166,20 @@ export default function SheetWithCreateTask({ userId, onTaskCreated }: Props) {
       alert("Fehler beim Erstellen der Aufgabe");
     }
   };
-
+  // erzwingt einen string für <input type="date" />
+  function toDateInputValue(v: unknown): string {
+    if (!v) return "";
+    if (typeof v === "string") return v; // erwartet bereits 'YYYY-MM-DD'
+    if (v instanceof Date && !isNaN(v.getTime())) {
+      return v.toISOString().slice(0, 10);
+    }
+    // alles andere (z. B. ReactNode/null) -> leerer String
+    return "";
+  }
 
   // Aktualisierung der Hauptaufgabenfelder
   const handleChange = (
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
-    >
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
     const { name, value } = e.target;
     setTask((prev) => ({
@@ -155,16 +188,15 @@ export default function SheetWithCreateTask({ userId, onTaskCreated }: Props) {
     }));
   };
 
-   const toggleDayOfWeek = (day: number) => {
+  const toggleDayOfWeek = (day: number) => {
     setTask((prev) => {
       const current = prev.daysOfWeek || [];
-      const updated = current.includes(day)
-        ? current.filter((d) => d !== day)
-        : [...current, day];
+      const updated = current.includes(day) ? current.filter((d) => d !== day) : [...current, day];
       return { ...prev, daysOfWeek: updated };
     });
   };
-  // Funktion zum Hinzufügen eines leeren Subtasks mit eindeutiger ID
+
+  // ✅ Subtask mit optionalem Namen hinzufügen
   const addSubTask = () => {
     setSubTasks((prev) => [
       ...prev,
@@ -195,10 +227,12 @@ export default function SheetWithCreateTask({ userId, onTaskCreated }: Props) {
 
   return (
     <div className="fixed bottom-4 right-4 z-100">
-      <Sheet>
-        <SheetTrigger className="bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg hover:bg-blue-700">
-          Neue Aufgabe erstellen
-        </SheetTrigger>
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        {!hideTrigger && (
+          <SheetTrigger className="bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg hover:bg-blue-700">
+            Neue Aufgabe erstellen
+          </SheetTrigger>
+        )}
         <SheetContent className="w-[400px] sm:w-[540px] max-h-[100vh] overflow-y-auto text-black">
           <SheetHeader>
             <SheetTitle className="text-white">Neue Aufgabe erstellen</SheetTitle>
@@ -262,12 +296,11 @@ export default function SheetWithCreateTask({ userId, onTaskCreated }: Props) {
                 type="color"
                 id="color"
                 name="color"
-                value={task.color ?? "#3B82F6"} // Standardfarbe (z. B. blau)
+                value={task.color ?? "#3B82F6"}
                 onChange={(e) => setTask((prev) => ({ ...prev, color: e.target.value }))}
                 className="mt-1 block w-full h-10 cursor-pointer"
               />
             </div>
-
 
             <div className="mb-4">
               <label htmlFor="dueDate" className="block text-sm font-medium text-white">
@@ -277,12 +310,19 @@ export default function SheetWithCreateTask({ userId, onTaskCreated }: Props) {
                 type="date"
                 id="dueDate"
                 name="dueDate"
-                value={task.dueDate}
-                onChange={handleChange}
+                value={toDateInputValue(task.dueDate)}
+                onChange={(e) =>
+                  setTask((prev) => ({
+                    ...prev,
+                    // e.target.value ist immer string ("" oder YYYY-MM-DD)
+                    dueDate: e.target.value,
+                  }))
+                }
                 required
                 className="mt-1 block w-full rounded-md border-gray-300"
               />
             </div>
+
 
             <div className="mb-4">
               <label htmlFor="frequency" className="block text-sm font-medium text-white">
@@ -303,11 +343,11 @@ export default function SheetWithCreateTask({ userId, onTaskCreated }: Props) {
               </select>
             </div>
 
-{task.frequency === "weekly" && (
+            {task.frequency === "weekly" && (
               <div className="mb-4">
                 <span className="block text-sm font-medium text-white">Wochentage</span>
                 <div className="flex flex-wrap gap-2 mt-1">
-                  {['So','Mo','Di','Mi','Do','Fr','Sa'].map((label, idx) => (
+                  {["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"].map((label, idx) => (
                     <label key={idx} className="flex items-center text-sm gap-1">
                       <input
                         type="checkbox"
@@ -376,7 +416,7 @@ export default function SheetWithCreateTask({ userId, onTaskCreated }: Props) {
                   </option>
                 ))}
               </select>
-              </div>
+            </div>
 
             <div className="mb-4 flex items-center gap-2">
               <label htmlFor="timebased" className="block text-sm font-medium text-white">
@@ -387,12 +427,10 @@ export default function SheetWithCreateTask({ userId, onTaskCreated }: Props) {
                 id="timebased"
                 name="timebased"
                 checked={task.timebased}
-                onChange={() =>
-                  setTask((prev) => ({ ...prev, timebased: !prev.timebased }))
-                }
+                onChange={() => setTask((prev) => ({ ...prev, timebased: !prev.timebased }))}
               />
             </div>
-            
+
             {task.timebased && (
               <>
                 <label className="block font-medium text-sm text-white">Uhrzeit</label>
@@ -407,13 +445,12 @@ export default function SheetWithCreateTask({ userId, onTaskCreated }: Props) {
                 <input
                   type="time"
                   step="60"
-                  value={task.duration || "00:30"} // default: 30 Minuten
+                  value={task.duration || "00:30"}
                   onChange={(e) => setTask({ ...task, duration: e.target.value })}
                   className="p-2 border border-gray-300 rounded-md w-full mb-4"
                 />
               </>
             )}
-
 
             {/* Subtasks-Bereich */}
             <div className="mb-4 border-t pt-4">
@@ -430,23 +467,26 @@ export default function SheetWithCreateTask({ userId, onTaskCreated }: Props) {
                       Entfernen
                     </button>
                   </div>
+
+                  {/* ✅ Titel ist jetzt optional (kein required), mit Placeholder */}
                   <div className="mb-2">
                     <label
                       htmlFor={`subtask-name-${index}`}
                       className="block text-sm font-medium text-white"
                     >
-                      Name
+                      Titel (optional)
                     </label>
                     <input
                       type="text"
                       id={`subtask-name-${index}`}
                       name="name"
-                      value={subtask.name}
+                      value={subtask.name ?? ""}
                       onChange={(e) => handleSubTaskChange(index, e)}
-                      required
                       className="mt-1 block w-full rounded-md border-gray-300"
+                      placeholder="z. B. Recherche – kann leer bleiben"
                     />
                   </div>
+
                   <div className="mb-2">
                     <label
                       htmlFor={`subtask-description-${index}`}
@@ -484,4 +524,6 @@ export default function SheetWithCreateTask({ userId, onTaskCreated }: Props) {
       </Sheet>
     </div>
   );
-}
+};
+
+export default SheetWithCreateTask;

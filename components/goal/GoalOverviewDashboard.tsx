@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from "react";
+"use client";
+
+import React, { useEffect, useMemo, useState } from "react";
 import { Goal, Task } from "@/utils/interface";
 import {
   parseISO,
-  isWithinInterval,
   startOfWeek,
   endOfWeek,
   startOfMonth,
@@ -27,41 +28,55 @@ import {
   updateGoal,
 } from "@/lib/api/goal";
 
+/** UI-Ansichten */
+type ViewMode = "goals" | "stats" | "history";
+/** Filter für FullGoalManagerSheet */
+type FilterType = "all" | "monthly" | "yearly" | "past";
+
 export default function GoalOverviewDashboard() {
   const [goals, setGoals] = useState<Goal[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Dialog/Editor Zustände
   const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
   const [editMode, setEditMode] = useState(false);
   const [moveMode, setMoveMode] = useState(false);
   const [editedGoal, setEditedGoal] = useState<Partial<Goal>>({});
   const [newStartDate, setNewStartDate] = useState("");
   const [newEndDate, setNewEndDate] = useState("");
-  const [filter, setFilter] = useState("all");
+
+  // Manager-Sheet
+  const [filter, setFilter] = useState<FilterType>("all");
   const [openSheet, setOpenSheet] = useState(false);
 
-  type ViewMode = "goals" | "stats" | "history";
   const [view, setView] = useState<ViewMode>("goals");
 
   useEffect(() => {
+    let abort = false;
     const fetchGoals = async () => {
       try {
         const sessionRes = await fetch("/api/auth/session");
         const session = await sessionRes.json();
         const userId = session?.user?.id;
-        if (!userId) return;
+        if (!userId || abort) return;
 
         const res = await fetch(`/api/goals/getGoals?userId=${userId}`);
         const data = await res.json();
-        setGoals(data.goals || []);
+        if (abort) return;
+        setGoals(Array.isArray(data.goals) ? data.goals : []);
       } catch (err) {
         console.error("Fehler beim Laden der Ziele", err);
       } finally {
-        setLoading(false);
+        if (!abort) setLoading(false);
       }
     };
     fetchGoals();
+    return () => {
+      abort = true;
+    };
   }, []);
 
+  /** Edit vorbereiten */
   const handleEdit = (goal: Goal) => {
     setSelectedGoal(goal);
     setEditMode(true);
@@ -74,9 +89,11 @@ export default function GoalOverviewDashboard() {
       goalType: goal.goalType || (goal as any).type,
       tasks: goal.tasks ? [...goal.tasks] : [],
       completedAt: goal.completedAt,
+      progress: goal.progress,
     });
   };
 
+  /** Neue Aufgabe im Edit-Dialog hinzufügen (lokal) */
   const handleAddTask = () => {
     setEditedGoal((prev) => ({
       ...prev,
@@ -103,21 +120,17 @@ export default function GoalOverviewDashboard() {
     }));
   };
 
-  // EINHEITLICH: optimistisches Toggle-Complete via API-Wrapper
+  /** Toggle abgeschlossen (optimistisch) */
   const handleToggleCompletion = async (goal: Goal) => {
     const nextProgress = goal.progress === 100 ? 0 : 100;
-    const completedAt =
-      nextProgress === 100 ? new Date().toISOString() : null;
+    const completedAt = nextProgress === 100 ? new Date().toISOString() : null;
 
     // Optimistic UI
-    setGoals((prev) =>
-      prev.map((g) =>
+    const prev = goals;
+    setGoals((p) =>
+      p.map((g) =>
         g._id === goal._id
-          ? {
-            ...g,
-            progress: nextProgress,
-            completedAt: completedAt ?? undefined,
-          }
+          ? { ...g, progress: nextProgress, completedAt: completedAt ?? undefined }
           : g
       )
     );
@@ -126,21 +139,16 @@ export default function GoalOverviewDashboard() {
       await patchGoalProgress(goal._id, nextProgress, completedAt);
     } catch (err) {
       console.error(err);
-      // rollback
-      setGoals((prev) =>
-        prev.map((g) =>
-          g._id === goal._id
-            ? { ...g, progress: goal.progress, completedAt: goal.completedAt }
-            : g
-        )
-      );
+      // Rollback
+      setGoals(prev);
     }
   };
 
+  /** Task-Felder im Edit-Dialog ändern */
   const handleTaskChange = (index: number, field: string, value: any) => {
     setEditedGoal((prev) => {
       const tasks = [...(prev.tasks || [])];
-      tasks[index] = { ...tasks[index], [field]: value };
+      tasks[index] = { ...(tasks[index] || {}), [field]: value };
       return { ...prev, tasks };
     });
   };
@@ -152,6 +160,7 @@ export default function GoalOverviewDashboard() {
     }));
   };
 
+  /** Move vorbereiten */
   const handleMove = (goal: Goal) => {
     setSelectedGoal(goal);
     setMoveMode(true);
@@ -160,7 +169,7 @@ export default function GoalOverviewDashboard() {
     setNewEndDate(goal.endDate);
   };
 
-  // Delete mit Optimistic-Update + Rollback
+  /** Löschen (optimistisch) */
   const handleDelete = async (goalId: string) => {
     const snapshot = goals;
     setGoals((p) => p.filter((g) => g._id !== goalId));
@@ -168,20 +177,17 @@ export default function GoalOverviewDashboard() {
       await deleteGoal(goalId);
     } catch (e) {
       console.error(e);
-      // rollback
       setGoals(snapshot);
     }
   };
 
-  // Duplicate – API call, neue Kopie oben einfügen
+  /** Duplizieren */
   const handleDuplicate = async (goalId: string) => {
     try {
       const { goal: copy } = await duplicateGoal(goalId);
       const copyUI = {
         ...copy,
-        title: copy.title?.includes("(Kopie)")
-          ? copy.title
-          : `${copy.title} (Kopie)`,
+        title: copy.title?.includes("(Kopie)") ? copy.title : `${copy.title} (Kopie)`,
       };
       setGoals((prev) => [copyUI, ...prev]);
     } catch (e) {
@@ -190,18 +196,18 @@ export default function GoalOverviewDashboard() {
   };
 
   const handleReflect = (goal: Goal) => {
+    // Platzhalter: hier ggf. Reflexionsflow öffnen
     console.log("Reflexion starten für", goal.title);
   };
 
+  /** Edit speichern */
   const handleSaveEdit = async () => {
     if (!selectedGoal) return;
 
-    // Optimistisch spiegeln
     const before = selectedGoal;
+    // Optimistisch in der Liste spiegeln
     setGoals((prev) =>
-      prev.map((g) =>
-        g._id === before._id ? ({ ...g, ...editedGoal } as Goal) : g
-      )
+      prev.map((g) => (g._id === before._id ? ({ ...g, ...editedGoal } as Goal) : g))
     );
 
     try {
@@ -216,11 +222,12 @@ export default function GoalOverviewDashboard() {
     }
   };
 
+  /** Move speichern */
   const handleSaveMove = async () => {
     if (!selectedGoal) return;
 
-    // Optimistisch spiegeln
     const before = selectedGoal;
+    // Optimistisch
     setGoals((prev) =>
       prev.map((g) =>
         g._id === before._id
@@ -245,17 +252,20 @@ export default function GoalOverviewDashboard() {
     }
   };
 
+  /** Nach Erstellung Ziel in Liste aufnehmen */
   const handleGoalCreated = (goal: Goal) => {
     setGoals((prev) => [...prev, goal]);
   };
 
-  // Kategorisierung – jetzt mit normalizeGoalType
-  const categorizeGoals = (all: Goal[]) => {
+  /** Kategorisierung – robust und übersichtlich */
+  const categorizeGoals = (
+    all: Goal[]
+  ): { weekly: Goal[]; monthly: Goal[]; yearly: Goal[]; past: Goal[]; mental: Goal[] } => {
     const now = new Date();
-    const weekStart = startOfWeek(now, { weekStartsOn: 1 });
-    const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
-    const monthStart = startOfMonth(now);
-    const monthEnd = endOfMonth(now);
+    const wStart = startOfWeek(now, { weekStartsOn: 1 });
+    const wEnd = endOfWeek(now, { weekStartsOn: 1 });
+    const mStart = startOfMonth(now);
+    const mEnd = endOfMonth(now);
 
     const weekly: Goal[] = [];
     const monthly: Goal[] = [];
@@ -263,78 +273,100 @@ export default function GoalOverviewDashboard() {
     const past: Goal[] = [];
     const mental: Goal[] = [];
 
-    all.forEach((goal) => {
+    const overlaps = (rangeStart: Date, rangeEnd: Date, start: Date, end: Date) =>
+      end >= rangeStart && start <= rangeEnd;
+
+    for (const goal of all ?? []) {
       const start = parseISO(goal.startDate);
       const end = parseISO(goal.endDate);
-      if (end < now && (goal.progress ?? 0) < 100) {
+
+      // abgelaufen (und nicht 100%)
+      if (end.getTime() < now.getTime() && (goal.progress ?? 0) < 100) {
         past.push(goal);
-        return;
+        continue;
       }
 
       const type = normalizeGoalType(goal.goalType || (goal as any).type);
+
       if (type === "weekly") {
-        if (
-          isWithinInterval(weekStart, { start, end }) ||
-          isWithinInterval(weekEnd, { start, end }) ||
-          isWithinInterval(now, { start, end })
-        ) {
-          weekly.push(goal);
-        }
+        if (overlaps(wStart, wEnd, start, end)) weekly.push(goal);
       } else if (type === "monthly") {
-        if (
-          isWithinInterval(now, { start, end }) ||
-          isWithinInterval(monthStart, { start, end }) ||
-          isWithinInterval(monthEnd, { start, end })
-        ) {
-          monthly.push(goal);
-        }
+        if (overlaps(mStart, mEnd, start, end)) monthly.push(goal);
       } else if (type === "yearly") {
         yearly.push(goal);
       } else if (type === "mental") {
         mental.push(goal);
       }
-    });
+    }
+
     return { weekly, monthly, yearly, past, mental };
   };
+  const { weekly, monthly, yearly, mental, past } = useMemo(
+    () => categorizeGoals(goals),
+    [goals]
+  );
 
-  const { weekly, monthly, yearly, mental, past } = categorizeGoals(goals);
-
-  if (loading) return <p className="text-center">Ziele werden geladen...</p>;
+  if (loading) {
+    return (
+      <div className="rounded-xl border bg-white p-4 shadow-sm">
+        <p className="text-sm text-gray-600">Ziele werden geladen…</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-800">Zielübersicht</h2>
-        <Button
-          className="border-solid color-blue"
-          onClick={() => setOpenSheet(true)}
-        >
-          Alle Ziele anzeigen
-        </Button>
+      {/* Sichtbarer, einheitlicher Header */}
+      <div
+        className="
+          flex flex-wrap items-center justify-between gap-3
+          rounded-2xl border shadow-sm
+          px-4 py-3 sm:px-6
+          bg-gradient-to-r from-slate-50 to-slate-100
+          dark:from-zinc-800 dark:to-zinc-800
+        "
+      >
+        <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-zinc-50">
+          Zielübersicht
+        </h2>
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={() => setOpenSheet(true)}
+            className="shadow-sm"
+          >
+            Alle Ziele anzeigen
+          </Button>
+        </div>
       </div>
 
-      {/* Ansichtsschalter */}
-      <div className="flex gap-2 rounded-xl bg-muted p-1 w-fit">
+      {/* Ansichtsschalter – gut abgesetzt sichtbar */}
+      <div
+        className="
+          flex flex-wrap gap-2 w-fit p-1 rounded-xl border
+          bg-slate-50 text-slate-800
+          dark:bg-zinc-800 dark:text-zinc-50
+        "
+      >
         <Button
           variant={view === "goals" ? "default" : "ghost"}
           onClick={() => setView("goals")}
           aria-pressed={view === "goals"}
         >
-          goals
+          Ziele
         </Button>
         <Button
           variant={view === "stats" ? "default" : "ghost"}
           onClick={() => setView("stats")}
           aria-pressed={view === "stats"}
         >
-          goals stat
+          Statistik
         </Button>
         <Button
           variant={view === "history" ? "default" : "ghost"}
           onClick={() => setView("history")}
           aria-pressed={view === "history"}
         >
-          goals history
+          Historie
         </Button>
       </div>
 
@@ -355,7 +387,7 @@ export default function GoalOverviewDashboard() {
           {/* Monatsziele (aktueller Monat) */}
           {monthly.length > 0 && (
             <section className="space-y-4">
-              <h2 className="text-xl font-semibold">
+              <h2 className="text-lg sm:text-xl font-semibold text-slate-900 dark:text-zinc-50">
                 📅 Monatsziele (aktueller Monat)
               </h2>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -378,29 +410,35 @@ export default function GoalOverviewDashboard() {
           {/* Mentale Ziele (optional) */}
           {mental.length > 0 && (
             <section className="space-y-4">
-              <h2 className="text-xl font-semibold">🧠 Mentale Ziele</h2>
-              {mental.map((goal) => (
-                <GoalCard
-                  key={goal._id}
-                  goal={goal}
-                  onEdit={handleEdit}
-                  onMove={handleMove}
-                  onDelete={handleDelete}
-                  onDuplicate={handleDuplicate}
-                  onReflect={handleReflect}
-                  onToggleComplete={handleToggleCompletion}
-                />
-              ))}
+              <h2 className="text-lg sm:text-xl font-semibold text-slate-900 dark:text-zinc-50">
+                🧠 Mentale Ziele
+              </h2>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {mental.map((goal) => (
+                  <GoalCard
+                    key={goal._id}
+                    goal={goal}
+                    onEdit={handleEdit}
+                    onMove={handleMove}
+                    onDelete={handleDelete}
+                    onDuplicate={handleDuplicate}
+                    onReflect={handleReflect}
+                    onToggleComplete={handleToggleCompletion}
+                  />
+                ))}
+              </div>
             </section>
           )}
         </>
       )}
 
       {view === "stats" && (
-        <section className="space-y-4 rounded-2xl border border-border p-4 shadow-sm
-                    bg-white text-gray-900
-                    dark:bg-zinc-900 dark:text-zinc-50">
-          <h3 className="text-xl font-semibold text-foreground">Ziel-Statistiken (leicht)</h3>
+        <section
+          className="space-y-4 rounded-2xl border border-border p-4 shadow-sm
+                     bg-white text-gray-900
+                     dark:bg-zinc-900 dark:text-zinc-50"
+        >
+          <h3 className="text-xl font-semibold text-foreground">Ziel-Statistiken</h3>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard label="Wöchentliche Ziele (aktuell)" value={weekly.length} />
             <StatCard label="Monatsziele (akt. Monat)" value={monthly.length} />
@@ -412,18 +450,19 @@ export default function GoalOverviewDashboard() {
 
       {view === "history" && (
         <section className="space-y-2">
-          <h3 className="text-xl font-semibold">Goals History</h3>
+          <h3 className="text-xl font-semibold text-slate-900 dark:text-zinc-50">
+            Historie (abgeschlossen)
+          </h3>
           <p className="text-sm text-muted-foreground">
-            Hier kannst du später abgeschlossene und vergangene Ziele
-            chronologisch einsehen. (Platzhalter)
+            Zuletzt abgeschlossene Ziele (Top 5).
           </p>
-          <div className="space-y-2">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {goals
               .filter((g) => (g.progress ?? 0) === 100)
               .sort((a, b) =>
                 a.completedAt
                   ? new Date(b.completedAt ?? 0).getTime() -
-                  new Date(a.completedAt ?? 0).getTime()
+                    new Date(a.completedAt ?? 0).getTime()
                   : 0
               )
               .slice(0, 5)
@@ -443,7 +482,7 @@ export default function GoalOverviewDashboard() {
         </section>
       )}
 
-      {/* Manager Sheet */}
+      {/* Manager Sheet – alle Ziele mit Filtern */}
       <FullGoalManagerSheet
         open={openSheet}
         onOpenChange={setOpenSheet}
@@ -461,21 +500,28 @@ export default function GoalOverviewDashboard() {
         onToggleComplete={handleToggleCompletion}
       />
 
-      {/* Ziel erstellen */}
+      {/* FAB: Neues Ziel */}
       <GoalCreateSheet onGoalCreated={handleGoalCreated} />
 
+      {/* Bearbeiten/Verschieben Dialog */}
       {selectedGoal && (
-        <Dialog open={!!selectedGoal} onOpenChange={() => setSelectedGoal(null)}>
+        <Dialog
+          open={!!selectedGoal}
+          onOpenChange={(o) => {
+            if (!o) setSelectedGoal(null);
+          }}
+        >
           <DialogContent className="sm:max-w-lg w-[95vw]">
             <DialogHeader>
               <DialogTitle>
                 {editMode
                   ? "Ziel bearbeiten"
                   : moveMode
-                    ? "Ziel verschieben"
-                    : "Ziel"}
+                  ? "Ziel verschieben"
+                  : "Ziel"}
               </DialogTitle>
             </DialogHeader>
+
             {editMode && (
               <>
                 <label className="block text-sm font-medium mb-1">Titel</label>
@@ -487,6 +533,7 @@ export default function GoalOverviewDashboard() {
                   }
                   className="border p-2 w-full rounded mb-3"
                 />
+
                 <label className="block text-sm font-medium mb-1">
                   Beschreibung
                 </label>
@@ -500,41 +547,50 @@ export default function GoalOverviewDashboard() {
                   }
                   className="border p-2 w-full rounded mb-3"
                 />
-                <label className="block text-sm font-medium mb-1">
-                  Startdatum
-                </label>
-                <input
-                  type="date"
-                  value={editedGoal.startDate || ""}
-                  onChange={(e) =>
-                    setEditedGoal((prev) => ({
-                      ...prev,
-                      startDate: e.target.value,
-                    }))
-                  }
-                  className="border p-2 w-full rounded mb-3"
-                />
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">
+                      Startdatum
+                    </label>
+                    <input
+                      type="date"
+                      value={editedGoal.startDate || ""}
+                      onChange={(e) =>
+                        setEditedGoal((prev) => ({
+                          ...prev,
+                          startDate: e.target.value,
+                        }))
+                      }
+                      className="border p-2 w-full rounded"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">
+                      Enddatum
+                    </label>
+                    <input
+                      type="date"
+                      value={editedGoal.endDate || ""}
+                      onChange={(e) =>
+                        setEditedGoal((prev) => ({
+                          ...prev,
+                          endDate: e.target.value,
+                        }))
+                      }
+                      className="border p-2 w-full rounded"
+                    />
+                  </div>
+                </div>
+
                 {editedGoal.completedAt && (
-                  <p className="text-xs text-gray-500 mb-3">
+                  <p className="text-xs text-gray-500 mt-2">
                     Erledigt am{" "}
                     {new Date(editedGoal.completedAt).toLocaleString()}
                   </p>
                 )}
-                <label className="block text-sm font-medium mb-1">
-                  Enddatum
-                </label>
-                <input
-                  type="date"
-                  value={editedGoal.endDate || ""}
-                  onChange={(e) =>
-                    setEditedGoal((prev) => ({
-                      ...prev,
-                      endDate: e.target.value,
-                    }))
-                  }
-                  className="border p-2 w-full rounded mb-3"
-                />
-                <label className="block text-sm font-medium mb-1">
+
+                <label className="block text-sm font-medium mb-1 mt-3">
                   Zieltyp
                 </label>
                 <select
@@ -553,7 +609,7 @@ export default function GoalOverviewDashboard() {
                 </select>
 
                 {(editedGoal.tasks as any[])?.map((task: any, idx: number) => (
-                  <div key={idx} className="border p-3 rounded mb-3 space-y-1">
+                  <div key={task?._id || idx} className="border p-3 rounded mb-3 space-y-1">
                     <input
                       type="text"
                       placeholder="Name"
@@ -641,6 +697,7 @@ export default function GoalOverviewDashboard() {
                     </button>
                   </div>
                 ))}
+
                 <Button
                   variant="outline"
                   type="button"
@@ -649,17 +706,16 @@ export default function GoalOverviewDashboard() {
                 >
                   + Aufgabe hinzufügen
                 </Button>
-                <div className="flex justify-end gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => setSelectedGoal(null)}
-                  >
+
+                <div className="flex flex-wrap justify-end gap-2">
+                  <Button variant="outline" onClick={() => setSelectedGoal(null)}>
                     Abbrechen
                   </Button>
                   <Button onClick={handleSaveEdit}>Speichern</Button>
                 </div>
               </>
             )}
+
             {moveMode && (
               <>
                 <label className="block text-sm font-medium mb-1">
@@ -680,11 +736,8 @@ export default function GoalOverviewDashboard() {
                   onChange={(e) => setNewEndDate(e.target.value)}
                   className="border p-2 w-full rounded mb-4"
                 />
-                <div className="flex justify-end gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => setSelectedGoal(null)}
-                  >
+                <div className="flex flex-wrap justify-end gap-2">
+                  <Button variant="outline" onClick={() => setSelectedGoal(null)}>
                     Abbrechen
                   </Button>
                   <Button onClick={handleSaveMove}>Speichern</Button>

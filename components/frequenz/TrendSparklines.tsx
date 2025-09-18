@@ -32,7 +32,13 @@ function deltaWindow(series: number[], win: number) {
   return a - b;
 }
 
-export default function TrendSparklines({ userId, defaultDays = 28 }: { userId: string; defaultDays?: 7 | 14 | 28 }) {
+export default function TrendSparklines({
+  userId,
+  defaultDays = 28,
+}: {
+  userId: string;
+  defaultDays?: 7 | 14 | 28;
+}) {
   const [days, setDays] = React.useState<7 | 14 | 28>(defaultDays);
   const [series, setSeries] = React.useState<Point[]>([]);
   const [loading, setLoading] = React.useState(false);
@@ -71,15 +77,19 @@ export default function TrendSparklines({ userId, defaultDays = 28 }: { userId: 
   const d14_conv = deltaWindow(convArr, 14);
 
   return (
-    <div className="rounded-xl border bg-white p-4">
-      <div className="flex items-center justify-between gap-3">
+    <div className="rounded-xl border bg-white p-3 sm:p-4">
+      {/* Header & Controls: mobile-first, wrap */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
         <h3 className="text-base font-semibold">Trends (Sparklines)</h3>
-        <div className="flex items-center gap-2">
-          <label className="text-xs text-gray-600">Zeitfenster</label>
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="text-xs text-gray-600" htmlFor="trend-range">
+            Zeitfenster
+          </label>
           <select
+            id="trend-range"
             value={days}
             onChange={(e) => setDays(Number(e.target.value) as 7 | 14 | 28)}
-            className="px-2 py-1.5 border rounded text-sm"
+            className="px-2 py-1.5 border rounded text-sm w-full xs:w-auto sm:w-auto"
           >
             <option value={7}>7 Tage</option>
             <option value={14}>14 Tage</option>
@@ -87,7 +97,7 @@ export default function TrendSparklines({ userId, defaultDays = 28 }: { userId: 
           </select>
           <button
             onClick={load}
-            className="px-2 py-1.5 rounded border text-sm bg-white hover:bg-gray-50"
+            className="px-2 py-1.5 rounded border text-sm bg-white hover:bg-gray-50 w-full xs:w-auto sm:w-auto"
             title="Neu laden"
           >
             Aktualisieren
@@ -96,11 +106,10 @@ export default function TrendSparklines({ userId, defaultDays = 28 }: { userId: 
       </div>
 
       {loading && <div className="mt-3 text-xs text-gray-500">Lade Daten…</div>}
-      {error && <div className="mt-3 text-xs text-rose-600">{error}</div>}
+      {error && <div className="mt-3 text-xs text-rose-600 break-words">{error}</div>}
 
       {!!series.length && (
-        <div className="grid md:grid-cols-3 gap-4 mt-4">
-          {/* Frequency % */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 mt-4">
           <SparkCard
             title="Frequency (%)"
             dataKey="taskScore"
@@ -112,7 +121,6 @@ export default function TrendSparklines({ userId, defaultDays = 28 }: { userId: 
             d14={d14_freq}
           />
 
-          {/* Conviction Target (0..10) */}
           <SparkCard
             title="Conviction Target"
             dataKey="convTarget"
@@ -123,7 +131,6 @@ export default function TrendSparklines({ userId, defaultDays = 28 }: { userId: 
             d14={d14_conv}
           />
 
-          {/* MoodAvg (−1..+1) */}
           <SparkCard
             title="Mood Avg"
             dataKey="moodAvg"
@@ -137,8 +144,8 @@ export default function TrendSparklines({ userId, defaultDays = 28 }: { userId: 
       )}
 
       <p className="mt-3 text-[11px] text-gray-600">
-        Δ7/Δ14 zeigen den Unterschied zwischen dem Durchschnitt der letzten 7/14 Tage und dem Durchschnitt der 7/14 Tage
-        davor. Werte stammen aus <code>frequency_daily_summary</code>.
+        Δ7/Δ14: Differenz zwischen dem Durchschnitt der letzten 7/14 Tage und dem der 7/14 Tage davor
+        (Quelle: <code>frequency_daily_summary</code>).
       </p>
     </div>
   );
@@ -170,14 +177,15 @@ function SparkCard({
 
   return (
     <div className="rounded-lg border p-3">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <div className="text-sm font-medium">{title}</div>
         <div className="text-[10px] text-gray-600">
           {Number.isFinite(last) ? (formatter ? formatter(last) : `${last}${unit}`) : '—'}
         </div>
       </div>
 
-      <div className="mt-2 h-24">
+      {/* höhere Chart-Höhe auf Mobile für bessere Touch-Zielgröße */}
+      <div className="mt-2 h-28 sm:h-24">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={series}>
             <CartesianGrid stroke="#f3f4f6" strokeDasharray="4 4" />
@@ -209,9 +217,10 @@ function DeltaBadge({ label, value, unit }: { label: string; value?: number | nu
   const s = Math.sign(value);
   const tone = s > 0 ? 'text-emerald-600' : s < 0 ? 'text-rose-600' : 'text-gray-600';
   const abs = Math.abs(value);
+  const digits = unit === '%' ? 1 : 2;
   return (
     <span className={`inline-flex items-center gap-1 ${tone}`}>
-      {label}: {abs.toFixed(unit === '%' ? 1 : 2)}
+      {label}: {abs.toFixed(digits)}
       {unit}
     </span>
   );

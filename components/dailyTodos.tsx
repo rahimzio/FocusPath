@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import Calendar from "react-calendar";
 import { Value } from "react-calendar/dist/esm/shared/types.js";
-import { FaCalendarAlt, FaCheckCircle, FaEdit } from "react-icons/fa";
+import { FaCalendarAlt, FaCheckCircle, FaEdit, FaPlus } from "react-icons/fa";
 import { toast } from "react-toastify";
 import ProgressBar from "./todo/ProgressBar";
 import DeleteRecurringTaskDialog from "./todo/DeleteRecurringTask";
@@ -58,6 +58,9 @@ const DailyTaskList = () => {
   const [showNoTimeOnMobile, setShowNoTimeOnMobile] = useState(false);
   const [isSavingDayScore, setIsSavingDayScore] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [showReflection, setShowReflection] = useState(true);
+  const [isCreateOpenMobile, setIsCreateOpenMobile] = useState(false);
+
   useEffect(() => {
     getSession().then((session) => {
       if (session?.user?.id) setUserId(session.user.id);
@@ -256,8 +259,38 @@ const DailyTaskList = () => {
           {budgetInfo}
         </p>
       )}
- <AvoidChecklist userId={userId} date={selectedDate} />
-      <ReflectionBlocks userId={userId} date={selectedDate} />
+      <AvoidChecklist userId={userId} date={selectedDate} />
+      {/* Toggle: Mobile */}
+      <button
+        onClick={() => setShowReflection(!showReflection)}
+        className="block sm:hidden w-full py-2 rounded-lg bg-blue-500 text-white mb-4"
+      >
+        {showReflection ? "Reflexion ausblenden" : "Reflexion anzeigen"}
+      </button>
+
+      {/* Toggle: Desktop */}
+      <div className="hidden sm:block">
+        <button
+          onClick={() => setShowReflection(!showReflection)}
+          className="w-full py-2 rounded-lg bg-blue-500 text-white mb-4"
+        >
+          {showReflection ? "Reflexion ausblenden" : "Reflexion anzeigen"}
+        </button>
+      </div>
+
+      {/* Mobile: nur anzeigen, wenn aktiviert */}
+      {showReflection && (
+        <div className="block sm:hidden">
+          <ReflectionBlocks userId={userId} date={selectedDate} />
+        </div>
+      )}
+
+      {/* Desktop: anzeigen/ausblenden über selben Toggle */}
+      {showReflection && (
+        <div className="hidden sm:block">
+          <ReflectionBlocks userId={userId} date={selectedDate} />
+        </div>
+      )}
       <p className="text-center text-sm text-[#20253b] font-medium rounded-xl shadow border-[#e5e5ea] font-wweight-600 py-2">
         Bisheriges Tages Rating <span className="underline">{dayScore}</span>
       </p>
@@ -367,6 +400,32 @@ const DailyTaskList = () => {
       />
 
       {userId && <SheetWithCreateTask userId={userId} onTaskCreated={handleTaskCreated} />}
+       {/* Mobil: eigenes FAB (Plus-Icon) steuert das Sheet kontrolliert */}
+      {userId && (
+        <>
+          {/* Sheet im kontrollierten Modus (ohne eigenen Trigger sichtbar) */}
+          <div className="sm:hidden">
+            <SheetWithCreateTask
+              userId={userId}
+              onTaskCreated={handleTaskCreated}
+              open={isCreateOpenMobile}                 // ⬅️ kontrolliert
+              onOpenChange={setIsCreateOpenMobile}      // ⬅️ kontrolliert
+              /* optional: falls dein Sheet intern einen Button rendert,
+                 kannst du in popUpCreateTask eine prop wie hideTrigger einführen
+                 und hier hideTrigger an true setzen. */
+            />
+          </div>
+
+          {/* Floating Action Button – nur mobil sichtbar */}
+          <button
+            aria-label="Neue Aufgabe"
+            onClick={() => setIsCreateOpenMobile(true)}
+            className="sm:hidden fixed bottom-5 right-5 h-14 w-14 rounded-full shadow-lg bg-[#007AFF] text-white flex items-center justify-center active:scale-95 transition"
+          >
+            <FaPlus className="text-xl" />
+          </button>
+        </>
+      )}
     </div>
   );
 };

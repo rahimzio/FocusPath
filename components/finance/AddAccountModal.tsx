@@ -1,9 +1,12 @@
 "use client";
 import { useMemo, useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose,
+} from "@/components/ui/dialog";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { X } from "lucide-react";
 
 type AccountType = "bank" | "broker" | "exchange" | "wallet";
 
@@ -19,7 +22,10 @@ export default function AddAccountModal({
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  const isValid = useMemo(() => !!userId && name.trim().length >= 2 && !!type && !!baseCurrency, [userId, name, type, baseCurrency]);
+  const isValid = useMemo(
+    () => !!userId && name.trim().length >= 2 && !!type && !!baseCurrency,
+    [userId, name, type, baseCurrency]
+  );
 
   async function handleSave() {
     if (!isValid || saving) return;
@@ -50,20 +56,34 @@ export default function AddAccountModal({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild><Button>Konto/Depot anlegen</Button></DialogTrigger>
-      <DialogContent>
-        <DialogHeader><DialogTitle>Neues Konto/Depot</DialogTitle></DialogHeader>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <div className="flex items-center justify-between">
+            <DialogTitle>Neues Konto/Depot</DialogTitle>
+            <DialogClose asChild>
+              <Button variant="ghost" size="icon" aria-label="Schließen">
+                <X className="w-5 h-5" />
+              </Button>
+            </DialogClose>
+          </div>
+        </DialogHeader>
 
         <div className="space-y-3">
           <div>
             <label className="text-sm">Name</label>
-            <Input placeholder="z. B. Binance Main / N26 / Trade Republic" value={name} onChange={(e) => setName(e.target.value)} />
+            <Input
+              placeholder="z. B. Binance Main / N26 / Trade Republic"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              autoFocus
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="text-sm">Typ</label>
               <Select value={type} onValueChange={(v: AccountType) => setType(v)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Typ wählen" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="bank">Bank</SelectItem>
                   <SelectItem value="broker">Broker</SelectItem>
@@ -75,7 +95,7 @@ export default function AddAccountModal({
             <div>
               <label className="text-sm">Währung</label>
               <Select value={baseCurrency} onValueChange={setBaseCurrency}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Währung" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="EUR">EUR</SelectItem>
                   <SelectItem value="USD">USD</SelectItem>
@@ -92,9 +112,15 @@ export default function AddAccountModal({
           </div>
 
           {err && <p className="text-sm text-red-600">{err}</p>}
-          <Button className="w-full" onClick={handleSave} disabled={!isValid || saving}>
-            {saving ? "Speichere…" : "Speichern"}
-          </Button>
+
+          <div className="flex items-center justify-end gap-2">
+            <DialogClose asChild>
+              <Button variant="outline">Abbrechen</Button>
+            </DialogClose>
+            <Button className="w-28" onClick={handleSave} disabled={!isValid || saving}>
+              {saving ? "Speichere…" : "Speichern"}
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

@@ -1,3 +1,4 @@
+// SavingGoalsOverview.tsx
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
@@ -8,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import AddSavingGoalModal from "./AddSavingGoalModal";
 import type { SavingGoal } from "@/utils/interface";
 
 function fmtEUR(n: number) {
@@ -18,15 +20,12 @@ function fmtEUR(n: number) {
     maximumFractionDigits: 2,
   }).format(Number.isFinite(n) ? n : 0);
 }
-
 function fmtDate(d?: string | null) {
   if (!d) return null;
   const date = new Date(d);
   if (isNaN(date.getTime())) return null;
   return new Intl.DateTimeFormat("de-DE", { dateStyle: "medium" }).format(date);
 }
-
-// toleranter Betrag-Parser (DE/EN)
 function parseAmount(s: string): number {
   if (!s) return NaN;
   const cleaned = s.replace(/[^\d,.\-]/g, "");
@@ -53,7 +52,6 @@ export default function SavingGoalsOverview() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  // Modal-State
   const [activeGoal, setActiveGoal] = useState<GoalView | null>(null);
   const [mode, setMode] = useState<"deposit" | "withdraw">("deposit");
   const [amountStr, setAmountStr] = useState("");
@@ -93,7 +91,6 @@ export default function SavingGoalsOverview() {
         const monthly = (g as any).monthlyContribution as number | undefined;
         return { ...(g as any), target, current, percent, remaining, deadlineLabel, monthly };
       })
-      // Sortieren: zuerst Ziele mit Deadline (frühere zuerst), sonst nach höchstem Fortschritt
       .sort((a, b) => {
         const ad = a.deadlineLabel ? 0 : 1;
         const bd = b.deadlineLabel ? 0 : 1;
@@ -110,24 +107,15 @@ export default function SavingGoalsOverview() {
     setSaving(true); setModalErr(null);
     try {
       const id = String((activeGoal as any)._id ?? (activeGoal as any).id);
-      const body = {
-        userId,
-        goalId: id,
-        delta: mode === "deposit" ? amt : -amt,
-        date: new Date(date).toISOString(),
-        note: note.trim() || undefined,
-      };
+      const body = { userId, goalId: id, delta: mode === "deposit" ? amt : -amt, date: new Date(date).toISOString(), note: note.trim() || undefined };
       const r = await fetch("/api/finance/updateSavingGoal", {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body)
       });
       if (!r.ok) {
-        let m = "Fehler beim Aktualisieren";
-        try { m = (await r.json()).message || m; } catch {}
+        let m = "Fehler beim Aktualisieren"; try { m = (await r.json()).message || m; } catch {}
         throw new Error(m);
       }
-      // Refresh
       await load();
-      // Modal reset
       setActiveGoal(null);
       setMode("deposit"); setAmountStr(""); setNote("");
       setDate(new Date().toISOString().slice(0, 10));
@@ -140,33 +128,60 @@ export default function SavingGoalsOverview() {
 
   if (loading) return <p>Sparziele werden geladen…</p>;
   if (err) return <p className="text-red-600">{err}</p>;
-  if (processed.length === 0) return <p>Noch keine Sparziele angelegt.</p>;
+
+  if (processed.length === 0) {
+    return (
+      <Card className="w-full max-w-full overflow-hidden">
+        <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <CardTitle className="text-gray-800 dark:text-gray-100">Sparziele</CardTitle>
+          <AddSavingGoalModal userId={userId} onSaved={load} />
+        </CardHeader>
+        <CardContent>Noch keine Sparziele angelegt.</CardContent>
+      </Card>
+    );
+  }
 
   return (
     <>
-      <div className="grid gap-4">
+      {/* Header-Zeile: bricht sauber auf mobilen Geräten um */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2 min-w-0">
+        <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100 truncate">
+          Sparziele
+        </h3>
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <AddSavingGoalModal userId={userId} onSaved={load} />
+        </div>
+      </div>
+
+      {/* Responsive Grid: 1 / 2 / 3 Spalten */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {processed.map((g, idx) => {
           const key = (g as any)._id ?? `${g.title}-${idx}`;
-          const id = String((g as any)._id ?? (g as any).id ?? key);
           return (
             <Card
               key={key}
-              className="cursor-pointer hover:bg-muted/30 transition-colors"
+              className="cursor-pointer hover:bg-muted/30 transition-colors w-full max-w-full min-w-0"
               onClick={() => setActiveGoal(g)}
             >
-              <CardHeader className="flex items-center justify-between space-y-0">
-                <CardTitle className="text-base font-semibold">{g.title}</CardTitle>
-                <div className="flex gap-2">
-                  {g.deadlineLabel && <Badge variant="secondary">Bis {g.deadlineLabel}</Badge>}
-                  {typeof g.monthly === "number" && g.monthly > 0 && (
-                    <Badge variant="outline">Monatlich: {fmtEUR(g.monthly)}</Badge>
+              <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 space-y-0 min-w-0">
+                {/* Titel kürzt neben den Badges/Buttons statt Layout zu sprengen */}
+                <CardTitle className="text-base font-semibold break-words sm:truncate sm:max-w-[60%]">
+                  {g.title}
+                </CardTitle>
+
+                <div className="flex items-center flex-wrap gap-2 sm:justify-end">
+                  {g.deadlineLabel && (
+                    <Badge variant="secondary" className="whitespace-nowrap">Bis {g.deadlineLabel}</Badge>
                   )}
-                  {/* expliziter Button (öffnet dasselbe Modal) */}
+                  {typeof g.monthly === "number" && g.monthly > 0 && (
+                    <Badge variant="outline" className="whitespace-nowrap">Monatlich: {fmtEUR(g.monthly)}</Badge>
+                  )}
                   <Button
                     variant="secondary"
                     size="sm"
                     onClick={(e) => { e.stopPropagation(); setActiveGoal(g); }}
                     aria-label={`Sparziel ${g.title} anpassen`}
+                    className="whitespace-nowrap"
                   >
                     Einzahlen / Abheben
                   </Button>
@@ -181,7 +196,6 @@ export default function SavingGoalsOverview() {
                   </span>
                 </div>
                 <Progress value={g.percent} />
-
                 <div className="flex justify-between text-sm">
                   <span>Restbetrag</span>
                   <span className="tabular-nums">{fmtEUR(g.remaining)}</span>
@@ -192,9 +206,9 @@ export default function SavingGoalsOverview() {
         })}
       </div>
 
-      {/* Adjust-Modal (kontrolliert) */}
+      {/* Modal: kompakte, responsive Breite */}
       <Dialog open={!!activeGoal} onOpenChange={(o) => !o && setActiveGoal(null)}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md w-full">
           <DialogHeader>
             <DialogTitle>
               Sparziel anpassen{activeGoal ? ` – ${activeGoal.title}` : ""}
@@ -202,7 +216,7 @@ export default function SavingGoalsOverview() {
           </DialogHeader>
 
           <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <div>
                 <label className="text-sm">Aktion</label>
                 <Select value={mode} onValueChange={(v) => setMode(v as any)}>
@@ -221,12 +235,7 @@ export default function SavingGoalsOverview() {
 
             <div>
               <label className="text-sm">Betrag</label>
-              <Input
-                inputMode="decimal"
-                value={amountStr}
-                onChange={(e) => setAmountStr(e.target.value)}
-                placeholder="z. B. 50,00"
-              />
+              <Input inputMode="decimal" value={amountStr} onChange={(e) => setAmountStr(e.target.value)} placeholder="z. B. 50,00" />
             </div>
 
             <div>

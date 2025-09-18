@@ -4,7 +4,7 @@ import React, { useMemo, useEffect } from "react";
 import { FormProvider, useForm, useFieldArray } from "react-hook-form";
 import useSWR from "swr";
 import { TradeEntry, Account, GameLibrary } from "@/utils/interface";
-
+import { Textarea } from "@/components/ui/textarea";
 import {
   Card, CardHeader, CardTitle, CardContent, CardFooter,
 } from "@/components/ui/card";
@@ -22,6 +22,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 
 import TEFGeneral from "./trade-entry/TEFGeneral";
 import TEFStrategy from "./trade-entry/TEFStrategy";
+import ProcessKPIBadge from "./trade-entry/ProcessKPIBadge";
+import ProcessFocusPanel from "./trade-entry/ProcessFocusPanel";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -33,8 +35,8 @@ type BiasExec = "RR" | "RW" | "WR" | "WW";
 
 /* Fallback-Library für mentale Fehler */
 const DEFAULT_EMOTION_LIBRARY: { name: string; items: string[] }[] = [
-  { name: "Angst", items: ["Exit zu früh", "Trade verpasst", "Nicht geklickt"] },
-  { name: "Gier", items: ["Overtrading", "Zu spät rein", "Zu viele Adds"] },
+  { name: "Angst", items: ["Exit zu früh", "zu früher entry", "Nicht geklickt", "nicht auf bos/cisd gewartet"] },
+  { name: "Gier", items: ["Overtrading", "zu später entry", "zu viele Adds"] },
   { name: "Wut", items: ["Revenge", "Plan ignoriert", "SL verschoben"] },
   { name: "Overconfidence", items: ["Size zu groß", "Kein SL gesetzt"] },
   { name: "Undiszipliniert", items: ["Regelbruch", "Ablenkung", "Impulsiv"] },
@@ -83,7 +85,11 @@ function minutesBetween(start?: string, end?: string) {
   if ([sh, sm, eh, em].some((n) => Number.isNaN(n))) return 0;
   return Math.max(0, (eh * 60 + em) - (sh * 60 + sm));
 }
-
+function dateOnly(d?: string) {
+  if (!d) return "";
+  // ISO -> "YYYY-MM-DD"
+  return d.length > 10 ? d.slice(0, 10) : d;
+}
 /** Pflichtfelder prüfen – Draft, wenn etwas fehlt */
 function computeMissingFields(values: any) {
   const missing: string[] = [];
@@ -167,6 +173,17 @@ export default function TradeEntryForm({
     strategyAdherence?: "yes" | "partial" | "no";
     hasPartialExits?: boolean;
     partialExits?: PartialExitForm[];
+    // in useForm defaultValues ergänzen:
+    processIntent?: string;                 // 1-Satz-Intention (Pre)
+    processFocus?: string[];               // Auswahl aus Shortlist
+    ifThenPlan?: string;                   // "Wenn X, dann Y"
+    processAdherence?: number;
+    tiltNoticed?: boolean;                // Tilt bemerkt?
+    cooldownDone?: boolean;               // Kurzer Reset gemacht?
+    processDebrief?: string;              // 1-Satz-Reflexion (Post)
+    hidePnLUntilDebrief?: boolean;        // UI-Flag (lokal)
+    luckFactor?: "positive" | "neutral" | "negative";
+    processNotes?: string;
   }>({
     defaultValues: {
       ...initialData,
@@ -208,14 +225,25 @@ export default function TradeEntryForm({
       customMistake: "",
       strategyAdherence: (initialData as any)?.strategyAdherence || undefined,
       hasPartialExits: (initialData as any)?.hasPartialExits || false,
+      // in useForm defaultValues ergänzen:
+      processIntent: (initialData as any)?.processIntent || "",
+      processFocus: (initialData as any)?.processFocus || [],
+      ifThenPlan: (initialData as any)?.ifThenPlan || "",
+      processAdherence: (initialData as any)?.processAdherence ?? 0,
+      tiltNoticed: (initialData as any)?.tiltNoticed ?? false,
+      cooldownDone: (initialData as any)?.cooldownDone ?? false,
+      processDebrief: (initialData as any)?.processDebrief || "",
+      hidePnLUntilDebrief: (initialData as any)?.hidePnLUntilDebrief ?? true,
+      luckFactor: (initialData as any)?.luckFactor ?? "neutral",
+      processNotes: (initialData as any)?.processNotes ?? "",
       partialExits: Array.isArray((initialData as any)?.partialExits)
         ? ((initialData as any)?.partialExits as any[]).map((p) => ({
-            label: p?.label ?? "",
-            price: Number.isFinite(Number(p?.price)) ? Number(p?.price) : undefined,
-            percent: Number.isFinite(Number(p?.percent)) ? Number(p?.percent) : undefined,
-            at: p?.at ?? "",
-            note: p?.note ?? "",
-          }))
+          label: p?.label ?? "",
+          price: Number.isFinite(Number(p?.price)) ? Number(p?.price) : undefined,
+          percent: Number.isFinite(Number(p?.percent)) ? Number(p?.percent) : undefined,
+          at: p?.at ?? "",
+          note: p?.note ?? "",
+        }))
         : [],
     } as any,
   });
@@ -249,38 +277,38 @@ export default function TradeEntryForm({
   );
 
   /* -------- 🆕 A/B/C Game Library laden (richtige API-Struktur: { items }) -------- */
- // 🆕 A/B/C Game Library laden (neues Response-Format: { items, nextCursor, summary })
-type GameLibItem = { _id: string; userId: string; label: string; game: "A" | "B" | "C"; points?: number; active?: boolean };
+  // 🆕 A/B/C Game Library laden (neues Response-Format: { items, nextCursor, summary })
+  type GameLibItem = { _id: string; userId: string; label: string; game: "A" | "B" | "C"; points?: number; active?: boolean };
 
-const { data: gameLibRes, error: gameLibErr, isLoading: gameLibLoading } = useSWR<{
-  items: GameLibItem[];
-  nextCursor?: string | null;
-  summary?: any;
-}>(
-  userId ? `/api/trading/gameLibrary?userId=${userId}&active=true&limit=500` : null,
-  fetcher
-);
+  const { data: gameLibRes, error: gameLibErr, isLoading: gameLibLoading } = useSWR<{
+    items: GameLibItem[];
+    nextCursor?: string | null;
+    summary?: any;
+  }>(
+    userId ? `/api/trading/gameLibrary?userId=${userId}&active=true&limit=500` : null,
+    fetcher
+  );
 
-// Sichtbares Logging zum Debuggen (kannst du später wieder entfernen)
-useEffect(() => {
-  if (userId) {
-    console.log("[TEF] gameLibrary response:", { count: gameLibRes?.items?.length ?? 0, items: gameLibRes?.items });
-    if (gameLibErr) console.warn("[TEF] gameLibrary error:", gameLibErr);
-  }
-}, [userId, gameLibRes, gameLibErr]);
+  // Sichtbares Logging zum Debuggen (kannst du später wieder entfernen)
+  useEffect(() => {
+    if (userId) {
+      console.log("[TEF] gameLibrary response:", { count: gameLibRes?.items?.length ?? 0, items: gameLibRes?.items });
+      if (gameLibErr) console.warn("[TEF] gameLibrary error:", gameLibErr);
+    }
+  }, [userId, gameLibRes, gameLibErr]);
 
-// Items → Gruppen A/B/C mappen
-const gameLib: GameLibrary = useMemo(() => {
-  const A: string[] = [], B: string[] = [], C: string[] = [];
-  const items = Array.isArray(gameLibRes?.items) ? gameLibRes!.items : [];
-  for (const it of items) {
-    if (!it?.label || !it?.game) continue;
-    if (it.game === "A") A.push(it.label);
-    else if (it.game === "B") B.push(it.label);
-    else if (it.game === "C") C.push(it.label);
-  }
-  return { A, B, C };
-}, [gameLibRes?.items]);
+  // Items → Gruppen A/B/C mappen
+  const gameLib: GameLibrary = useMemo(() => {
+    const A: string[] = [], B: string[] = [], C: string[] = [];
+    const items = Array.isArray(gameLibRes?.items) ? gameLibRes!.items : [];
+    for (const it of items) {
+      if (!it?.label || !it?.game) continue;
+      if (it.game === "A") A.push(it.label);
+      else if (it.game === "B") B.push(it.label);
+      else if (it.game === "C") C.push(it.label);
+    }
+    return { A, B, C };
+  }, [gameLibRes?.items]);
 
   const gameItems = gameLibRes?.items ?? [];
 
@@ -384,7 +412,6 @@ const gameLib: GameLibrary = useMemo(() => {
       return acc + (Number.isFinite(n) ? n : 0);
     }, 0);
   }, [v.partialExits]);
-
   // SUBMIT (final/draft)
   const onSubmit = async (values: any, forceStatus?: "final" | "draft") => {
     setPending(true);
@@ -452,27 +479,35 @@ const gameLib: GameLibrary = useMemo(() => {
       // Partial-Exits sanitisieren
       const partialExitsSan = Array.isArray(values.partialExits)
         ? values.partialExits
-            .map((p: PartialExitForm, idx: number) => {
-              const label = strTrim(p?.label) ?? `TP ${idx + 1}`;
-              const price = numOpt(p?.price);
-              let percent = numOpt(p?.percent);
-              if (percent !== undefined) {
-                if (percent < 0) percent = 0;
-                if (percent > 100) percent = 100;
-              }
-              const at = strTrim(p?.at);
-              const note = strTrim(p?.note);
-              if (!label && price === undefined && percent === undefined && !at && !note) {
-                return null;
-              }
-              return { label: label ?? undefined, price, percent, at, note };
-            })
-            .filter(Boolean)
+          .map((p: PartialExitForm, idx: number) => {
+            const label = strTrim(p?.label) ?? `TP ${idx + 1}`;
+            const price = numOpt(p?.price);
+            let percent = numOpt(p?.percent);
+            if (percent !== undefined) {
+              if (percent < 0) percent = 0;
+              if (percent > 100) percent = 100;
+            }
+            const at = strTrim(p?.at);
+            const note = strTrim(p?.note);
+            if (!label && price === undefined && percent === undefined && !at && !note) {
+              return null;
+            }
+            return { label: label ?? undefined, price, percent, at, note };
+          })
+          .filter(Boolean)
         : undefined;
 
       const payload: any = {
         ...values,
         userId,
+        processIntent: values.processIntent || undefined,
+        processFocus: Array.isArray(values.processFocus) ? values.processFocus : undefined,
+        ifThenPlan: values.ifThenPlan || undefined,
+        processAdherence: Number(values.processAdherence ?? 0),
+        tiltNoticed: !!values.tiltNoticed,
+        cooldownDone: !!values.cooldownDone,
+        processDebrief: values.processDebrief || undefined,
+        hidePnLUntilDebrief: !!values.hidePnLUntilDebrief,
         entry: num(values.entry),
         exit: num(values.exit),
         pnl: num(values.pnl),
@@ -485,15 +520,19 @@ const gameLib: GameLibrary = useMemo(() => {
           breakEven: !!values?.outcomeFlags?.breakEven,
           stopHit: !!values?.outcomeFlags?.stopHit,
         },
+        luckFactor: (values.luckFactor === "positive" || values.luckFactor === "negative" || values.luckFactor === "neutral")
+          ? values.luckFactor
+          : "neutral",
+        processNotes: typeof values.processNotes === "string" ? values.processNotes.trim() : undefined,
         tradingMistakes: Array.isArray(values.tradingMistakes) ? values.tradingMistakes : [],
         viewTimeframes: Array.isArray(values.viewTimeframes) ? values.viewTimeframes : [],
         concepts: Array.isArray(values.concepts)
           ? values.concepts.map((c: any) => ({
-              name: String(c?.name || ""),
-              direction: c?.direction || undefined,
-              timeframe: String(c?.timeframe || ""),
-              note: c?.note ? String(c.note) : undefined,
-            }))
+            name: String(c?.name || ""),
+            direction: c?.direction || undefined,
+            timeframe: String(c?.timeframe || ""),
+            note: c?.note ? String(c.note) : undefined,
+          }))
           : [],
         gameItems: Array.isArray(values.gameItems) ? values.gameItems : [],
         gameSelf: values.gameSelf ?? undefined,
@@ -573,71 +612,36 @@ const gameLib: GameLibrary = useMemo(() => {
 
               {/* --- GENERAL --- */}
               <TabsContent value="general" className="space-y-6">
+                <TabsContent value="process" className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <ProcessFocusPanel
+                    value={{
+                      focus: v.processFocus ?? [],
+                      ifThen: v.ifThenPlan ?? "",
+                      intent: v.processIntent ?? "",
+                    }}
+                    onChange={(nv) => {
+                      setValue("processFocus", nv.focus, { shouldDirty: true });
+                      setValue("ifThenPlan", nv.ifThen ?? "", { shouldDirty: true });
+                      setValue("processIntent", nv.intent ?? "", { shouldDirty: true });
+                    }}
+                  />
+                  <ProcessKPIBadge
+                    value={{
+                      adherence: v.processAdherence ?? 0,
+                      tiltNoticed: v.tiltNoticed ?? false,
+                      cooldownDone: v.cooldownDone ?? false,
+                      debrief: v.processDebrief ?? "",
+                    }}
+                    onChange={(nv) => {
+                      setValue("processAdherence", nv.adherence ?? 0, { shouldDirty: true });
+                      setValue("tiltNoticed", !!nv.tiltNoticed, { shouldDirty: true });
+                      setValue("cooldownDone", !!nv.cooldownDone, { shouldDirty: true });
+                      setValue("processDebrief", nv.debrief ?? "", { shouldDirty: true });
+                    }}
+                  />
+                </TabsContent>
+
                 <TEFGeneral userId={userId} />
-
-                {/* Zeiten & Session */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <FormField control={control} name="startTime" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Startzeit</FormLabel>
-                      <FormControl><Input type="time" {...field} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                  <FormField control={control} name="endTime" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Endzeit</FormLabel>
-                      <FormControl><Input type="time" {...field} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                  <FormField control={control} name="session" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Session</FormLabel>
-                      <FormControl>
-                        <Select value={field.value || ""} onValueChange={field.onChange}>
-                          <SelectTrigger className="w-full"><SelectValue placeholder="Session wählen" /></SelectTrigger>
-                          <SelectContent>
-                            {SESSIONS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                </div>
-
-                {/* Outcome & Bias */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <FormField control={control} name="outcomeFlags.breakEven" render={({ field }) => (
-                    <FormItem className="flex items-center gap-3">
-                      <FormControl><Checkbox checked={!!field.value} onCheckedChange={field.onChange} /></FormControl>
-                      <FormLabel className="m-0">Break Even</FormLabel>
-                    </FormItem>
-                  )} />
-                  <FormField control={control} name="outcomeFlags.stopHit" render={({ field }) => (
-                    <FormItem className="flex items-center gap-3">
-                      <FormControl><Checkbox checked={!!field.value} onCheckedChange={field.onChange} /></FormControl>
-                      <FormLabel className="m-0">Stop Hit</FormLabel>
-                    </FormItem>
-                  )} />
-                  <FormField control={control} name="biasExecution" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Bias/Execution</FormLabel>
-                      <FormControl>
-                        <Select value={field.value || ""} onValueChange={field.onChange}>
-                          <SelectTrigger className="w-full"><SelectValue placeholder="Bias wählen" /></SelectTrigger>
-                          <SelectContent>
-                            {(["RR", "RW", "WR", "WW"] as BiasExec[]).map((b) => (
-                              <SelectItem key={b} value={b}>{b}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                </div>
 
                 {/* Mentale Fehler */}
                 <div className="space-y-2">
@@ -737,7 +741,7 @@ const gameLib: GameLibrary = useMemo(() => {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  {(["A","B","C"] as const).map((grade) => (
+                  {(["A", "B", "C"] as const).map((grade) => (
                     <div key={grade} className="border rounded-lg p-3">
                       <div className="flex items-center justify-between mb-2">
                         <div className="text-sm font-medium">{grade}-Game</div>

@@ -1,10 +1,16 @@
 "use client";
 import { useMemo, useState, useCallback } from "react";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogClose,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { X } from "lucide-react";
 
 interface Props {
   userId: string;
@@ -41,7 +47,6 @@ export default function AddSavingGoalModal({ userId, onSaved }: Props) {
     if (!userId) return false;
     if (title.trim().length < 2) return false;
     if (!Number.isFinite(parsedTarget) || parsedTarget <= 0) return false;
-    // deadline optional → kein Zwang
     return true;
   }, [userId, title, parsedTarget]);
 
@@ -67,14 +72,14 @@ export default function AddSavingGoalModal({ userId, onSaved }: Props) {
           targetAmount: parsedTarget,
           currentAmount: 0,
           monthlyContribution: parsedMonthly ?? undefined, // optional
-          deadline: deadline || undefined,                 // optional
+          deadline: deadline || undefined, // optional
         }),
       });
       if (!res.ok) {
         const msg = await res.text().catch(() => "");
         throw new Error(msg || "Fehler beim Anlegen des Sparziels");
       }
-      onSaved();    // nur bei Erfolg
+      onSaved();
       reset();
       setOpen(false);
     } catch (e: any) {
@@ -103,9 +108,16 @@ export default function AddSavingGoalModal({ userId, onSaved }: Props) {
         <Button>Sparziel erstellen</Button>
       </DialogTrigger>
 
-      <DialogContent onKeyDown={onKeyDown}>
+      <DialogContent onKeyDown={onKeyDown} className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Neues Sparziel</DialogTitle>
+          <div className="flex items-center justify-between">
+            <DialogTitle>Neues Sparziel</DialogTitle>
+            <DialogClose asChild>
+              <Button variant="ghost" size="icon" aria-label="Schließen">
+                <X className="w-5 h-5" />
+              </Button>
+            </DialogClose>
+          </div>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -116,6 +128,7 @@ export default function AddSavingGoalModal({ userId, onSaved }: Props) {
               onChange={(e) => setTitle(e.target.value)}
               placeholder="z. B. Notgroschen, Urlaub, Auto"
               autoComplete="off"
+              autoFocus
             />
           </div>
 
@@ -131,7 +144,9 @@ export default function AddSavingGoalModal({ userId, onSaved }: Props) {
           </div>
 
           <div className="space-y-1">
-            <label className="text-sm font-medium">Monatliche Einzahlung (optional)</label>
+            <label className="text-sm font-medium">
+              Monatliche Einzahlung (optional)
+            </label>
             <Input
               inputMode="decimal"
               pattern="[0-9]*[.,]?[0-9]*"
@@ -152,13 +167,14 @@ export default function AddSavingGoalModal({ userId, onSaved }: Props) {
 
           {error && <p className="text-sm text-red-600">{error}</p>}
 
-          <Button
-            className="w-full"
-            onClick={handleSave}
-            disabled={!isValid || saving}
-          >
-            {saving ? "Speichern…" : "Speichern"}
-          </Button>
+          <div className="flex items-center justify-end gap-2">
+            <DialogClose asChild>
+              <Button variant="outline">Abbrechen</Button>
+            </DialogClose>
+            <Button onClick={handleSave} disabled={!isValid || saving}>
+              {saving ? "Speichern…" : "Speichern"}
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

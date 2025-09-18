@@ -2,7 +2,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { connectToDatabase } from "../db/mongo";
 
-// Shape in der vereinheitlichten "trading"-Collection
 type AccountDoc = {
   _id: any;
   type?: string;               // "account"
@@ -11,6 +10,8 @@ type AccountDoc = {
   broker?: string;
   currency?: string;
   startingBalance?: number;
+  currentBalance?: number;
+  realizedPnl?: number;
   riskPerTrade?: number;       // in %
   createdAt?: string;
   updatedAt?: string;
@@ -21,17 +22,20 @@ type AccountDoc = {
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "GET") return res.status(405).json({ message: "Method not allowed" });
 
-  const { userId } = req.query;
+  const { userId, includeArchived } = req.query as {
+    userId?: string;
+    includeArchived?: string;
+  };
+
   if (!userId || typeof userId !== "string") {
     return res.status(400).json({ message: "Missing userId" });
   }
 
   try {
     const { db } = await connectToDatabase();
-    const col = db.collection<AccountDoc>("trading"); // ✅ vereinheitlicht
+    const col = db.collection<AccountDoc>("trading");
 
-    // ✅ Indizes (idempotent). Erster Index deckt Filter + Sort(createdAt) ab.
-    // Zweiter Index erlaubt schnelle Namenssuche/Sort nach name (ohne Composite-OrderBy).
+    // Indizes (idempotent)
     try {
       await Promise.all([
         col.createIndex({ userId: 1, type: 1, archived: 1, deleted: 1, createdAt: -1 }),
@@ -42,12 +46,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const match: any = {
       userId,
       type: "account",
-      archived: { $ne: true },
       deleted: { $ne: true },
+      ...(includeArchived === "true" ? {} : { archived: { $ne: true } }),
     };
 
-    // ❗️WICHTIG: Nur EIN Sort-Key benutzen, sonst verlangt Cosmos einen Composite-Index.
-    // Wenn du wieder sekundär nach name sortieren willst, lies die Notiz unten.
     const docs = await col
       .find(match, {
         projection: {
@@ -56,27 +58,39 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           broker: 1,
           currency: 1,
           startingBalance: 1,
+          currentBalance: 1,
+          realizedPnl: 1,
           riskPerTrade: 1,
           createdAt: 1,
           updatedAt: 1,
         },
       })
-      .sort({ createdAt: -1 }) // ← nur ein Feld, kompatibel mit obigem Index
+      .sort({ createdAt: -1, name: 1 })
       .toArray();
 
-    const accounts = docs.map((d) => ({
-      _id: String(d._id),
-      name: d.name,
-      broker: d.broker,
-      currency: d.currency,
-      startingBalance: typeof d.startingBalance === "number" ? d.startingBalance : undefined,
-      riskPerTrade: typeof d.riskPerTrade === "number" ? d.riskPerTrade : undefined,
-      createdAt: d.createdAt,
-      updatedAt: d.updatedAt,
-    }));
+    const accounts = docs.map((d) => {
+      const current =
+        typeof d.currentBalance === "number"
+          ? d.currentBalance
+          : (typeof d.startingBalance === "number" ? d.startingBalance : undefined);
+
+      return {
+        _id: String(d._id),
+        userId: d.userId, // ✅ wichtig für Frontend-Typ
+        name: d.name,
+        broker: d.broker,
+        currency: d.currency,
+        startingBalance: typeof d.startingBalance === "number" ? d.startingBalance : undefined,
+        currentBalance: current,
+        realizedPnl: typeof d.realizedPnl === "number" ? d.realizedPnl : undefined,
+        riskPerTrade: typeof d.riskPerTrade === "number" ? d.riskPerTrade : undefined,
+        createdAt: d.createdAt,
+        updatedAt: d.updatedAt,
+      };
+    });
 
     return res.status(200).json({ accounts });
-  } catch (err) {
+  } catch (err: any) {
     console.error("getAllAccounts error:", err);
     return res.status(500).json({ message: "server error" });
   }

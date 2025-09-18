@@ -38,11 +38,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const date = s10(String(dateRaw));
     const lim = Math.max(1, Math.min(1000, Number(limitRaw) || 200));
 
-    // Match inkl. Archiv/Lösch-Filter & optional account/strategy
+    // Basis-Match (ohne Sort-Felder)
     const match: any = {
-      type: "tradeEntry",
       userId,
-      date,
       deleted: { $ne: true },
     };
 
@@ -50,20 +48,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const allowArchived = includeArchived === "true";
     if (!allowArchived) match.archived = { $ne: true };
 
-    // Zusätzliche Bedingungen sauber mit $and kombinieren
+    // Sauber kombinierte Bedingungen
     const andConds: any[] = [];
 
-    if (accountId) {
-      andConds.push({ accountId });
-    }
-    if (strategy) {
-      andConds.push({ $or: [{ strategy }, { strategy_name: strategy }] });
-    }
+    // Toleranter type-Guard
+    andConds.push({ $or: [{ type: "tradeEntry" }, { type: "trade" }, { type: { $exists: false } }] });
+
+    // Datum: Entweder 'date' == YYYY-MM-DD ODER (Fallback) createdAt beginnt mit YYYY-MM-DD
+    andConds.push({
+      $or: [
+        { date }, // nutzt Index, wenn vorhanden
+        { $expr: { $eq: [{ $substrCP: ["$createdAt", 0, 10] }, date] } },
+      ],
+    });
+
+    if (accountId) andConds.push({ accountId });
+    if (strategy) andConds.push({ $or: [{ strategy }, { strategy_name: strategy }] });
+
     if (status === "draft") {
       andConds.push({ $or: [{ status: "draft" }, { completed: { $ne: true } }] });
     } else if (status === "final") {
       andConds.push({ $or: [{ status: "final" }, { completed: true }] });
     }
+
     if (andConds.length) match.$and = andConds;
 
     // bevorzugte Sortierung (chronologisch): startTime ↑, dann _id ↑
@@ -71,7 +78,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     try {
       const docs = await col.find(match).sort(sortSpec).limit(lim).toArray();
-
       const trades = docs.map(mapDocToTrade);
       return res.status(200).json({ trades });
     } catch (err: any) {
@@ -112,6 +118,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
 /** Mapping eines DB-Dokuments auf das API-Shape */
 function mapDocToTrade(d: any) {
+  const rawResult = typeof d.result === "string" ? d.result : undefined;
+  const mappedStatus =
+    typeof d.status === "string"
+      ? d.status
+      : (d.completed ? "final" : (rawResult ? "final" : "draft"));
+
   return {
     _id: String(d._id),
     userId: d.userId,
@@ -128,14 +140,15 @@ function mapDocToTrade(d: any) {
     potentialLoss: toNum(d.potentialLoss),
     rating: toNum(d.rating),
 
-    result: d.result ?? "win",
-    tradeType: d.tradeType ?? "buy",
+    // ❗ Kein Default mehr – Drafts behalten undefined:
+    result: rawResult,
+    tradeType: d.tradeType === "sell" ? "sell" : "buy",
 
     // Setup wurde in der UI entfernt, lassen wir hier neutral durch
     setup: d.setup ?? "",
     strategy: d.strategy ?? d.strategy_name ?? undefined,
     strategy_name: d.strategy_name ?? d.strategy ?? undefined,
-    riskReward: d.riskReward ?? undefined,
+    riskReward: typeof d.riskReward === "string" && d.riskReward.trim() ? d.riskReward.trim() : undefined,
 
     notes: d.notes ?? "",
 
@@ -168,9 +181,9 @@ function mapDocToTrade(d: any) {
     stopPrice: toNum(d.stopPrice),
     targetPrice: toNum(d.targetPrice),
 
-    // Status
-    status: d.status ?? (d.completed ? "final" : "draft"),
-    completed: !!d.completed,
+    // Status (aus echten Feldern abgeleitet)
+    status: mappedStatus,
+    completed: mappedStatus === "final",
     missing: Array.isArray(d.missing) ? d.missing : [],
 
     createdAt: d.createdAt ?? undefined,

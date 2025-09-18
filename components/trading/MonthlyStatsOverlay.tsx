@@ -37,21 +37,14 @@ type ApiResponse = {
   avgRiskReward: number; // Ø RR
 };
 
-/** Robuster Fetcher:
- * - wirft auf !res.ok (SWR setzt `error`)
- * - normalisiert das Response-Shape (Fallbacks)
- */
 const fetcher = async (url: string): Promise<ApiResponse> => {
   const res = await fetch(url);
   let json: any = null;
   try {
     json = await res.json();
-  } catch {
-    // ignore body parse error; handled below
-  }
+  } catch {}
   if (!res.ok) {
-    const msg =
-      (json && (json.error || json.message)) || `HTTP ${res.status}`;
+    const msg = (json && (json.error || json.message)) || `HTTP ${res.status}`;
     throw new Error(msg);
   }
   return {
@@ -62,20 +55,18 @@ const fetcher = async (url: string): Promise<ApiResponse> => {
 };
 
 export default function MonthlyStatsOverlay({ userId }: { userId: string }) {
-  // URL + Events (account-change / strategy-select) → Filter
   const [accountId, setAccountId] = React.useState<string | undefined>();
   const [strategy, setStrategy] = React.useState<string | undefined>();
 
   React.useEffect(() => {
-    const url = new URL(window.location.href);
-    setAccountId(url.searchParams.get("account") || undefined);
-    setStrategy(url.searchParams.get("strategy") || undefined);
-
-    const onAccount = (e: any) =>
-      setAccountId(e?.detail?.accountId || undefined);
+    try {
+      const url = new URL(window.location.href);
+      setAccountId(url.searchParams.get("account") || undefined);
+      setStrategy(url.searchParams.get("strategy") || undefined);
+    } catch {}
+    const onAccount = (e: any) => setAccountId(e?.detail?.accountId || undefined);
     const onStrategy = (e: any) =>
       setStrategy(e?.detail?.name || e?.detail?.strategy || undefined);
-
     window.addEventListener("account-change", onAccount as EventListener);
     window.addEventListener("strategy-select", onStrategy as EventListener);
     return () => {
@@ -84,16 +75,13 @@ export default function MonthlyStatsOverlay({ userId }: { userId: string }) {
     };
   }, []);
 
-  // SWR-Key
   const key = React.useMemo(() => {
     if (!userId) return null;
     const params = new URLSearchParams();
     if (accountId) params.set("accountId", accountId);
     if (strategy) params.set("strategy", strategy);
     const qs = params.toString();
-    return `/api/trading/monthly/${encodeURIComponent(userId)}${
-      qs ? `?${qs}` : ""
-    }`;
+    return `/api/trading/monthly/${encodeURIComponent(userId)}${qs ? `?${qs}` : ""}`;
   }, [userId, accountId, strategy]);
 
   const { data, error, isLoading } = useSWR<ApiResponse>(key, fetcher);
@@ -101,58 +89,50 @@ export default function MonthlyStatsOverlay({ userId }: { userId: string }) {
   if (error)
     return (
       <div className="text-red-600">
-        Fehler beim Laden der Monatsstatistik: {String(error.message || error)}
+        Fehler beim Laden der Monatsstatistik: {String((error as any).message || error)}
       </div>
     );
-  if (!data || isLoading)
-    return <div className="opacity-70">Lade Monatsstatistik…</div>;
+  if (!data || isLoading) return <div className="opacity-70">Lade Monatsstatistik…</div>;
 
-  // defensives Auslesen
   const months: MonthRow[] = Array.isArray(data.months) ? data.months : [];
   const maxDrawdown = Number(data.maxDrawdown ?? 0);
   const avgRiskReward = Number(data.avgRiskReward ?? 0);
 
-  // Equity aus Monats-PnL (für Linie)
   let eq = 0;
   const chart = months.map((m) => {
     eq += m.pnl ?? 0;
     return { ...m, equity: eq, label: m.month };
   });
 
-  // kleine Hilfsformate
   const pct = (n: number) => `${Math.round(n * 100)}%`;
-  const eur = (n: number) =>
-    Number.isFinite(n) ? `${n.toFixed(2)}€` : "–";
+  const eur = (n: number) => (Number.isFinite(n) ? `${n.toFixed(2)}€` : "–");
 
   return (
-    <Card>
-      <CardHeader>
+    <Card className="w-full max-w-full min-w-0 overflow-hidden">
+      <CardHeader className="w-full max-w-full min-w-0">
         <div className="flex items-center justify-between gap-2 flex-wrap">
-          <div>
-            <CardTitle>Monatliche Übersicht</CardTitle>
-            <CardDescription>
+          <div className="min-w-0">
+            <CardTitle className="truncate">Monatliche Übersicht</CardTitle>
+            <CardDescription className="truncate">
               Kumulierte PnL, Max Drawdown & Ø Risk/Reward nach Monaten.
             </CardDescription>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Badge variant="outline">Max DD: {eur(maxDrawdown)}</Badge>
             <Badge variant="secondary">Ø RR: {avgRiskReward.toFixed(2)}</Badge>
           </div>
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-6">
-        {/* Hinweis bei leeren Daten */}
+      <CardContent className="space-y-6 w-full max-w-full min-w-0">
         {months.length === 0 && (
-          <div className="opacity-70">
-            Keine Daten für die aktuelle Auswahl.
-          </div>
+          <div className="opacity-70">Keine Daten für die aktuelle Auswahl.</div>
         )}
 
         {/* Balken: PnL pro Monat */}
-        <AspectRatio ratio={16 / 9}>
+        <AspectRatio ratio={16 / 9} className="w-full max-w-full min-w-0">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chart}>
+            <BarChart data={chart} margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
               <XAxis dataKey="label" />
               <YAxis />
               <Tooltip
@@ -164,6 +144,7 @@ export default function MonthlyStatsOverlay({ userId }: { userId: string }) {
                   return [val, name];
                 }}
                 labelFormatter={(l) => `Monat: ${l}`}
+                wrapperStyle={{ outline: "none" }}
               />
               <Bar dataKey="pnl" name="pnl" />
             </BarChart>
@@ -171,9 +152,9 @@ export default function MonthlyStatsOverlay({ userId }: { userId: string }) {
         </AspectRatio>
 
         {/* Linie: Equity über Monate */}
-        <AspectRatio ratio={16 / 9}>
+        <AspectRatio ratio={16 / 9} className="w-full max-w-full min-w-0">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={chart}>
+            <LineChart data={chart} margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
               <XAxis dataKey="label" />
               <YAxis />
               <Tooltip
@@ -182,13 +163,9 @@ export default function MonthlyStatsOverlay({ userId }: { userId: string }) {
                   return [val, name];
                 }}
                 labelFormatter={(l) => `Monat: ${l}`}
+                wrapperStyle={{ outline: "none" }}
               />
-              <Line
-                type="monotone"
-                dataKey="equity"
-                name="equity"
-                dot={false}
-              />
+              <Line type="monotone" dataKey="equity" name="equity" dot={false} />
             </LineChart>
           </ResponsiveContainer>
         </AspectRatio>
@@ -196,14 +173,14 @@ export default function MonthlyStatsOverlay({ userId }: { userId: string }) {
         <Separator />
 
         {/* Tabellenartige Kurzinfos */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full max-w-full min-w-0">
           {months.map((m) => (
             <div
               key={m.month}
-              className="rounded-md border p-3 flex items-center justify-between"
+              className="rounded-md border p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 min-w-0"
             >
-              <div className="font-medium">{m.month}</div>
-              <div className="flex items-center gap-3">
+              <div className="font-medium truncate">{m.month}</div>
+              <div className="flex items-center gap-2 sm:gap-3 flex-wrap min-w-0">
                 <Badge variant="outline">Trades: {m.trades}</Badge>
                 <Badge variant="outline">Winrate: {pct(m.winrate)}</Badge>
                 <Badge>Ø PnL: {eur(m.avgPnl)}</Badge>

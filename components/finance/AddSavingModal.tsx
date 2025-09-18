@@ -6,10 +6,12 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogClose,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { X } from "lucide-react";
 
 interface Props {
   userId: string;
@@ -75,7 +77,7 @@ export default function AddSavingModal({ userId, onSaved }: Props) {
         const msg = await res.text().catch(() => "");
         throw new Error(msg || "Fehler beim Speichern der Ersparnis");
       }
-      onSaved();      // nur bei Erfolg
+      onSaved();
       reset();
       setOpen(false);
     } catch (e: any) {
@@ -104,41 +106,60 @@ export default function AddSavingModal({ userId, onSaved }: Props) {
         <Button>Ersparnis für diesen Monat eintragen</Button>
       </DialogTrigger>
 
-      <DialogContent onKeyDown={onKeyDown}>
+      <DialogContent onKeyDown={onKeyDown} className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Ersparnis eintragen</DialogTitle>
+          <div className="flex items-center justify-between">
+            <DialogTitle>Ersparnis eintragen</DialogTitle>
+            <DialogClose asChild>
+              <Button variant="ghost" size="icon" aria-label="Schließen">
+                <X className="w-5 h-5" />
+              </Button>
+            </DialogClose>
+          </div>
         </DialogHeader>
 
         <div className="space-y-4">
-          <Input
-            type="month"
-            value={month}
-            onChange={(e) => setMonth(e.target.value)}
-          />
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Monat</label>
+            <Input
+              type="month"
+              value={month}
+              onChange={(e) => setMonth(e.target.value)}
+            />
+          </div>
 
-          <Input
-            inputMode="decimal"
-            pattern="[0-9]*[.,]?[0-9]*"
-            placeholder="Betrag, z. B. 250,00"
-            value={amountStr}
-            onChange={(e) => setAmountStr(e.target.value)}
-          />
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Betrag</label>
+            <Input
+              inputMode="decimal"
+              pattern="[0-9]*[.,]?[0-9]*"
+              placeholder="z. B. 250,00"
+              value={amountStr}
+              onChange={(e) => setAmountStr(e.target.value)}
+              autoFocus
+            />
+          </div>
 
-          <Textarea
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="Notiz (optional)"
-          />
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Notiz (optional)</label>
+            <Textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="z. B. Bonus, Nebenjob, unerwartete Ersparnis"
+              rows={3}
+            />
+          </div>
 
           {error && <p className="text-sm text-red-600">{error}</p>}
 
-          <Button
-            onClick={handleSave}
-            className="w-full"
-            disabled={!isValid || saving}
-          >
-            {saving ? "Speichern…" : "Speichern"}
-          </Button>
+          <div className="flex items-center justify-end gap-2">
+            <DialogClose asChild>
+              <Button variant="outline">Abbrechen</Button>
+            </DialogClose>
+            <Button onClick={handleSave} disabled={!isValid || saving}>
+              {saving ? "Speichern…" : "Speichern"}
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

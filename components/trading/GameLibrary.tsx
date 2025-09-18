@@ -19,7 +19,6 @@ import {
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 
 type Game = "A" | "B" | "C";
@@ -72,14 +71,11 @@ function useLibrary(userId: string | undefined, opts: {
     if (swr.data?.nextCursor) setCursor(swr.data.nextCursor);
   };
 
-  const resetCursor = () => setCursor(null);
-
   React.useEffect(() => {
-    // bei Filteränderung zurück auf Seite 1
-    setCursor(null);
+    setCursor(null); // bei Filteränderung zurück auf Seite 1
   }, [opts.game, opts.q, opts.activeOnly, opts.limit]);
 
-  return { ...swr, loadMore, resetCursor, cursor };
+  return { ...swr, loadMore };
 }
 
 /* ---------- Create/Edit Dialog ---------- */
@@ -104,10 +100,7 @@ function ItemDialog({
   const [saving, setSaving] = React.useState(false);
 
   React.useEffect(() => {
-    // Points-Default an Game koppeln, wenn noch nicht manuell gesetzt
-    if (!initial?._id) {
-      setPoints(game === "A" ? 3 : game === "B" ? 2 : 1);
-    }
+    if (!initial?._id) setPoints(game === "A" ? 3 : game === "B" ? 2 : 1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game]);
 
@@ -116,37 +109,23 @@ function ItemDialog({
     setSaving(true);
     try {
       if (initial?._id) {
-        // Update
         const resp = await fetch(`/api/trading/gameLibrary?id=${initial._id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            userId,
-            label,
-            game,
-            points,
-            tags: tags
-              .split(",")
-              .map((s) => s.trim())
-              .filter(Boolean),
+            userId, label, game, points,
+            tags: tags.split(",").map(s => s.trim()).filter(Boolean),
             active,
           }),
         });
         if (!resp.ok) throw new Error("Update failed");
       } else {
-        // Create
         const resp = await fetch(`/api/trading/gameLibrary`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            userId,
-            label,
-            game,
-            points,
-            tags: tags
-              .split(",")
-              .map((s) => s.trim())
-              .filter(Boolean),
+            userId, label, game, points,
+            tags: tags.split(",").map(s => s.trim()).filter(Boolean),
             active,
           }),
         });
@@ -165,7 +144,7 @@ function ItemDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {trigger ? <DialogTrigger asChild>{trigger}</DialogTrigger> : null}
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="w-[95vw] sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{initial?._id ? "Eintrag bearbeiten" : "Neuen Game-Item anlegen"}</DialogTitle>
           <DialogDescription>Definiere Checklisten-Punkte für A/B/C-Game.</DialogDescription>
@@ -174,14 +153,14 @@ function ItemDialog({
         <div className="grid gap-3 py-2">
           <div className="grid gap-1.5">
             <Label>Label</Label>
-            <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="z. B. Plan befolgt" />
+            <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="z. B. Plan befolgt" className="w-full" />
           </div>
 
-          <div className="grid sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="grid gap-1.5">
               <Label>Kategorie</Label>
               <Select value={game} onValueChange={(v) => setGame(v as Game)}>
-                <SelectTrigger><SelectValue placeholder="A/B/C" /></SelectTrigger>
+                <SelectTrigger className="w-full"><SelectValue placeholder="A/B/C" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="A">A (3 Punkte)</SelectItem>
                   <SelectItem value="B">B (2 Punkte)</SelectItem>
@@ -196,13 +175,14 @@ function ItemDialog({
                 step="1"
                 value={String(points)}
                 onChange={(e) => setPoints(Number(e.target.value || 0))}
+                className="w-full"
               />
             </div>
           </div>
 
           <div className="grid gap-1.5">
             <Label>Tags (kommagetrennt)</Label>
-            <Input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="z. B. disziplin, risk" />
+            <Input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="z. B. disziplin, risk" className="w-full" />
           </div>
 
           <div className="flex items-center gap-2 pt-1">
@@ -283,13 +263,17 @@ function ItemRow({
   };
 
   return (
-    <div className={cn(
-      "flex items-center gap-3 rounded-md border p-3",
-      item.active ? "opacity-100" : "opacity-60"
-    )}>
-      <Badge variant={item.game === "A" ? "default" : item.game === "B" ? "secondary" : "outline"}>
-        {item.game}
-      </Badge>
+    <div
+      className={cn(
+        "flex flex-col sm:flex-row sm:items-center gap-3 rounded-md border p-3 min-w-0 w-full max-w-full",
+        item.active ? "opacity-100" : "opacity-60"
+      )}
+    >
+      <div className="shrink-0">
+        <Badge variant={item.game === "A" ? "default" : item.game === "B" ? "secondary" : "outline"}>
+          {item.game}
+        </Badge>
+      </div>
 
       <div className="flex-1 min-w-0">
         <div className="font-medium truncate">{item.label}</div>
@@ -298,8 +282,9 @@ function ItemRow({
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap sm:justify-end shrink-0">
         <Badge variant="outline">Pts {item.points}</Badge>
+
         <div className="flex items-center gap-2 pl-2">
           <Checkbox
             id={`active-${item._id}`}
@@ -314,14 +299,12 @@ function ItemRow({
           userId={userId}
           initial={item}
           onDone={onChanged}
-          trigger={
-            <Button variant="outline" size="sm" disabled={busy}>Bearbeiten</Button>
-          }
+          trigger={<Button variant="outline" size="sm" disabled={busy} className="whitespace-nowrap">Bearbeiten</Button>}
         />
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" disabled={busy} title="Mehr">
+            <Button variant="ghost" size="icon" disabled={busy} title="Mehr" aria-label="Mehr">
               ⋯
             </Button>
           </DropdownMenuTrigger>
@@ -355,33 +338,34 @@ export default function GameLibrary({ userId }: { userId: string }) {
   const nextCursor = data?.nextCursor ?? null;
 
   return (
-    <Card className="w-full">
-      <CardHeader className="gap-2">
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <div>
-            <CardTitle>Game-Katalog (A/B/C)</CardTitle>
-            <CardDescription>Checklisten-Punkte pflegen – erscheint später in der Trade-Eingabe.</CardDescription>
+    <Card className="w-full max-w-full min-w-0 overflow-hidden">
+      <CardHeader className="gap-2 w-full max-w-full min-w-0">
+        <div className="flex items-center justify-between gap-2 flex-wrap min-w-0">
+          <div className="min-w-0">
+            <CardTitle className="truncate">Game-Katalog (A/B/C)</CardTitle>
+            <CardDescription className="truncate">Checklisten-Punkte pflegen – erscheint später in der Trade-Eingabe.</CardDescription>
           </div>
 
           <ItemDialog
             userId={userId}
             onDone={() => mutate()}
-            trigger={<Button>Neu</Button>}
+            trigger={<Button className="whitespace-nowrap">Neu</Button>}
           />
         </div>
 
         {/* Filterzeile */}
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex-1 min-w-[220px]">
+        <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 w-full max-w-full min-w-0">
+          <div className="flex-1 min-w-0">
             <Input
               placeholder="Suchen (Label, Tags)…"
               value={q}
               onChange={(e) => setQ(e.target.value)}
+              className="w-full min-w-0"
             />
           </div>
 
           <Select value={game} onValueChange={(v) => setGame(v as any)}>
-            <SelectTrigger className="w-[120px]">
+            <SelectTrigger className="w-full sm:w-[120px]">
               <SelectValue placeholder="Game" />
             </SelectTrigger>
             <SelectContent>
@@ -392,13 +376,13 @@ export default function GameLibrary({ userId }: { userId: string }) {
             </SelectContent>
           </Select>
 
-          <div className="flex items-center gap-2 px-2 py-1 rounded-md border">
+          <div className="flex items-center gap-2 px-2 py-1 rounded-md border shrink-0">
             <Checkbox id="activeOnly" checked={activeOnly} onCheckedChange={(v) => setActiveOnly(v === true)} />
             <Label htmlFor="activeOnly" className="text-sm">nur aktive</Label>
           </div>
 
           <Select value={String(limit)} onValueChange={(v) => setLimit(Number(v))}>
-            <SelectTrigger className="w-[110px]">
+            <SelectTrigger className="w-full sm:w-[110px]">
               <SelectValue placeholder="Limit" />
             </SelectTrigger>
             <SelectContent>
@@ -410,7 +394,7 @@ export default function GameLibrary({ userId }: { userId: string }) {
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-3 w-full max-w-full min-w-0 overflow-x-hidden">
         {error && <div className="text-red-600">Fehler beim Laden.</div>}
         {isLoading && <div className="opacity-70">Lade…</div>}
 
@@ -419,7 +403,7 @@ export default function GameLibrary({ userId }: { userId: string }) {
         )}
 
         {items.length > 0 && (
-          <div className="grid grid-cols-1 gap-3">
+          <div className="grid grid-cols-1 gap-3 w-full max-w-full min-w-0">
             {items.map((it) => (
               <ItemRow key={it._id} item={it} userId={userId} onChanged={() => mutate()} />
             ))}
@@ -427,7 +411,7 @@ export default function GameLibrary({ userId }: { userId: string }) {
         )}
       </CardContent>
 
-      <CardFooter className="flex items-center justify-between">
+      <CardFooter className="flex flex-col sm:flex-row gap-2 sm:items-center justify-between w-full max-w-full min-w-0">
         <div className="text-sm text-muted-foreground">
           {items.length} Einträge
         </div>

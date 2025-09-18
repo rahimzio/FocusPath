@@ -18,32 +18,24 @@ import {
 } from "recharts";
 
 type Props = { userId: string };
-
 type Row = { name: string; count: number; pct?: number };
 type BreakdownKey = "mistakes" | "emotions" | "biasExecution" | "sessions";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
-/** Normalisiert unterschiedliche Shapes der mentalStats-API zu {name,count}[] */
 function normalize(rowsLike: any): Row[] {
   if (!rowsLike) return [];
   const rows: Row[] = [];
-
   const src = rowsLike;
   if (Array.isArray(src)) {
-    // [{label,count}] | [{name,count}] | [{mistake,count}]
     for (const it of src) {
       const name = String(it?.name ?? it?.label ?? it?.mistake ?? "").trim();
       const count = Number(it?.count ?? it?.value ?? it?.total ?? 0);
       if (name) rows.push({ name, count: Number.isFinite(count) ? count : 0 });
     }
   } else if (src && typeof src === "object") {
-    // { "FOMO": 3, "SL verschoben": 1 }
-    for (const [k, v] of Object.entries(src)) {
-      rows.push({ name: String(k), count: Number(v) || 0 });
-    }
+    for (const [k, v] of Object.entries(src)) rows.push({ name: String(k), count: Number(v) || 0 });
   }
-
   return rows.filter((r) => r.count > 0).sort((a, b) => b.count - a.count);
 }
 
@@ -54,22 +46,15 @@ export default function MistakePatternChart({ userId }: Props) {
   const [topN, setTopN] = React.useState<number>(8);
   const [showPct, setShowPct] = React.useState<boolean>(true);
   const [groupOthers, setGroupOthers] = React.useState<boolean>(true);
-
-  // 🆕 Range/Final
   const [range, setRange] = React.useState<"week" | "month" | "all">("month");
   const [onlyFinal, setOnlyFinal] = React.useState<boolean>(false);
-
-  // 🆕 Dimension
   const [breakdown, setBreakdown] = React.useState<BreakdownKey>("mistakes");
 
-  // URL & Events lesen
   React.useEffect(() => {
     try {
       const url = new URL(window.location.href);
       setAccountId(url.searchParams.get("account") || undefined);
       setStrategy(url.searchParams.get("strategy") || undefined);
-
-      // Falls range/onlyFinal via URL vorkonfiguriert sind
       const r = url.searchParams.get("range");
       if (r === "week" || r === "month" || r === "all") setRange(r);
       const of = url.searchParams.get("onlyFinal");
@@ -85,13 +70,11 @@ export default function MistakePatternChart({ userId }: Props) {
     };
   }, []);
 
-  // SWR-Key (inkl. Range/onlyFinal)
   const key = React.useMemo(() => {
     if (!userId) return null;
     const parts = [`userId=${encodeURIComponent(userId)}`, `range=${range}`, `onlyFinal=${onlyFinal ? "true" : "false"}`];
     if (accountId) parts.push(`accountId=${encodeURIComponent(accountId)}`);
     if (strategy) parts.push(`strategy=${encodeURIComponent(strategy)}`);
-    // from/to übernehmen, wenn in URL gesetzt
     try {
       const u = new URL(window.location.href);
       const from = u.searchParams.get("from");
@@ -99,14 +82,12 @@ export default function MistakePatternChart({ userId }: Props) {
       if (from) parts.push(`from=${encodeURIComponent(from)}`);
       if (to) parts.push(`to=${encodeURIComponent(to)}`);
     } catch {}
-    // Limit/Schwelle für Fehlerliste (wir schneiden clientseitig dennoch auf TopN)
     parts.push("minCount=1", "limit=200");
     return `/api/trading/mentalStats?${parts.join("&")}`;
   }, [userId, accountId, strategy, range, onlyFinal]);
 
   const { data, error } = useSWR<any>(key, fetcher);
 
-  // Datenquellen
   const kpis = {
     trades: Number(data?.totals?.trades ?? 0),
     withMistakes: Number(data?.totals?.withMistakes ?? 0),
@@ -115,7 +96,6 @@ export default function MistakePatternChart({ userId }: Props) {
     stop: Number(data?.totals?.stopHitCount ?? 0),
   };
 
-  // Aktuelle Dimension laden
   const source = React.useMemo(() => {
     const counts = data?.counts;
     if (!counts) return undefined;
@@ -127,11 +107,10 @@ export default function MistakePatternChart({ userId }: Props) {
     }
   }, [data, breakdown]);
 
-  // Normalisieren
-  const baseRows = React.useMemo(() => {
-    // Fallback auf legacy shape (data.mistakes), falls counts fehlt
-    return normalize(source ?? data?.mistakes ?? data?.topMistakes ?? data?.data ?? []);
-  }, [source, data]);
+  const baseRows = React.useMemo(
+    () => normalize(source ?? data?.mistakes ?? data?.topMistakes ?? data?.data ?? []),
+    [source, data]
+  );
 
   const grandTotal = React.useMemo(() => baseRows.reduce((s, r) => s + r.count, 0), [baseRows]);
 
@@ -140,35 +119,41 @@ export default function MistakePatternChart({ userId }: Props) {
     const withPct = baseRows.map((r) => ({ ...r, pct: grandTotal > 0 ? (r.count / grandTotal) * 100 : 0 }));
     const top = withPct.slice(0, Math.max(1, topN));
     if (!groupOthers || withPct.length <= top.length) return top;
-
     const others = withPct.slice(top.length);
     const othersCount = others.reduce((s, r) => s + r.count, 0);
     const othersPct = grandTotal > 0 ? (othersCount / grandTotal) * 100 : 0;
     return [...top, { name: "Andere", count: othersCount, pct: othersPct }];
   }, [baseRows, grandTotal, topN, groupOthers]);
 
+  // Dynamische Y-Achsenbreite (verhindert Overflow bei langen Labels)
+  const yAxisWidth = React.useMemo(() => {
+    const longest = displayRows.reduce((m, r) => Math.max(m, r.name.length), 0);
+    // grobe Schätzung: ~7px pro Zeichen + Padding
+    const est = longest * 7 + 24;
+    return Math.max(80, Math.min(160, est));
+  }, [displayRows]);
+
   if (error) return <div className="text-red-600">Fehler beim Laden.</div>;
   if (!data) return <div className="opacity-70">Lade…</div>;
 
   return (
-    <Card>
-      <CardHeader className="flex items-center justify-between gap-3 flex-wrap">
-        <CardTitle className="flex items-center gap-2">
-          Fehlermuster
-          {/* kleine KPI-Badges */}
-          <Badge variant="secondary" title="Trades gesamt">{kpis.trades} Trades</Badge>
-          <Badge variant="secondary" title="Trades mit mind. 1 Fehler">{kpis.withMistakes} mit Fehlern</Badge>
-          <Badge variant="secondary" title="Fehler total">{kpis.mistakesTotal} Fehler</Badge>
-          <Badge variant="outline" title="Break-Even Flags">BE: {kpis.be}</Badge>
-          <Badge variant="outline" title="StopHit Flags">SL: {kpis.stop}</Badge>
+    <Card className="w-full max-w-full min-w-0 overflow-hidden">
+      <CardHeader className="flex items-center justify-between gap-2 flex-wrap min-w-0">
+        <CardTitle className="flex items-center gap-2 flex-wrap min-w-0 truncate">
+          <span className="truncate">Fehlermuster</span>
+          <Badge variant="secondary" className="text-xs px-2 py-0.5"> {kpis.trades} Trades</Badge>
+          <Badge variant="secondary" className="text-xs px-2 py-0.5">{kpis.withMistakes} mit Fehlern</Badge>
+          <Badge variant="secondary" className="text-xs px-2 py-0.5">{kpis.mistakesTotal} Fehler</Badge>
+          <Badge variant="outline" className="text-xs px-2 py-0.5">BE: {kpis.be}</Badge>
+          <Badge variant="outline" className="text-xs px-2 py-0.5">SL: {kpis.stop}</Badge>
         </CardTitle>
 
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
           {/* Range */}
           <div className="flex items-center gap-2">
             <Label htmlFor="mistake-range" className="text-sm">Zeitraum</Label>
             <Select value={range} onValueChange={(v: any) => setRange(v)}>
-              <SelectTrigger id="mistake-range" className="w-[120px]">
+              <SelectTrigger id="mistake-range" className="w-[110px] h-8 px-2">
                 <SelectValue placeholder="Range" />
               </SelectTrigger>
               <SelectContent>
@@ -183,7 +168,7 @@ export default function MistakePatternChart({ userId }: Props) {
           <div className="flex items-center gap-2">
             <Label htmlFor="mistake-dim" className="text-sm">Dimension</Label>
             <Select value={breakdown} onValueChange={(v: BreakdownKey) => setBreakdown(v)}>
-              <SelectTrigger id="mistake-dim" className="w-[160px]">
+              <SelectTrigger id="mistake-dim" className="w-[150px] h-8 px-2">
                 <SelectValue placeholder="Dimension" />
               </SelectTrigger>
               <SelectContent>
@@ -199,7 +184,7 @@ export default function MistakePatternChart({ userId }: Props) {
           <div className="flex items-center gap-2">
             <Label htmlFor="mistake-topn" className="text-sm">Top</Label>
             <Select value={String(topN)} onValueChange={(v) => setTopN(Number(v))}>
-              <SelectTrigger id="mistake-topn" className="w-[90px]">
+              <SelectTrigger id="mistake-topn" className="w-[84px] h-8 px-2">
                 <SelectValue placeholder="Top N" />
               </SelectTrigger>
               <SelectContent>
@@ -226,24 +211,29 @@ export default function MistakePatternChart({ userId }: Props) {
         </div>
       </CardHeader>
 
-      <CardContent>
+      <CardContent className="w-full max-w-full min-w-0 overflow-x-hidden">
         {displayRows.length === 0 ? (
           <div className="opacity-70">Keine Daten für diese Auswahl.</div>
         ) : (
-          <div className="w-full h-[320px]">
+          <div className="w-full h-[280px] sm:h-[320px] md:h-[360px] min-w-0 overflow-hidden">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={displayRows}
                 layout="vertical"
-                margin={{ top: 8, right: 16, bottom: 8, left: 16 }}
+                margin={{ top: 8, right: 12, bottom: 8, left: 12 }}
               >
                 <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
                 <XAxis
                   type="number"
-                  tickFormatter={(v) => showPct ? `${Math.round(v as number)}%` : String(v)}
+                  tickFormatter={(v) => (showPct ? `${Math.round(v as number)}%` : String(v))}
                   domain={[0, (dataMax: number) => Math.ceil(dataMax)]}
                 />
-                <YAxis type="category" dataKey="name" width={160} />
+                <YAxis
+                  type="category"
+                  dataKey="name"
+                  width={yAxisWidth}
+                  tick={{ fontSize: 12 }}
+                />
                 <Tooltip
                   formatter={(value: any, _name, payload: any) => {
                     const r = payload?.payload as Row | undefined;
@@ -265,7 +255,6 @@ export default function MistakePatternChart({ userId }: Props) {
           </div>
         )}
 
-        {/* Fußzeile mit Total & aktivem Filterkontext */}
         <div className="mt-3 text-xs text-muted-foreground">
           Gesamt in dieser Ansicht: {breakdown === "mistakes" ? kpis.mistakesTotal : grandTotal} Einträge
           {strategy ? ` • Strategie: ${strategy}` : ""}{accountId ? ` • Account: ${accountId}` : ""} • Zeitraum: {range}

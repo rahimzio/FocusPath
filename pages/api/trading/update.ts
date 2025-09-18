@@ -13,13 +13,18 @@ const toNumOpt = (v: any) => {
   const n = Number(v);
   return Number.isFinite(n) ? n : undefined;
 };
-
-const toBool = (v: any) => v === true || v === "true" || v === 1 || v === "1";
-const toStr = (v: any) => (v === undefined || v === null ? undefined : String(v));
-const trimOrUndef = (v: any) => {
-  const s = toStr(v)?.trim();
+function trimOrUndef(v: any): string | undefined {
+  const s = typeof v === "string" ? v.trim() : "";
   return s ? s : undefined;
-};
+}
+function toBool(v: any): boolean {
+  if (typeof v === "boolean") return v;
+  if (typeof v === "number") return v !== 0;
+  if (typeof v === "string") return ["true", "1", "on", "yes"].includes(v.toLowerCase());
+  return false;
+}
+const toStr = (v: any) => (v === undefined || v === null ? undefined : String(v));
+
 const date10 = (d: any) => {
   const s = String(d || "");
   return s ? s.slice(0, 10) : undefined;
@@ -209,6 +214,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       v ? (set.notes = v) : (unset.notes = "");
     }
 
+    // --- Reflection / Journal (NEU) ---
+    if ("reflectionNotes" in body) {
+      const v = trimOrUndef(body.reflectionNotes);
+      if (v !== undefined) set.reflectionNotes = v;
+      else unset.reflectionNotes = "";
+    }
+    if ("triggerEvent" in body) {
+      const v = trimOrUndef(body.triggerEvent);
+      if (v !== undefined) set.triggerEvent = v;
+      else unset.triggerEvent = "";
+    }
+    if ("tiltDetected" in body) {
+      const v = toBool(body.tiltDetected);
+      if (v) set.tiltDetected = true;
+      else unset.tiltDetected = "";
+    }
+
     // --- Zeiten/Session ---
     if ("startTime" in body) {
       const v = trimOrUndef(body.startTime);
@@ -296,7 +318,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const v = sanitizeStringArray(body.confluences);
       v ? (set.confluences = v) : (unset.confluences = "");
     }
-
 
     // --- Strategy (beide Felder synchron halten) ---
     if ("strategy" in body || "strategy_name" in body) {
@@ -443,8 +464,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (balanceOps.length) {
         const now = new Date().toISOString();
         for (const op of balanceOps) {
+          let accountFilter: any;
+          try {
+            accountFilter = { _id: new ObjectId(op.accountId), type: "account", ...(userId ? { userId } : {}), deleted: { $ne: true } };
+          } catch {
+            // Fallback, falls accountId bereits als String-_id gespeichert wurde
+            accountFilter = { _id: op.accountId as any, type: "account", ...(userId ? { userId } : {}), deleted: { $ne: true } };
+          }
+
           await col.updateOne(
-            { _id: op.accountId as any, type: "account", ...(userId ? { userId } : {}), deleted: { $ne: true } },
+            accountFilter,
             {
               $inc: { currentBalance: op.amount, realizedPnl: op.amount },
               $push: {

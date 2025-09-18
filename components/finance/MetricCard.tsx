@@ -1,33 +1,24 @@
+// MetricCard.tsx
 "use client";
+import * as React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowUpRight, ArrowDownRight } from "lucide-react";
-import * as React from "react";
 
 type ValueFormat = "number" | "currency" | "percent";
 
 interface MetricCardProps {
   title: string;
-  /** Zahl oder bereits formatierter String (z. B. "23,1") */
   value: number | string;
-  /** Optional, wenn du selbst formatierst (z. B. "%", "€"). */
   unit?: string;
-  /** Optionaler Trend (z. B. 0.12 = +12%). */
   trend?: number | null;
-  /** Tooltip-Text. */
   tooltip?: string;
-  /** Wenn true, zeigt Skeleton. */
   isLoading?: boolean;
-  /** Automatische Formatierung (überschreibt unit-Ausgabe, außer value ist String). */
   format?: ValueFormat;
-  /** Locale für Intl-Formatierung. */
-  locale?: string; // z. B. "de-DE"
-  /** Dezimalstellen bei number/percent (currency nimmt Währungs-Standard). */
+  locale?: string;
   decimals?: number;
-  /** CSS-Klasse für das Card-Root. */
   className?: string;
-  /** Währungscode, wenn format="currency" (default EUR). */
   currency?: string;
 }
 
@@ -40,15 +31,12 @@ function formatValue(
     decimals,
   }: { format?: ValueFormat; locale?: string; currency?: string; decimals?: number }
 ) {
-  if (typeof value === "string") return value; // bereits formatiert
+  if (typeof value === "string") return value;
   if (typeof value !== "number" || !Number.isFinite(value)) return "—";
 
   switch (format) {
     case "currency":
-      return new Intl.NumberFormat(locale, {
-        style: "currency",
-        currency,
-      }).format(value);
+      return new Intl.NumberFormat(locale, { style: "currency", currency }).format(value);
     case "percent":
       return new Intl.NumberFormat(locale, {
         style: "percent",
@@ -83,27 +71,33 @@ export default function MetricCard({
   );
 
   const hasTrend = typeof trend === "number" && Number.isFinite(trend);
-  const trendPositive = (hasTrend && trend! > 0) || false;
+  const trendPositive = hasTrend && trend! > 0;
   const trendZero = hasTrend && trend === 0;
-
   const TrendIcon = trendPositive ? ArrowUpRight : ArrowDownRight;
 
   const content = (
-    <Card className={className ?? "w-full"}>
+    <Card className={className ? `w-full min-w-0 ${className}` : "w-full min-w-0"}>
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
+        {/* gut lesbarer Header in hell/dunkel, keine weißen Titel auf weißem BG */}
+        <CardTitle className="text-xs sm:text-sm font-medium text-gray-800 dark:text-gray-200">
+          {title}
+        </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="min-w-0">
         {isLoading ? (
           <div className="space-y-2">
-            <Skeleton className="h-7 w-32" />
-            <Skeleton className="h-4 w-20" />
+            <Skeleton className="h-7 w-24 sm:w-32" />
+            <Skeleton className="h-4 w-16 sm:w-20" />
           </div>
         ) : (
           <>
-            <div className="text-2xl font-bold tabular-nums">
+            <div className="text-xl sm:text-2xl font-bold tabular-nums break-words">
               {formatted}
-              {!format && unit && <span className="ml-1 text-base font-normal">{unit}</span>}
+              {!format && unit && (
+                <span className="ml-1 text-sm sm:text-base font-normal text-gray-700 dark:text-gray-300">
+                  {unit}
+                </span>
+              )}
             </div>
 
             {hasTrend && !trendZero && (
@@ -111,8 +105,13 @@ export default function MetricCard({
                 className={`mt-1 inline-flex items-center gap-1 text-sm ${
                   trendPositive ? "text-green-600" : "text-red-600"
                 }`}
+                aria-label={`Trend ${new Intl.NumberFormat(locale, {
+                  style: "percent",
+                  minimumFractionDigits: 1,
+                  maximumFractionDigits: 1,
+                }).format(trend!)}`}
               >
-                <TrendIcon className="h-4 w-4" aria-hidden />
+                <TrendIcon className="h-4 w-4 shrink-0" aria-hidden />
                 <span className="tabular-nums">
                   {new Intl.NumberFormat(locale, {
                     style: "percent",
@@ -133,10 +132,12 @@ export default function MetricCard({
   );
 
   return tooltip ? (
-    <Tooltip>
-      <TooltipTrigger asChild>{content}</TooltipTrigger>
-      <TooltipContent>{tooltip}</TooltipContent>
-    </Tooltip>
+    <TooltipProvider delayDuration={150}>
+      <Tooltip>
+        <TooltipTrigger asChild>{content}</TooltipTrigger>
+        <TooltipContent className="max-w-[18rem] break-words">{tooltip}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   ) : (
     content
   );

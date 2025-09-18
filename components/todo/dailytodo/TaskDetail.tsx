@@ -30,18 +30,17 @@ const TaskDetailModal: React.FC<Props> = ({
   if (!selectedTask) return null;
 
   return (
-    <Dialog
-      open={!!selectedTask}
+    <Dialog      open={!!selectedTask}
       onOpenChange={(open) => setSelectedTask(open ? selectedTask : null)}
     >
-      <DialogContent className="bg-white text-black dark:bg-gray-800 dark:text-white">
+      <DialogContent className="sm:max-w-lg w-[95vw] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold">
             {selectedTask.name}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-2 mt-4">
+        <div className="space-y-4 mt-4">
           <p>
             <span className="font-semibold">Punkte:</span> {selectedTask.points}
           </p>
@@ -107,18 +106,6 @@ const TaskDetailModal: React.FC<Props> = ({
                     <p>
                       <span className="font-semibold">Beschreibung:</span>{" "}
                       {subTask.description}
-                    </p>
-                  )}
-                  {subTask.points !== undefined && (
-                    <p>
-                      <span className="font-semibold">Punkte:</span>{" "}
-                      {subTask.points}
-                    </p>
-                  )}
-                  {subTask.dueDate && (
-                    <p>
-                      <span className="font-semibold">Fälligkeitsdatum:</span>{" "}
-                      {subTask.dueDate}
                     </p>
                   )}
                   {subTask.time && (

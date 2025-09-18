@@ -25,8 +25,9 @@ const WeeklyGoalsDashboard: React.FC<WeeklyGoalsDashboardProps> = ({
 
   const stats = useMemo(() => {
     const total = goals.length;
-    const done = goals.filter((g) => (g.progress ?? 0) >= 100).length;
-    const open = total - done;
+    const done = goals.filter((g) => (g.progress ?? 0) >= 100 || !!g.completedAt).length;
+    const open = Math.max(0, total - done);
+
     // recurring-Flag ist optional → nur zählen, wenn gesetzt
     const oneoff = goals.filter((g) => (g as any).recurring === false).length;
     const recurring = goals.filter((g) => (g as any).recurring === true).length;
@@ -35,6 +36,9 @@ const WeeklyGoalsDashboard: React.FC<WeeklyGoalsDashboardProps> = ({
     const sorted = [...goals].sort((a, b) => {
       const ae = new Date(a.endDate).getTime();
       const be = new Date(b.endDate).getTime();
+      if (!Number.isFinite(ae) || !Number.isFinite(be)) {
+        return (Number.isFinite(ae) ? -1 : 0) + (Number.isFinite(be) ? 1 : 0);
+      }
       if (ae !== be) return ae - be;
       return (a.progress ?? 0) - (b.progress ?? 0);
     });
@@ -44,9 +48,11 @@ const WeeklyGoalsDashboard: React.FC<WeeklyGoalsDashboardProps> = ({
 
   return (
     <section className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">🗓 Wöchentliche Ziele (aktuelle Woche)</h2>
-        <div className="text-xs text-muted-foreground flex gap-3">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <h2 className="text-lg sm:text-xl font-semibold">
+          🗓 Wöchentliche Ziele (aktuelle Woche)
+        </h2>
+        <div className="text-[11px] sm:text-xs text-muted-foreground flex flex-wrap items-center gap-2 sm:gap-3">
           <span>gesamt: <b>{stats.total}</b></span>
           <span>offen: <b>{stats.open}</b></span>
           <span>erledigt: <b>{stats.done}</b></span>

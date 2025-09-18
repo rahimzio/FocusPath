@@ -6,7 +6,120 @@
 import { FileType2Icon } from "lucide-react";
 
 // utils/interface.ts  (ergänzen)
+export type MagnifyMaintainMode = 'maintain' | 'magnify';
+// utils/interface.ts  (ergänzen/angleichen)
+export type Game = "A" | "B" | "C";
+export type Period = { start: string; end: string };
+export type YM = `${number}-${"01"|"02"|"03"|"04"|"05"|"06"|"07"|"08"|"09"|"10"|"11"|"12"}`;
+export type YQ = `${number}-Q${1|2|3|4}`;
 
+export type Trade = {
+  _id: string;
+  userId: string;
+  date: string;
+  setup: string;
+  rMultiple: number;
+  pnl: number;
+  complianceScore?: number;  // 0–100
+  game?: Game;               // A/B/C je Trade
+  mae?: number;
+  mfe?: number;
+  session?: "open"|"mid"|"close";
+  rulesBroken?: string[];
+  // prozessnahe Flags (optional)
+  setupValid?: boolean;
+  riskAdhered?: boolean;
+  executionTiming?: "early"|"ok"|"late"|null;
+};
+
+export type WeeklyReflection = {
+  userId: string;
+  label: string;  // z.B. "2025-09 W3"
+  period: Period;
+  kpis: {
+    trades: number; pnl: number; winrate: number;
+    expectancyR: number; avgR: number; maxDD: number; daysTraded: number;
+    complianceAvg: number;
+    gameAvg: { A: number; B: number; C: number };
+    tiltSessions: number;
+  };
+  gameStats: {
+    byGame: Array<{ game: Game; trades: number; wins: number; losses: number; winrate: number; avgR: number; expectancyR: number; complianceAvg?: number }>;
+    overall: { A: number; B: number; C: number };
+  };
+  processKPIs: {
+    complianceAvg: number;
+    setupValidityRate?: number;
+    riskAdherenceRate?: number;
+    executionTimingDist?: { early: number; ok: number; late: number };
+    matrix: {
+      goodProcess_goodOutcome: number;
+      goodProcess_badOutcome: number;
+      badProcess_goodOutcome: number;
+      badProcess_badOutcome: number;
+    };
+    pqi?: number;
+  };
+  miniDaily: Array<{ date: string; abcg: Game; discipline: number; r?: number; pnl?: number; tilt?: boolean }>;
+  createdAt: string;
+};
+
+export type MonthlyReflection = {
+  userId: string;
+  month: YM;
+  period: Period;
+  weeks: WeeklyReflection[]; // exakt 4
+  kpis: WeeklyReflection["kpis"];
+  processKPIs: WeeklyReflection["processKPIs"] | null;
+  createdAt: string;
+};
+
+export type QuarterlyReflection = {
+  userId: string;
+  quarter: YQ;
+  period: Period;
+  months: MonthlyReflection[]; // exakt 3
+  kpis: MonthlyReflection["kpis"];
+  processKPIs: MonthlyReflection["processKPIs"] | null;
+  createdAt: string;
+};
+
+export type MmState = {
+  mode: MagnifyMaintainMode;
+  streakPos: number;
+  streakNeg: number;
+};
+
+export type Smoothed = {
+  frequencySmoothed?: number | null;
+  convictionSmoothed?: number | null;
+  lastUpdateDate?: string | null;
+  mmState?: MmState | null;
+} | null;
+
+export type Preview = {
+  frequencyToday?: number | null;
+  convictionToday?: number | null;
+} | null;
+
+export type TrendPair = { d7?: number | null; d14?: number | null } | null;
+
+export type Trend = {
+  freq?: TrendPair;
+  conviction?: TrendPair;
+} | null;
+
+export const clamp = (n: number, min: number, max: number) =>
+  Math.max(min, Math.min(max, n));
+
+export const pctTone = (pct?: number | null) => {
+  const v = typeof pct === 'number' ? pct : -1;
+  if (v < 0) return 'bg-gray-200';
+  if (v <= 39) return 'bg-red-400';
+  if (v <= 69) return 'bg-yellow-400';
+  if (v <= 89) return 'bg-green-400';
+  return 'bg-yellow-100 border border-yellow-200';
+};
 // --- A/B/C Game Grundtypen ---
 export type GameGrade = "A" | "B" | "C";
 
@@ -211,7 +324,7 @@ export interface PortfolioTransaction {
   updatedAt: string;
 }
 import type { ObjectId} from 'mongodb';
-export type MagnifyMaintainMode = 'maintain' | 'magnify';
+import { ReactNode } from "react";
 export interface FrequencySmoothingCfg {
   windowDays: number           // e.g., 14 or 21
   alpha: number                // ~ 2/(N+1), e.g., 0.12 for 14d, 0.09 for 21d
@@ -545,6 +658,7 @@ export interface GoalDocument {
  * ------------------------------------- */
 
 export interface Task {
+  dueDate: ReactNode;
   category: string;
   userId?: string;
   _id: string;

@@ -1,3 +1,5 @@
+// financialSummary.tsx
+"use client";
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -8,12 +10,12 @@ interface Props {
 }
 
 export default function FinancialSummary({ income, expenses, savings }: Props) {
-  // robuste Werte (NaN/undefined -> 0)
   const inc = Number.isFinite(income) ? income : 0;
   const exp = Number.isFinite(expenses) ? expenses : 0;
   const sav = Number.isFinite(savings) ? savings : 0;
 
-  const balance = inc - exp - sav; // gleich wie bisher, nur robust gemacht
+  const balance = inc - exp - sav;
+
   const fmt = (n: number) =>
     new Intl.NumberFormat("de-DE", {
       style: "currency",
@@ -29,24 +31,26 @@ export default function FinancialSummary({ income, expenses, savings }: Props) {
     "font-semibold tabular-nums " + (balance < 0 ? "text-red-600" : "text-green-600");
 
   return (
-    <Card className="mb-6">
+    <Card className="w-full max-w-full overflow-hidden mb-6">
       <CardHeader>
-        <CardTitle>Finanzübersicht</CardTitle>
+        <CardTitle className="text-gray-900 dark:text-gray-100">
+          Finanzübersicht
+        </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-2">
-        <div className="flex justify-between text-sm">
+      <CardContent className="space-y-2 text-sm sm:text-base">
+        <div className="flex items-center justify-between gap-2">
           <span>Einkommen:</span>
           <span className={incomeCls}>{fmt(inc)}</span>
         </div>
-        <div className="flex justify-between text-sm">
+        <div className="flex items-center justify-between gap-2">
           <span>Ausgaben:</span>
           <span className={expenseCls}>{fmt(exp)}</span>
         </div>
-        <div className="flex justify-between text-sm">
+        <div className="flex items-center justify-between gap-2">
           <span>Gespart:</span>
           <span className={savingsCls}>{fmt(sav)}</span>
         </div>
-        <div className="flex justify-between text-sm">
+        <div className="flex items-center justify-between gap-2">
           <span>Verfügbar:</span>
           <span className={balanceCls}>{fmt(balance)}</span>
         </div>

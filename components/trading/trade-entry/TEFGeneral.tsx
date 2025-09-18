@@ -3,7 +3,7 @@
 import React from "react";
 import useSWR from "swr";
 import { useFormContext } from "react-hook-form";
-import { Account } from "@/utils/interface";
+import { Account, BiasExec } from "@/utils/interface";
 
 import {
   FormField, FormItem, FormLabel, FormControl, FormMessage,
@@ -19,24 +19,25 @@ import { Button } from "@/components/ui/button";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from "recharts";
 
-// 🆕 Emotionale Bibliothek für mentale Fehler
-import EmotionMistakeLibrary from "./EmotionMistakeLibrary";
-
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
+
+const SESSIONS = ["Asia", "London", "NewYork", "Overlap"] as const;
+type SessionKey = (typeof SESSIONS)[number];
 
 // FX: 0.0001, JPY: 0.01
 const pipSizeFor = (symbol: string) => (/JPY/i.test(symbol) ? 0.01 : 0.0001);
-// grobe Annahme: 1 Pip pro Standard-Lot ≈ 10 Einheiten der Kurswährung
 const PIP_VALUE_PER_LOT = 10;
 
-// Persistenz-Key für benutzerdefinierte Paare
 const PAIRS_LS_KEY = "tef_pairs_v1";
 
-// 🆕 Emotionen erweitert
 const MENTAL = {
-  emotions: ["Angst", "Gier", "Stress", "Ruhe", "Wut", "Overconfidence", "Undiszipliniert"],
-  mistakes: ["SL verschoben", "Overtrading", "FOMO"] as const,
+  emotions: ["Neutral", "Angst", "Gier", "Wut", "Overconfidence", "Undiszipliniert", "Euphorie", "Frust"],
 };
+
+function dateOnly(d?: string) {
+  if (!d) return "";
+  return d.length > 10 ? d.slice(0, 10) : d;
+}
 
 export default function TEFGeneral({ userId }: { userId: string }) {
   const { control, setValue, watch } = useFormContext<any>();
@@ -51,7 +52,7 @@ export default function TEFGeneral({ userId }: { userId: string }) {
   const selectedAccount = accounts.find((a) => a._id === v.accountId);
   const accountCcy = selectedAccount?.currency || "";
 
-  // Pairs lokal verwalten (+ Persistenz)
+  // Pairs lokal + Persistenz
   const [pairs, setPairs] = React.useState<string[]>(["EURUSD", "GBPUSD", "BTCUSD"]);
   const [newPair, setNewPair] = React.useState("");
 
@@ -65,7 +66,6 @@ export default function TEFGeneral({ userId }: { userId: string }) {
       }
     } catch { }
   }, []);
-
   React.useEffect(() => {
     try {
       localStorage.setItem(PAIRS_LS_KEY, JSON.stringify(pairs));
@@ -79,7 +79,7 @@ export default function TEFGeneral({ userId }: { userId: string }) {
     setNewPair("");
   };
 
-  // ---------- Auto-Berechnungen (Loss & RR) ----------
+  // Auto-Berechnungen
   const [autoLoss, setAutoLoss] = React.useState(true);
   const [autoRR, setAutoRR] = React.useState(true);
 
@@ -88,14 +88,12 @@ export default function TEFGeneral({ userId }: { userId: string }) {
     return Number.isFinite(n) ? n : 0;
   };
 
-  // ⬇️ dynamischer Price-Step je nach Symbol (für alle Preisfelder)
   const priceStep = React.useMemo(() => pipSizeFor(String(v.symbol || "")), [v.symbol]);
 
   const calcRiskMoney = React.useCallback(() => {
     const entry = num(v.entry);
-    const lots = Number.isFinite(Number(v.lotSize)) ? Number(v.lotSize) : 0; // lotSize optional
+    const lots = Number.isFinite(Number(v.lotSize)) ? Number(v.lotSize) : 0;
     const symbol = String(v.symbol || "");
-    // bevorzugt SL; fallback: exit (alte Logik)
     const stop =
       v.stopPrice !== undefined && v.stopPrice !== null && v.stopPrice !== ""
         ? num(v.stopPrice)
@@ -109,14 +107,19 @@ export default function TEFGeneral({ userId }: { userId: string }) {
 
   const calcRR = React.useCallback(() => {
     const entry = num(v.entry);
-    const lots = Number.isFinite(Number(v.lotSize)) ? Number(v.lotSize) : 0; // lotSize optional
+    const lots = Number.isFinite(Number(v.lotSize)) ? Number(v.lotSize) : 0;
     const symbol = String(v.symbol || "");
     if (!entry || !symbol || !lots) return "";
 
     const risk = calcRiskMoney();
     if (risk <= 0) return "";
 
-    // Reward bevorzugt mit Ziel, sonst Exit – Fallback: |PnL|
+    const a = v.followedSetup === true ? 1 : 0;
+    const b = v.respectedStopLoss === true ? 1 : 0;
+    const c = v.managedRisk === true ? 1 : 0;
+    const score = Math.round(((a + b + c) / 3) * 100);
+    setValue("disciplineScore", score)
+
     const hasTarget =
       v.targetPrice !== undefined && v.targetPrice !== null && v.targetPrice !== "";
     const target = hasTarget ? num(v.targetPrice) : num(v.exit);
@@ -138,21 +141,18 @@ export default function TEFGeneral({ userId }: { userId: string }) {
     return `1:${(Math.round(ratio * 100) / 100).toFixed(2)}`;
   }, [v.entry, v.exit, v.targetPrice, v.lotSize, v.symbol, v.pnl, calcRiskMoney]);
 
-  // Auto-Update PotentialLoss
   React.useEffect(() => {
     if (!autoLoss) return;
     const loss = calcRiskMoney();
     if (num(v.potentialLoss) !== loss) setValue("potentialLoss", loss, { shouldDirty: true });
   }, [autoLoss, calcRiskMoney, v.potentialLoss, setValue]);
 
-  // Auto-Update Risk/Reward
   React.useEffect(() => {
     if (!autoRR) return;
     const rr = calcRR();
     if (rr && v.riskReward !== rr) setValue("riskReward", rr, { shouldDirty: true });
   }, [autoRR, calcRR, v.riskReward, setValue]);
 
-  // 🆕 Disziplin automatisch aus den drei Häkchen berechnen (0–100)
   React.useEffect(() => {
     const a = v.followedSetup === true ? 1 : 0;
     const b = v.respectedStopLoss === true ? 1 : 0;
@@ -163,18 +163,14 @@ export default function TEFGeneral({ userId }: { userId: string }) {
     }
   }, [v.followedSetup, v.respectedStopLoss, v.managedRisk, v.disciplineScore, setValue]);
 
-  // Mini-Chart (Disziplin)
   const pieData = [
     { name: "Disziplin", value: v.disciplineScore || 0 },
     { name: "Fehler", value: 100 - (v.disciplineScore || 0) },
   ];
   const COLORS = ["#10b981", "#e5e7eb"];
 
-  // Aus Library gewählte Fehler → Select-Optionen anreichern
-  const librarySelected: string[] = Array.isArray(v.tradingMistakes) ? v.tradingMistakes : [];
-  const mentalSelectOptions = Array.from(new Set([...MENTAL.mistakes, ...librarySelected]));
 
-  // ---- Teil-Exits: Logik direkt neben TP ----
+  /* ---- Teil-Exits (Zeit & Notizen entfernt) ---- */
   const partials: any[] = Array.isArray(v.partialExits) ? v.partialExits : [];
   const percentSum = partials.reduce((acc, it) => {
     const n = Number(it?.percent);
@@ -183,15 +179,18 @@ export default function TEFGeneral({ userId }: { userId: string }) {
 
   const addPartial = () => {
     const remaining = Math.max(0, 100 - percentSum);
-    const arr = [...partials, {
-      label: `TP ${partials.length + 1}`,
-      price: undefined,
-      percent: remaining > 0 ? Number(remaining.toFixed(2)) : undefined,
-      at: "",
-      note: "",
-    }];
+    const arr = [
+      ...partials,
+      {
+        label: `TP ${partials.length + 1}`,
+        price: undefined,
+        percent: remaining > 0 ? Number(remaining.toFixed(2)) : undefined,
+        // ✅ at & note entfernt
+      },
+    ];
     setValue("partialExits", arr, { shouldDirty: true });
   };
+
   const removePartial = (idx: number) => {
     const arr = [...partials];
     arr.splice(idx, 1);
@@ -227,12 +226,61 @@ export default function TEFGeneral({ userId }: { userId: string }) {
           )}
         />
 
-        {/* Währungspaar (frei + Liste) */}
+        {/* Datum unter Account */}
+        <FormField
+          control={control}
+          name="date"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Datum</FormLabel>
+              <FormControl>
+                <Input
+                  type="date"
+                  value={dateOnly(field.value)}
+                  onChange={(e) => field.onChange(e.target.value)}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {/* Start/End/Session */}
+        <FormField control={control} name="startTime" render={({ field }) => (
+          <FormItem>
+            <FormLabel>Startzeit</FormLabel>
+            <FormControl><Input type="time" {...field} /></FormControl>
+            <FormMessage />
+          </FormItem>
+        )} />
+        <FormField control={control} name="endTime" render={({ field }) => (
+          <FormItem>
+            <FormLabel>Endzeit</FormLabel>
+            <FormControl><Input type="time" {...field} /></FormControl>
+            <FormMessage />
+          </FormItem>
+        )} />
+        <FormField control={control} name="session" render={({ field }) => (
+          <FormItem>
+            <FormLabel>Session</FormLabel>
+            <FormControl>
+              <Select value={field.value || ""} onValueChange={field.onChange}>
+                <SelectTrigger className="w-full"><SelectValue placeholder="Session wählen" /></SelectTrigger>
+                <SelectContent>
+                  {SESSIONS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )} />
+
+        {/* Symbol */}
         <FormField
           control={control}
           name="symbol"
           render={({ field }) => (
-            <FormItem>
+            <FormItem className="sm:col-span-2">
               <FormLabel>Währungspaar</FormLabel>
               <div className="flex gap-2">
                 <Input
@@ -415,7 +463,7 @@ export default function TEFGeneral({ userId }: { userId: string }) {
               </FormControl>
               <FormMessage />
 
-              {/* ⬇️ Teil-Exits direkt beim TP */}
+              {/* ✅ Teil-Exits: nur Label / Preis / % schließen */}
               <div className="mt-3 space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="flex items-center gap-2 text-sm">
@@ -442,7 +490,7 @@ export default function TEFGeneral({ userId }: { userId: string }) {
                 {v.hasPartialExits ? (
                   <div className="space-y-2">
                     {(partials as any[]).map((p, idx) => (
-                      <div key={idx} className="grid grid-cols-1 md:grid-cols-12 gap-2 items-end border p-2 rounded-lg">
+                      <div key={idx} className="grid grid-cols-1 md:grid-cols-8 gap-2 items-end border p-2 rounded-lg">
                         <div className="md:col-span-3">
                           <FormLabel className="text-xs">Label</FormLabel>
                           <Input
@@ -493,31 +541,8 @@ export default function TEFGeneral({ userId }: { userId: string }) {
                             placeholder="z. B. 50"
                           />
                         </div>
-                        <div className="md:col-span-2">
-                          <FormLabel className="text-xs">Zeit (optional)</FormLabel>
-                          <Input
-                            type="datetime-local"
-                            value={p?.at ?? ""}
-                            onChange={(e) => {
-                              const arr = [...partials];
-                              arr[idx] = { ...(arr[idx] || {}), at: e.target.value };
-                              setValue("partialExits", arr, { shouldDirty: true });
-                            }}
-                          />
-                        </div>
-                        <div className="md:col-span-2">
-                          <FormLabel className="text-xs">Notiz (optional)</FormLabel>
-                          <Input
-                            value={p?.note ?? ""}
-                            onChange={(e) => {
-                              const arr = [...partials];
-                              arr[idx] = { ...(arr[idx] || {}), note: e.target.value };
-                              setValue("partialExits", arr, { shouldDirty: true });
-                            }}
-                            placeholder="kurze Notiz"
-                          />
-                        </div>
-                        <div className="md:col-span-12 flex justify-end">
+
+                        <div className="md:col-span-8 flex justify-end">
                           <Button type="button" variant="ghost" onClick={() => removePartial(idx)}>
                             Entfernen
                           </Button>
@@ -533,11 +558,53 @@ export default function TEFGeneral({ userId }: { userId: string }) {
                   </div>
                 ) : null}
               </div>
+
+              {/* Outcome-Flags */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                <FormField control={control} name="outcomeFlags.stopHit" render={({ field }) => (
+                  <FormItem className="flex items-center gap-3">
+                    <FormControl><Checkbox checked={!!field.value} onCheckedChange={field.onChange} /></FormControl>
+                    <FormLabel className="m-0">Stop-Loss getroffen</FormLabel>
+                  </FormItem>
+                )} />
+                <FormField control={control} name="outcomeFlags.breakEven" render={({ field }) => (
+                  <FormItem className="flex items-center gap-3">
+                    <FormControl><Checkbox checked={!!field.value} onCheckedChange={field.onChange} /></FormControl>
+                    <FormLabel className="m-0">Break Even</FormLabel>
+                  </FormItem>
+                )} />
+              </div>
             </FormItem>
           )}
         />
-
-        {/* Potentieller Verlust – Auto mit Override */}
+        {/* ✅ Prozess-Häkchen für Disziplin (wirken auf den Kreis) */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+          <FormField control={control} name="followedSetup" render={({ field }) => (
+            <FormItem className="flex items-center gap-3">
+              <FormControl>
+                <Checkbox checked={!!field.value} onCheckedChange={field.onChange} />
+              </FormControl>
+              <FormLabel className="m-0">Setup befolgt</FormLabel>
+            </FormItem>
+          )} />
+          <FormField control={control} name="respectedStopLoss" render={({ field }) => (
+            <FormItem className="flex items-center gap-3">
+              <FormControl>
+                <Checkbox checked={!!field.value} onCheckedChange={field.onChange} />
+              </FormControl>
+              <FormLabel className="m-0">Stop-Loss respektiert</FormLabel>
+            </FormItem>
+          )} />
+          <FormField control={control} name="managedRisk" render={({ field }) => (
+            <FormItem className="flex items-center gap-3">
+              <FormControl>
+                <Checkbox checked={!!field.value} onCheckedChange={field.onChange} />
+              </FormControl>
+              <FormLabel className="m-0">Risiko gemanagt</FormLabel>
+            </FormItem>
+          )} />
+        </div>
+        {/* Potentieller Verlust */}
         <FormField
           control={control}
           name="potentialLoss"
@@ -581,7 +648,7 @@ export default function TEFGeneral({ userId }: { userId: string }) {
           )}
         />
 
-        {/* Risk/Reward – Auto mit Override */}
+        {/* Risk/Reward */}
         <FormField
           control={control}
           name="riskReward"
@@ -622,85 +689,120 @@ export default function TEFGeneral({ userId }: { userId: string }) {
           )}
         />
 
-        {/* Notes */}
+        {/* Ergebnis */}
         <FormField
           control={control}
-          name="notes"
+          name="result"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Notizen</FormLabel>
+              <FormLabel>Ergebnis</FormLabel>
               <FormControl>
-                <Textarea rows={3} {...field} />
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Result" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ongoing">Ongoing</SelectItem>
+                    <SelectItem value="win">Win</SelectItem>
+                    <SelectItem value="loss">Loss</SelectItem>
+                    <SelectItem value="BE">BE</SelectItem>
+                  </SelectContent>
+                </Select>
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
-      </div>
 
-      {/* Ergebnis */}
-      <FormField
-        control={control}
-        name="result"
-        render={({ field }) => (
+        {/* Emotion */}
+        <FormField
+          control={control}
+          name="emotionBefore"
+          render={({ field }) => (
+            <FormItem className="sm:col-span-2">
+              <FormLabel>Emotion vor dem Trade</FormLabel>
+              <div
+                className="flex flex-wrap gap-2"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {MENTAL.emotions.map((em) => {
+                  const active = field.value === em;
+                  return (
+                    <button
+                      key={em}
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        field.onChange(em);
+                      }}
+                      className={[
+                        "px-3 py-1 rounded-md text-sm border",
+                        active ? "bg-primary text-primary-foreground" : "bg-secondary"
+                      ].join(" ")}
+                    >
+                      {em}
+                    </button>
+                  );
+                })}
+              </div>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {/* Glück/Varianz & Prozess-Notizen */}
+        <FormField control={control} name="luckFactor" render={({ field }) => (
           <FormItem>
-            <FormLabel>Ergebnis</FormLabel>
+            <FormLabel>Glück / Varianz (optional)</FormLabel>
             <FormControl>
-              <Select value={field.value} onValueChange={field.onChange}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Result" />
-                </SelectTrigger>
+              <Select value={field.value || "neutral"} onValueChange={field.onChange}>
+                <SelectTrigger className="w-full"><SelectValue placeholder="Bewertung wählen" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ongoing">Ongoing</SelectItem>
-                  <SelectItem value="win">Win</SelectItem>
-                  <SelectItem value="loss">Loss</SelectItem>
-                  <SelectItem value="BE">BE</SelectItem>
+                  <SelectItem value="positive">Positives Glück</SelectItem>
+                  <SelectItem value="neutral">Keins / neutral</SelectItem>
+                  <SelectItem value="negative">Negatives Glück</SelectItem>
                 </SelectContent>
               </Select>
             </FormControl>
             <FormMessage />
           </FormItem>
-        )}
-      />
+        )} />
 
-      {/* Mentale Faktoren */}
-      <FormField
-        control={control}
-        name="emotionBefore"
-        render={({ field }) => (
+        <FormField control={control} name="biasExecution" render={({ field }) => (
           <FormItem>
-            <FormLabel>Emotion vor dem Trade</FormLabel>
-            <div
-              className="flex flex-wrap gap-2"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={(e) => e.stopPropagation()}
-            >
-              {["Neutral", "Angst", "Gier", "Wut", "Overconfidence", "Undiszipliniert", "Euphorie", "Frust"].map((em) => {
-                const active = field.value === em;
-                return (
-                  <button
-                    key={em}
-                    type="button"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      field.onChange(em);
-                    }}
-                    className={[
-                      "px-3 py-1 rounded-md text-sm border",
-                      active ? "bg-primary text-primary-foreground" : "bg-secondary"
-                    ].join(" ")}
-                  >
-                    {em}
-                  </button>
-                );
-              })}
-            </div>
+            <FormLabel>Bias/Execution</FormLabel>
+            <FormControl>
+              <Select value={field.value || ""} onValueChange={field.onChange}>
+                <SelectTrigger className="w-full"><SelectValue placeholder="Bias wählen" /></SelectTrigger>
+                <SelectContent>
+                  {(["RR", "RW", "WR", "WW"] as BiasExec[]).map((b) => (
+                    <SelectItem key={b} value={b}>{b}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FormControl>
             <FormMessage />
           </FormItem>
-        )}
-      />
+        )} />
+
+        <FormField control={control} name="processNotes" render={({ field }) => (
+          <FormItem className="sm:col-span-2">
+            <FormLabel>Notizen zum Trade & Denkprozess</FormLabel>
+            <FormControl>
+              <Textarea
+                placeholder="Kurz: Wie hast du gedacht/gefühlt? Welche Rolle spielte Varianz/Glück?"
+                value={field.value ?? ""}
+                onChange={(e) => field.onChange(e.target.value)}
+                rows={4}
+              />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )} />
+      </div>
 
       {/* Mini-Chart */}
       <div className="w-24 mx-auto mt-6">

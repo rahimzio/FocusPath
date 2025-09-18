@@ -1,4 +1,5 @@
 "use client";
+
 import useSWR from "swr";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import ReflectionPanel from "./ReflectionPanel";
@@ -21,12 +22,18 @@ export default function TradeReflection({ userId, date }: TradeReflectionProps) 
   if (!trade) return null;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Trade Reflexion</CardTitle>
+    <Card className="w-full max-w-full min-w-0 overflow-hidden">
+      <CardHeader className="w-full max-w-full min-w-0">
+        <CardTitle className="truncate">Trade Reflexion</CardTitle>
       </CardHeader>
-      <CardContent>
-        <ReflectionPanel trade={trade} onSaved={() => {}} />
+      <CardContent className="w-full max-w-full min-w-0">
+        {/* verhindert, dass Inhalte horizontal aus der Card ragen */}
+        <div className="w-full max-w-full min-w-0 overflow-x-auto">
+          {/* sorgt für sauberes Umbrechen innerhalb des Scroll-Containers */}
+          <div className="min-w-0 max-w-full break-words">
+            <ReflectionPanel trade={trade} onSaved={() => {}} />
+          </div>
+        </div>
       </CardContent>
     </Card>
   );

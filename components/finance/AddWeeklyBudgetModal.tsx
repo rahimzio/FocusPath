@@ -1,21 +1,23 @@
 "use client";
 import { useMemo, useState, useCallback } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { BudgetCategoryEntry } from "@/utils/interface";
+import { X } from "lucide-react";
 
 interface Props {
   userId: string;
-  week: string; // z.B. "2025-33" (ISO-KW-String)
+  week: string; // z.B. "2025-33"
   onSaved: () => void;
 }
 
 export default function AddWeeklyBudgetModal({ userId, week, onSaved }: Props) {
   const [open, setOpen] = useState(false);
 
-  // Budget als String -> erlaubt "400,00"
   const [budgetStr, setBudgetStr] = useState("");
   const [categories, setCategories] = useState<BudgetCategoryEntry[]>([]);
   const [catName, setCatName] = useState("");
@@ -44,7 +46,7 @@ export default function AddWeeklyBudgetModal({ userId, week, onSaved }: Props) {
     if (!userId || !week) return false;
     if (!Number.isFinite(parsedBudget) || parsedBudget <= 0) return false;
     if (plannedTotal < 0) return false;
-    if (plannedTotal > parsedBudget) return false; // nicht mehr planen als Budget
+    if (plannedTotal > parsedBudget) return false;
     return true;
   }, [userId, week, parsedBudget, plannedTotal]);
 
@@ -61,7 +63,6 @@ export default function AddWeeklyBudgetModal({ userId, week, onSaved }: Props) {
     const parsed = Number(catAmountStr.replace(",", "."));
     if (!name || !Number.isFinite(parsed) || parsed <= 0) return;
 
-    // Duplikat-Check
     if (categories.some((c) => c.name.toLowerCase() === name.toLowerCase())) {
       setError("Kategorie existiert bereits.");
       return;
@@ -81,25 +82,16 @@ export default function AddWeeklyBudgetModal({ userId, week, onSaved }: Props) {
     setSaving(true);
     setError(null);
     try {
-      // ⚠️ WICHTIG: 'spent' NICHT aus geplanten Kategorien berechnen.
-      // Das Backend sollte 'spent' aus echten Ausgaben der Woche ableiten.
       const res = await fetch("/api/finance/updateWeeklyBudget", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId,
-          week,
-          budget: parsedBudget,
-          categories, // geplante Kategorien
-          // spent NICHT senden oder 0 übergeben, wenn der Endpoint es erwartet
-          // spent: 0,
-        }),
+        body: JSON.stringify({ userId, week, budget: parsedBudget, categories }),
       });
       if (!res.ok) {
         const msg = await res.text().catch(() => "");
         throw new Error(msg || "Fehler beim Speichern des Wochenbudgets");
       }
-      onSaved();      // nur bei Erfolg
+      onSaved();
       reset();
       setOpen(false);
     } catch (e: any) {
@@ -111,7 +103,6 @@ export default function AddWeeklyBudgetModal({ userId, week, onSaved }: Props) {
 
   function onKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
     if (e.key === "Enter" && !saving) {
-      // Enter in der Kategorien-Zeile fügt Kategorie hinzu, sonst Save
       if (document.activeElement && (document.activeElement as HTMLElement).id?.startsWith("cat-")) {
         e.preventDefault();
         addCategory();
@@ -134,9 +125,16 @@ export default function AddWeeklyBudgetModal({ userId, week, onSaved }: Props) {
         <Button>Budget setzen</Button>
       </DialogTrigger>
 
-      <DialogContent onKeyDown={onKeyDown}>
+      <DialogContent onKeyDown={onKeyDown} className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Wochenbudget setzen</DialogTitle>
+          <div className="flex items-center justify-between">
+            <DialogTitle>Wochenbudget setzen</DialogTitle>
+            <DialogClose asChild>
+              <Button variant="ghost" size="icon" aria-label="Schließen">
+                <X className="w-5 h-5" />
+              </Button>
+            </DialogClose>
+          </div>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -216,9 +214,14 @@ export default function AddWeeklyBudgetModal({ userId, week, onSaved }: Props) {
 
           {error && <p className="text-sm text-red-600">{error}</p>}
 
-          <Button onClick={handleSave} className="w-full" disabled={!isValid || saving}>
-            {saving ? "Speichern…" : "Speichern"}
-          </Button>
+          <div className="flex items-center justify-end gap-2">
+            <DialogClose asChild>
+              <Button variant="outline">Abbrechen</Button>
+            </DialogClose>
+            <Button onClick={handleSave} className="min-w-28" disabled={!isValid || saving}>
+              {saving ? "Speichern…" : "Speichern"}
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
