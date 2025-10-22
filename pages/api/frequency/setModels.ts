@@ -1,7 +1,7 @@
 import type { NextApiRequest as Req2, NextApiResponse as Res2 } from 'next';
-import { FrequencyCurrent, FrequencyDoc, FrequencyIdeal } from '@/utils/interface';
 import { connectToDatabase } from "../db/mongo";
 import { requireCollection } from '@/lib/requireCollection';
+import { FrequencyCurrent, FrequencyIdeal, FrequencyDoc } from '@/utils/interfaces/frequency';
 
 export default async function handlerSetModels(req: Req2, res: Res2) {
   if (req.method !== 'POST') {

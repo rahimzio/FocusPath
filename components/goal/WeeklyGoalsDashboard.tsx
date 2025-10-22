@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
-import { Goal } from "@/utils/interface";
 import GoalCard from "./GoalCard";
+import { Goal } from "@/utils/interfaces/goal";
 
 interface WeeklyGoalsDashboardProps {
   weeklyGoals: Goal[];

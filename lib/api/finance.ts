@@ -1,7 +1,7 @@
 // pages/api/_lib/finance.ts
 import type { NextApiRequest } from "next";
 import type { Db, Document, WithId } from "mongodb";
-import { FinanceDoc } from "@/utils/interface";
+import { FinanceDoc } from "@/utils/interfaces/finance";
 
 export const FINANCE_COLLECTION = "finance";
 

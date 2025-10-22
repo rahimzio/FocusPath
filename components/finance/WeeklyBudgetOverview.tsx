@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import AddWeeklyBudgetModal from "./AddWeeklyBudgetModal";
 import AddExpenseModal from "./AddExpenseModal";
-import type { BudgetEntry } from "@/utils/interface";
+import { BudgetEntry } from "@/utils/interfaces/finance";
 
 function getISOWeekString(date: Date) {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));

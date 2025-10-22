@@ -1,8 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { ObjectId } from "mongodb";
 import { connectToDatabase } from "../db/mongo";
-import { AssetClass, FinanceTransaction, TransactionKind } from "@/utils/interface";
 import { insertFinance } from "@/lib/api/finance";
+import { TransactionKind, FinanceTransaction } from "@/utils/interfaces/finance";
+import { AssetClass } from "../cron/daily-prices";
 
 const KINDS: TransactionKind[] = [
   "cash_deposit","cash_withdrawal","asset_buy","asset_sell",

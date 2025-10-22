@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import { connectToDatabase } from "../db/mongo";
-import { Task, Completion } from "@/utils/interface";
 import { Description } from "@radix-ui/react-dialog";
+import { Task, Completion } from "@/utils/interfaces/task";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "GET") {

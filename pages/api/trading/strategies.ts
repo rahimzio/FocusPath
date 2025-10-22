@@ -1,36 +1,15 @@
 // pages/api/trading/strategies.ts
 import type { NextApiRequest, NextApiResponse } from "next";
-import { MongoClient, Db } from "mongodb";
+import { connectToDatabase, getTradingCollection } from "../db/mongo";
 
-let _client: MongoClient | null = null;
-let _db: Db | null = null;
-
-async function getDb(): Promise<Db> {
-  if (_db) {
-    console.log("🔄 Verwende bestehende MongoDB-Verbindung.");
-    return _db;
-  }
-  const uri = process.env.MONGODB_URI;
-  if (!uri) throw new Error("MONGODB_URI fehlt in der Umgebung.");
-  console.log("✅ Verbindung zur Datenbank wird aufgebaut …");
-  _client = await MongoClient.connect(uri);
-  const dbName = process.env.MONGODB_DB || (new URL(uri).pathname.replace("/", "") || "trading");
-  _db = _client.db(dbName);
-  console.log("✅ DB-Verbindung erfolgreich");
-  return _db;
-}
-
-// deterministische Farbe aus Name (HSL → Hex)
+/** deterministische Farbe aus Name (HSL → Hex) */
 function colorFromName(name: string): string {
   const s = (name || "").trim().toLowerCase();
   let hash = 0;
-  for (let i = 0; i < s.length; i++) {
-    hash = (hash * 31 + s.charCodeAt(i)) | 0;
-  }
+  for (let i = 0; i < s.length; i++) hash = (hash * 31 + s.charCodeAt(i)) | 0;
   const hue = Math.abs(hash) % 360;
   const sat = 60; // %
   const light = 45; // %
-  // HSL → RGB → Hex (quick’n’dirty)
   const c = (1 - Math.abs(2 * light / 100 - 1)) * (sat / 100);
   const x = c * (1 - Math.abs(((hue / 60) % 2) - 1));
   const m = light / 100 - c / 2;
@@ -41,10 +20,7 @@ function colorFromName(name: string): string {
   else if (hue < 240) { r = 0; g = x; b = c; }
   else if (hue < 300) { r = x; g = 0; b = c; }
   else { r = c; g = 0; b = x; }
-  const toHex = (v: number) => {
-    const n = Math.round((v + m) * 255);
-    return n.toString(16).padStart(2, "0");
-  };
+  const toHex = (v: number) => Math.round((v + m) * 255).toString(16).padStart(2, "0");
   return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
 }
 
@@ -52,8 +28,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
 
   try {
-    const db = await getDb();
-    const col = db.collection("trading"); // ggf. Collection-Namen anpassen
+    const { db } = await connectToDatabase();
+    const col = await getTradingCollection(db);
+
+    // defensive indexes (idempotent, optional)
+    try {
+      await Promise.all([
+        col.createIndex({ userId: 1, type: 1, date: 1 }),
+        col.createIndex({ userId: 1, type: 1, strategy_name: 1 }),
+        col.createIndex({ userId: 1, type: 1, strategy: 1 }),
+        col.createIndex({ userId: 1, archived: 1, deleted: 1 }),
+      ]);
+    } catch {}
 
     const {
       userId,
@@ -61,15 +47,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       from,
       to,
       limit: limitRaw,
-      q, // optionales Suchwort
+      q,
     } = req.query as Record<string, string | undefined>;
 
     if (!userId) return res.status(400).json({ error: "userId ist erforderlich" });
 
-    const limit = Math.min(Math.max(Number(limitRaw ?? 50), 1), 200);
+    const limit = Math.max(1, Math.min(200, Number(limitRaw ?? 50) || 50));
 
-    // Match: nur echte Trade-Entries des Users
-    const match: any = { userId, type: "tradeEntry" };
+    const match: any = {
+      userId,
+      type: "tradeEntry",
+      archived: { $ne: true },
+      deleted: { $ne: true },
+    };
     if (accountId) match.accountId = accountId;
     if (from || to) {
       match.date = {};
@@ -77,8 +67,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (to) match.date.$lte = String(to).slice(0, 10);
     }
 
-    // Ein Strategy-Feld erzeugen: bevorzugt strategy_name, sonst strategy
-    // filtern auf non-empty
     const pipeline: any[] = [
       { $match: match },
       {
@@ -90,11 +78,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       {
         $addFields: {
           strategyName: {
-            $cond: [
-              { $ne: [{ $strLenCP: "$_str1" }, 0] },
-              "$_str1",
-              "$_str2",
-            ],
+            $cond: [{ $ne: [{ $strLenCP: "$_str1" }, 0] }, "$_str1", "$_str2"],
           },
         },
       },
@@ -107,28 +91,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       { $match: { strategyName: { $exists: true, $ne: "" } } },
     ];
 
-    // optional Text-Filter
     if (q && q.trim()) {
-      pipeline.push({
-        $match: { _norm: { $regex: q.trim().toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&") } },
-      });
+      // lowercase vergleichen; Regex sicher escapen
+      const esc = q.trim().toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      pipeline.push({ $match: { _norm: { $regex: esc } } });
     }
 
-    // Gruppieren (case-insensitive), aber "schönsten" Namen behalten
     pipeline.push(
       {
         $group: {
           _id: "$_norm",
-          name: { $first: "$strategyName" },
+          name: { $first: "$strategyName" }, // "hübscheste" Schreibweise behalten
           count: { $sum: 1 },
         },
       },
       { $sort: { count: -1, name: 1 } },
-      { $limit: limit },
+      { $limit: limit }
     );
 
     const rows = await col.aggregate(pipeline).toArray();
 
+    // Frontend erwartet ein Array (kein {items})
     const out = rows.map((r: any) => ({
       _id: String(r._id),
       name: String(r.name),
@@ -136,6 +119,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       tag_color: colorFromName(String(r.name)),
     }));
 
+    // kleine Cache-Hilfe für Edge/Proxy
+    res.setHeader("Cache-Control", "s-maxage=60, stale-while-revalidate=300");
     return res.status(200).json(out);
   } catch (err: any) {
     console.error("❌ Fehler in /api/trading/strategies:", err);

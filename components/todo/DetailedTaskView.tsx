@@ -1,5 +1,5 @@
+import { Task } from "@/utils/interfaces/task";
 import { useState } from "react";
-import { Task } from "@/utils/interface";
 
 const DetailedTaskView = () => {
   const [tasks, setTasks] = useState<Task[]>([]);

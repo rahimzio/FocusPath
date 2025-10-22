@@ -5,7 +5,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Task, SubTask } from "@/utils/interface";
+import { Task } from "@/utils/interfaces/task";
 
 interface Props {
   selectedTask: Task | null;

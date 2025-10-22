@@ -6,7 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import type { SavingGoal } from "@/utils/interface";
+import { SavingGoal } from "@/utils/interfaces/finance";
 
 function fmtEUR(n: number) {
   return new Intl.NumberFormat("de-DE", {

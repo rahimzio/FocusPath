@@ -1,7 +1,7 @@
 'use client';
 
+import { MentalScene } from '@/utils/interfaces/frequency';
 import React, { useEffect, useRef, useState } from 'react';
-import { MentalScene } from '@/utils/interface';
 
 interface Props {
   onComplete?: () => void;

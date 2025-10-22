@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { Goal, Task } from "@/utils/interface";
 import {
   parseISO,
   startOfWeek,
@@ -27,6 +26,8 @@ import {
   patchGoalProgress,
   updateGoal,
 } from "@/lib/api/goal";
+import { Goal } from "@/utils/interfaces/goal";
+import { Task } from "@/utils/interfaces/task";
 
 /** UI-Ansichten */
 type ViewMode = "goals" | "stats" | "history";

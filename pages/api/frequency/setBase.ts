@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import  { FrequencyBase, FrequencyDoc } from '@/utils/interface';
 import { requireCollection } from '@/lib/requireCollection';
 import { connectToDatabase } from '../db/connectToDatabase';
+import { FrequencyDoc, FrequencyBase } from '@/utils/interfaces/frequency';
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');

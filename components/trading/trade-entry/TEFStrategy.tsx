@@ -21,7 +21,12 @@ import {
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json());
+/* Fetcher mit Fehlerbehandlung */
+const fetcher = async (url: string) => {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+};
 
 type StrategySuggestion = {
   _id: string;
@@ -31,12 +36,22 @@ type StrategySuggestion = {
 };
 
 const VIEW_TF = ["M5", "M15", "M30", "H1", "H4", "D1"] as const;
+type ViewTF = (typeof VIEW_TF)[number];
+
+/** Schlanker Form-Value-Typ für die hier genutzten Felder */
+type TEFStrategyValues = {
+  strategyAdherence?: "yes" | "partial" | "no";
+  strategy_name?: string;
+  strategy?: string; // wir spiegeln beide Felder
+  confluences?: string[];
+  entryTimeframe?: ViewTF | string;
+  viewTimeframes?: string[];
+};
 
 export default function TEFStrategy({ userId }: { userId: string }) {
-  const { control, setValue, watch } = useFormContext<any>();
+  const { control, setValue, watch } = useFormContext<TEFStrategyValues>();
 
   /* ---------------- Strategietreue ---------------- */
-  // Tri-State: "yes" | "partial" | "no"
   const setAdherence = (val: "yes" | "partial" | "no") => {
     setValue("strategyAdherence", val, { shouldDirty: true });
   };
@@ -55,12 +70,12 @@ export default function TEFStrategy({ userId }: { userId: string }) {
   const onPick = (s: StrategySuggestion) => {
     setStrategyName(s.name);
     setValue("strategy_name", s.name, { shouldDirty: true });
-    setValue("strategy", s.name, { shouldDirty: true }); // Kompat
+    setValue("strategy", s.name, { shouldDirty: true }); // Kompatibel halten
   };
 
   /* ---------------- Confluences (Tags) ---------------- */
   const confluences: string[] = Array.isArray(watch("confluences"))
-    ? watch("confluences")
+    ? (watch("confluences") as string[])
     : [];
   const [confInput, setConfInput] = React.useState("");
 
@@ -85,9 +100,9 @@ export default function TEFStrategy({ userId }: { userId: string }) {
 
   /* ---------------- View Timeframes ---------------- */
   const viewTF: string[] = Array.isArray(watch("viewTimeframes"))
-    ? watch("viewTimeframes")
+    ? (watch("viewTimeframes") as string[])
     : [];
-  const toggleTF = (tf: string, checked: boolean) => {
+  const toggleTF = (tf: ViewTF, checked: boolean) => {
     const set = new Set(viewTF);
     if (checked) set.add(tf);
     else set.delete(tf);
@@ -96,7 +111,7 @@ export default function TEFStrategy({ userId }: { userId: string }) {
 
   return (
     <div className="space-y-6">
-      {/* 🆕 Strategietreue (prozess-orientiert tracken) */}
+      {/* Strategietreue */}
       <FormField
         control={control}
         name="strategyAdherence"
@@ -107,18 +122,21 @@ export default function TEFStrategy({ userId }: { userId: string }) {
             </FormLabel>
             <FormControl>
               <div className="flex gap-2">
-                {[
+                {([
                   { key: "yes", label: "Ja" },
                   { key: "partial", label: "Teilweise" },
                   { key: "no", label: "Nein" },
-                ].map((opt) => {
+                ] as const).map((opt) => {
                   const active = (field.value ?? "") === opt.key;
                   return (
                     <Button
                       key={opt.key}
                       type="button"
                       variant={active ? "default" : "secondary"}
-                      onClick={() => field.onChange(opt.key)}
+                      onClick={() => {
+                        field.onChange(opt.key);
+                        setAdherence(opt.key);
+                      }}
                       onMouseDown={(e) => e.preventDefault()}
                     >
                       {opt.label}
@@ -153,6 +171,8 @@ export default function TEFStrategy({ userId }: { userId: string }) {
                     const val = strategyName.trim();
                     setValue("strategy_name", val, { shouldDirty: true });
                     setValue("strategy", val, { shouldDirty: true }); // Kompat
+                    // Feld „dirty“ halten
+                    field.onChange(val);
                   }}
                 />
               </FormControl>
@@ -165,7 +185,7 @@ export default function TEFStrategy({ userId }: { userId: string }) {
           <div className="flex flex-wrap gap-2">
             {suggestionList.slice(0, 16).map((s) => {
               const style = s.tag_color
-                ? { backgroundColor: s.tag_color, color: "white" }
+                ? { backgroundColor: s.tag_color, color: "white" as const }
                 : undefined;
               return (
                 <Button

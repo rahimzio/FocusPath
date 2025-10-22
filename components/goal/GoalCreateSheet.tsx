@@ -10,8 +10,8 @@ import {
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import NewGoalForm from "./createGoal";
-import { Goal } from "@/utils/interface";
 import { Plus } from "lucide-react";
+import { Goal } from "@/utils/interfaces/goal";
 
 type Props = {
   onGoalCreated?: (goal: Goal) => void;

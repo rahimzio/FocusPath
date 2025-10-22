@@ -1,8 +1,7 @@
 // pages/api/trading/create.ts
 import type { NextApiRequest, NextApiResponse } from "next";
 import { ObjectId } from "mongodb";
-import { connectToDatabase } from "../db/mongo"; // falls dein Pfad anders ist: anpassen!
-import { getTradingCollection } from "../db/mongo";
+import { connectToDatabase, getTradingCollection } from "../db/mongo";
 
 /* ---------------- helpers ---------------- */
 function adherenceOk(a: any): "yes" | "partial" | "no" | undefined {
@@ -51,7 +50,11 @@ const sessionOk = (s: any) => {
 };
 const gradeOk = (g: any) => {
   const v = String(g || "").toUpperCase();
-  return (["A", "B", "C"] as const).includes(v as any) ? (v as any) : undefined;
+  return (["S", "A", "B", "C"] as const).includes(v as any) ? (v as any) : undefined;
+};
+const luckOk = (v: any): "positive" | "neutral" | "negative" | undefined => {
+  const s = String(v ?? "").toLowerCase();
+  return s === "positive" || s === "neutral" || s === "negative" ? (s as any) : undefined;
 };
 
 type Concept = { name: string; direction?: "bullish" | "bearish" | "neutral"; timeframe?: string; note?: string };
@@ -103,7 +106,6 @@ function sanitizePartialExits(raw: any): PartialExit[] | undefined {
     const at = trimOrUndef(it?.at);
     const note = trimOrUndef(it?.note);
 
-    // nur behalten, wenn wenigstens irgendetwas gesetzt ist
     if (!label && price === undefined && percent === undefined && !at && !note) continue;
     out.push({ label, price, percent, at, note });
   }
@@ -146,12 +148,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       exit: toNumOpt(body.exit),
       pnl: toNum(body.pnl, 0),
 
-      // LotSize jetzt optional
       lotSize: toNumOpt(body.lotSize),
       potentialLoss: toNumOpt(body.potentialLoss),
       rating: toNumOpt(body.rating),
 
-      // Ergebnis NUR setzen, wenn wirklich übergeben (win/loss/BE); kein „ongoing“ → gar nicht setzen
+      // Ergebnis NUR setzen, wenn win/loss/BE übergeben wurde (kein „ongoing“)
       ...(body.result !== undefined && String(body.result).trim() !== ""
         ? { result: clampResult(body.result) }
         : {}),
@@ -159,8 +160,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       notes: trimOrUndef(body.notes),
 
       setup: trimOrUndef(body.setup),
-      riskReward: trimOrUndef(body.riskReward),              // <— NEU
+      riskReward: trimOrUndef(body.riskReward),
       confluences: sanitizeStringArray(body.confluences) ?? [],
+
       // Zeiten/Session
       startTime: trimOrUndef(body.startTime),
       endTime: trimOrUndef(body.endTime),
@@ -201,7 +203,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       stopPrice: toNumOpt(body.stopPrice),
       targetPrice: toNumOpt(body.targetPrice),
 
-      // mental
+      // Mentales
       emotionBefore: trimOrUndef(body.emotionBefore),
       mentalMistake: trimOrUndef(body.mentalMistake),
       performanceState: gradeOk(body.performanceState),
@@ -211,12 +213,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       managedRisk: toBool(body.managedRisk),
       disciplineScore: toNumOpt(body.disciplineScore),
 
-      // Partial Exits (neu)
+      // --- Process / Journal (NEU) ---
+      processIntent: trimOrUndef(body.processIntent),
+      processFocus: sanitizeStringArray(body.processFocus), // ⇦ jetzt string[]
+      ifThenPlan: trimOrUndef(body.ifThenPlan),
+      processNotes: trimOrUndef(body.processNotes),
+      luckFactor: luckOk(body.luckFactor),                  // ⇦ Union
+
+      processAdherence: toNumOpt(body.processAdherence),
+      tiltNoticed: toBool(body.tiltNoticed) || undefined,
+      cooldownDone: toBool(body.cooldownDone) || undefined,
+      processDebrief: trimOrUndef(body.processDebrief),
+      hidePnLUntilDebrief: toBool(body.hidePnLUntilDebrief) || undefined,
+
+      // --- Reflection (optional) ---
+      reflectionNotes: trimOrUndef(body.reflectionNotes),
+      triggerEvent: trimOrUndef(body.triggerEvent),
+      tiltDetected: toBool(body.tiltDetected) || undefined,
+
+      // Partial Exits (NEU)
       ...(toBool(body.hasPartialExits) && sanitizePartialExits(body.partialExits)
         ? {
-          hasPartialExits: true,
-          partialExits: sanitizePartialExits(body.partialExits),
-        }
+            hasPartialExits: true,
+            partialExits: sanitizePartialExits(body.partialExits),
+          }
         : {}),
 
       createdAt: new Date().toISOString(),
@@ -276,7 +296,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         // accountId sicher in ObjectId gießen (Fallback: string match)
         let accId: ObjectId | string = doc.accountId;
-        try { accId = new ObjectId(String(doc.accountId)); } catch { }
+        try { accId = new ObjectId(String(doc.accountId)); } catch {}
 
         await col.updateOne(
           { _id: accId as any, type: "account", userId: doc.userId, deleted: { $ne: true } },
@@ -309,6 +329,4 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.error("❌ Fehler in /api/trading/create:", err);
     return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
   }
-
-
 }

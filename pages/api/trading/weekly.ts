@@ -2,8 +2,8 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import { ObjectId } from "mongodb";
 import { connectToDatabase } from "../db/mongo";
-import { WeeklyStat } from "@/utils/interface";
 import { getCached, setCached } from "@/utils/redis";
+import { WeeklyStat } from "@/utils/interfaces/trading";
 
 function mapWeeklyStat(doc: any): WeeklyStat {
   if (!doc) return doc;

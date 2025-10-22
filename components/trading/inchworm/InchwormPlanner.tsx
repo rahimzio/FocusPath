@@ -1,221 +1,404 @@
+// components/inchworm/InchwormPlanner.tsx
 "use client";
 
 import * as React from "react";
 import useSWR from "swr";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import {
+  Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils";
+import { GameGrade } from "@/utils/interfaces/shared";
 
-type PlanHorizon = "1m" | "2m" | "3m";
+const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
-type FocusPoint = {
-  id: string;
-  grade: "A" | "B" | "C";
-  text: string;
-  done?: boolean;
+type GameLibItem = {
+  _id: string;
+  userId: string;
+  label: string;
+  game: GameGrade; // "A" | "B" | "C"
+  points?: number; // meist 3/2/1
+  active?: boolean; // nur aktive zeigen
 };
 
 type InchwormPlan = {
-  _id?: string;
-  recordType: "inchwormPlan";
+  type: "inchworm_plan";
   userId: string;
-  title: string;
-  horizon: PlanHorizon;
-  startDateISO: string;
-  notes?: string;
-  focus: FocusPoint[];
-  createdAt: string;
-  updatedAt: string;
+  period?: { start?: string; end?: string };
+  focus?: string;
+  selected: { A: string[]; B: string[]; C: string[] }; // ← nur IDs
+  targets?: {
+    avgTradesPerDay?: number;
+    avgTradesPerWeek?: number;
+    avgTradesPerMonth?: number;
+    standardRR?: string; // "1:2.0"
+  };
+  _id?: string;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
-const fetcher = (url: string) => fetch(url).then(r => (r.ok ? r.json() : { items: [] }));
-
 export default function InchwormPlanner({ userId }: { userId: string }) {
-  const [title, setTitle] = React.useState("Inchworm Plan");
-  const [horizon, setHorizon] = React.useState<PlanHorizon>("1m");
-  const [notes, setNotes] = React.useState("");
-  const [focus, setFocus] = React.useState<FocusPoint[]>([]);
-  const [pending, setPending] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
 
-  const { data, mutate } = useSWR<{ items?: InchwormPlan[] }>(
-    userId ? `/api/trading/inchworm-plan?userId=${userId}&limit=1` : null,
-    fetcher
+  // 1) Game-Library laden (nur aktive)
+  const libKey = userId
+    ? `/api/trading/gameLibrary?userId=${userId}&active=true&limit=500`
+    : null;
+  const {
+    data: libRes,
+    isLoading: libLoading,
+    error: libErr,
+  } = useSWR<{ items: GameLibItem[] }>(libKey, fetcher, { revalidateOnFocus: false });
+  const libItems = (libRes?.items ?? []).filter((i) => i.active !== false);
+
+  const byGrade: Record<GameGrade, GameLibItem[]> = React.useMemo(
+    () => ({
+      A: libItems.filter((i) => i.game === "A"),
+      B: libItems.filter((i) => i.game === "B"),
+      C: libItems.filter((i) => i.game === "C"),
+    }),
+    [libItems]
   );
 
-  // API → State (einmal pro Planwechsel)
-  React.useEffect(() => {
-    const plan = data?.items?.[0];
-    if (plan) {
-      setTitle(plan.title || "Inchworm Plan");
-      setHorizon(plan.horizon || "1m");
-      setNotes(plan.notes || "");
-      setFocus(Array.isArray(plan.focus) ? plan.focus : []);
-      return;
-    }
-    // Fallback aus localStorage, falls kein Plan vom Server
+  // 2) Bestehenden Plan laden
+  const planKey = userId ? `/api/trading/inchworm/plan?userId=${userId}` : null;
+  const {
+    data: planRes,
+    isLoading: planLoading,
+    mutate: mutatePlan,
+  } = useSWR<{ plan: InchwormPlan }>(planKey, fetcher, { revalidateOnFocus: false });
+
+  // Lokale States
+  const [periodStart, setPeriodStart] = React.useState<string>("");
+  const [periodEnd, setPeriodEnd] = React.useState<string>("");
+  const [focus, setFocus] = React.useState<string>("");
+
+  const [selA, setSelA] = React.useState<Set<string>>(new Set());
+  const [selB, setSelB] = React.useState<Set<string>>(new Set());
+  const [selC, setSelC] = React.useState<Set<string>>(new Set());
+
+  const [avgD, setAvgD] = React.useState<string>(""); // Ø Trades/Tag
+  const [avgW, setAvgW] = React.useState<string>(""); // Ø Trades/Woche
+  const [avgM, setAvgM] = React.useState<string>(""); // Ø Trades/Monat
+  const [stdRR, setStdRR] = React.useState<string>(""); // Standard R:R
+
+  const LS_KEYS = {
+    period: "inchworm:period",
+    focus: "inchworm:focus",
+    selectedA: "inchworm:selected:A",
+    selectedB: "inchworm:selected:B",
+    selectedC: "inchworm:selected:C",
+    targets: "inchworm:targets",
+  };
+
+  function storePlanToLocalStorage(p?: InchwormPlan) {
     try {
-      const raw = localStorage.getItem(`inchworm-plan:${userId}`);
-      if (raw) {
-        const p: InchwormPlan = JSON.parse(raw);
-        if (p?.userId === userId) {
-          setTitle(p.title || "Inchworm Plan");
-          setHorizon(p.horizon || "1m");
-          setNotes(p.notes || "");
-          setFocus(Array.isArray(p.focus) ? p.focus : []);
-        }
-      }
+      if (!p) return;
+      const start = p?.period?.start || "";
+      const end = p?.period?.end || "";
+      const periodLabel = start && end ? `${start} → ${end}` : (start || end || "");
+      localStorage.setItem(LS_KEYS.period, periodLabel);
+      localStorage.setItem(LS_KEYS.focus, p?.focus || "");
+      localStorage.setItem(LS_KEYS.selectedA, JSON.stringify(p?.selected?.A ?? []));
+      localStorage.setItem(LS_KEYS.selectedB, JSON.stringify(p?.selected?.B ?? []));
+      localStorage.setItem(LS_KEYS.selectedC, JSON.stringify(p?.selected?.C ?? []));
+      localStorage.setItem(LS_KEYS.targets, JSON.stringify(p?.targets ?? {}));
+      window.dispatchEvent(new CustomEvent("inchworm-plan-updated", { detail: { plan: p } }));
     } catch {}
-  }, [userId, data?.items?.[0]?._id]);
+  }
 
-  const addFocus = (grade: "A" | "B" | "C") => {
-    setFocus(prev => [...prev, { id: crypto.randomUUID(), grade, text: "" }]);
+  // Init aus Plan
+  React.useEffect(() => {
+    const p = planRes?.plan;
+    if (!p) return;
+    setPeriodStart(p?.period?.start || "");
+    setPeriodEnd(p?.period?.end || "");
+    setFocus(p?.focus || "");
+    setSelA(new Set(p?.selected?.A ?? []));
+    setSelB(new Set(p?.selected?.B ?? []));
+    setSelC(new Set(p?.selected?.C ?? []));
+    setAvgD(p?.targets?.avgTradesPerDay != null ? String(p.targets.avgTradesPerDay) : "");
+    setAvgW(p?.targets?.avgTradesPerWeek != null ? String(p.targets.avgTradesPerWeek) : "");
+    setAvgM(p?.targets?.avgTradesPerMonth != null ? String(p.targets.avgTradesPerMonth) : "");
+    setStdRR(p?.targets?.standardRR || "");
+    // 🔹 Mirror ins LocalStorage + Broadcast
+    storePlanToLocalStorage(p);
+  }, [planRes?.plan?._id]);
+
+// (Remove invalid spread operator here)
+  const selectAll = (grade: GameGrade) => {
+    const ids = byGrade[grade].map((i) => i._id);
+    (grade === "A" ? setSelA : grade === "B" ? setSelB : setSelC)(new Set(ids));
+  };
+  const clearAll = (grade: GameGrade) => {
+    (grade === "A" ? setSelA : grade === "B" ? setSelB : setSelC)(new Set());
   };
 
-  const updateFocus = (id: string, patch: Partial<FocusPoint>) => {
-    setFocus(prev => prev.map(f => (f.id === id ? { ...f, ...patch } : f)));
-  };
-
-  const removeFocus = (id: string) => {
-    setFocus(prev => prev.filter(f => f.id !== id));
+  // Toggle selection for a given grade and item
+  const ontoggle = (grade: GameGrade, id: string) => {
+    if (grade === "A") {
+      setSelA((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) {
+          next.delete(id);
+        } else {
+          next.add(id);
+        }
+        return next;
+      });
+    } else if (grade === "B") {
+      setSelB((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) {
+          next.delete(id);
+        } else {
+          next.add(id);
+        }
+        return next;
+      });
+    } else {
+      setSelC((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) {
+          next.delete(id);
+        } else {
+          next.add(id);
+        }
+        return next;
+      });
+    }
   };
 
   const save = async () => {
-    setPending(true);
+    if (!userId) return;
+    setSaving(true);
     try {
-      const now = new Date().toISOString();
       const payload: InchwormPlan = {
-        recordType: "inchwormPlan",
+        type: "inchworm_plan",
         userId,
-        title,
-        horizon,
-        startDateISO: new Date().toISOString().slice(0, 10),
-        notes: notes?.trim() || undefined,
-        focus,
-        createdAt: now,
-        updatedAt: now,
+        period: { start: periodStart || undefined, end: periodEnd || undefined },
+        focus: focus || undefined,
+        selected: {
+          A: Array.from(selA),
+          B: Array.from(selB),
+          C: Array.from(selC),
+        },
+        targets: {
+          avgTradesPerDay: Number.isFinite(Number(avgD)) ? Number(avgD) : undefined,
+          avgTradesPerWeek: Number.isFinite(Number(avgW)) ? Number(avgW) : undefined,
+          avgTradesPerMonth: Number.isFinite(Number(avgM)) ? Number(avgM) : undefined,
+          standardRR: stdRR?.trim() || undefined,
+        },
       };
 
-      // localStorage (robust, bricht nie das UI)
-      try {
-        localStorage.setItem(`inchworm-plan:${userId}`, JSON.stringify(payload));
-      } catch {}
-
-      // Optionaler Server-Save
-      try {
-        const resp = await fetch("/api/trading/create", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        if (resp.ok) mutate();
-      } catch {}
+      const resp = await fetch("/api/trading/inchworm/plan", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!resp.ok) throw new Error(`Save failed: ${resp.status}`);
+      await mutatePlan();
+    } catch (e) {
+      console.error(e);
+      alert("Speichern fehlgeschlagen.");
     } finally {
-      setPending(false);
+      setSaving(false);
     }
   };
 
   return (
-    <Card className="w-full max-w-full min-w-0 overflow-hidden">
-      <CardHeader className="w-full max-w-full min-w-0">
-        <CardTitle className="truncate">Inchworm Planner</CardTitle>
-        <CardDescription className="truncate">
-          Plane 1–3 Monate fokussierte Verbesserungen (Tendler: „Inchworm“ – hinten straffen, vorne ausbauen).
-        </CardDescription>
-      </CardHeader>
+    <div className="mx-auto w-full max-w-screen-lg px-3 sm:px-4">
+      <Card className="w-full max-w-full overflow-hidden">
+        <CardHeader className="space-y-1">
+          <CardTitle className="truncate">Inchworm Planner</CardTitle>
+          <CardDescription className="truncate">
+            Wähle deine A/B/C-Faktoren direkt aus deiner Game-Library. Keine neuen Faktoren – nur Zeitraum, Fokus & Ziele.
+          </CardDescription>
+        </CardHeader>
 
-      <CardContent className="space-y-4 w-full max-w-full min-w-0 overflow-x-hidden">
-        <div className="grid gap-3 md:grid-cols-3 items-start w-full max-w-full min-w-0">
-          <div className="md:col-span-2 min-w-0">
-            <label className="text-sm">Titel</label>
-            <Input
-              value={title}
-              onChange={e => setTitle(e.target.value)}
-              placeholder="z. B. Q4 Inchworm Fokus"
-              className="w-full"
-            />
-          </div>
-
-          <div className="min-w-0">
-            <label className="text-sm">Zeitraum</label>
-            <Tabs value={horizon} onValueChange={(v) => setHorizon(v as PlanHorizon)} className="w-full">
-              <TabsList className="w-full overflow-x-auto whitespace-nowrap">
-                <TabsTrigger value="1m" className="flex-1 sm:flex-none min-w-[90px]">1 Monat</TabsTrigger>
-                <TabsTrigger value="2m" className="flex-1 sm:flex-none min-w-[90px]">2 Monate</TabsTrigger>
-                <TabsTrigger value="3m" className="flex-1 sm:flex-none min-w-[90px]">3 Monate</TabsTrigger>
-              </TabsList>
-              {/* Dummy content to satisfy Tabs API; Inhalt ist oben */}
-              <TabsContent value="1m" />
-              <TabsContent value="2m" />
-              <TabsContent value="3m" />
-            </Tabs>
-          </div>
-        </div>
-
-        <div className="w-full max-w-full min-w-0">
-          <label className="text-sm">Notizen</label>
-          <Textarea
-            rows={4}
-            value={notes}
-            onChange={e => setNotes(e.target.value)}
-            placeholder="Was genau wird verbessert, wie misst du Fortschritt?"
-            className="w-full"
-          />
-        </div>
-
-        <Separator />
-
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <div className="text-sm font-medium">Fokus-Punkte</div>
-          <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" onClick={() => addFocus("A")} className="whitespace-nowrap">+ A-Fokus</Button>
-            <Button variant="secondary" onClick={() => addFocus("B")} className="whitespace-nowrap">+ B-Fokus</Button>
-            <Button variant="secondary" onClick={() => addFocus("C")} className="whitespace-nowrap">+ C-Fokus</Button>
-          </div>
-        </div>
-
-        <div className="grid gap-3 w-full max-w-full min-w-0">
-          {focus.length === 0 && (
-            <div className="text-sm text-muted-foreground">Noch keine Fokus-Punkte. Lege 1–3 pro Kategorie an.</div>
-          )}
-
-          {focus.map((f) => (
-            <div key={f.id} className="rounded-md border p-3 w-full max-w-full min-w-0">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <Badge variant={f.grade === "A" ? "default" : f.grade === "B" ? "secondary" : "outline"}>
-                  {f.grade}-Game
-                </Badge>
-                <div className="flex items-center gap-3 flex-wrap">
-                  <div className="flex items-center gap-2">
-                    <Checkbox checked={!!f.done} onCheckedChange={(v) => updateFocus(f.id, { done: v === true })} />
-                    <span className="text-xs">Done</span>
-                  </div>
-                  <Button variant="ghost" size="sm" onClick={() => removeFocus(f.id)} className="whitespace-nowrap">
-                    Entfernen
-                  </Button>
-                </div>
-              </div>
-
+        <CardContent className="space-y-4">
+          {/* Zeitraum & Fokus */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div>
+              <div className="text-xs mb-1">Start</div>
               <Input
-                className="mt-3 w-full"
-                placeholder="Konkreter Fokus (z. B. ‚Kein SL verschieben‘ / ‚Entry erst nach M1-Confirmation‘)"
-                value={f.text}
-                onChange={(e) => updateFocus(f.id, { text: e.target.value })}
+                type="date"
+                value={periodStart}
+                onChange={(e) => setPeriodStart(e.target.value)}
               />
             </div>
-          ))}
-        </div>
-      </CardContent>
+            <div>
+              <div className="text-xs mb-1">Ende</div>
+              <Input
+                type="date"
+                value={periodEnd}
+                onChange={(e) => setPeriodEnd(e.target.value)}
+              />
+            </div>
+            <div className="lg:col-span-1 sm:col-span-2">
+              <div className="text-xs mb-1">Fokus (kurz)</div>
+              <Input
+                value={focus}
+                onChange={(e) => setFocus(e.target.value)}
+                placeholder="z. B. 'SL-Disziplin & Entry-Qualität'"
+              />
+            </div>
+          </div>
 
-      <CardFooter className="flex justify-end gap-2 flex-wrap w-full max-w-full min-w-0">
-        <Button onClick={save} disabled={pending} className="whitespace-nowrap">
-          {pending ? "Speichere…" : "Plan speichern"}
-        </Button>
-      </CardFooter>
-    </Card>
+          <Separator />
+
+          {/* Ziele */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div>
+              <div className="text-xs mb-1">Ø Trades/Tag</div>
+              <Input
+                inputMode="numeric"
+                value={avgD}
+                onChange={(e) => setAvgD(e.target.value)}
+                placeholder="z. B. 2"
+              />
+            </div>
+            <div>
+              <div className="text-xs mb-1">Ø Trades/Woche</div>
+              <Input
+                inputMode="numeric"
+                value={avgW}
+                onChange={(e) => setAvgW(e.target.value)}
+                placeholder="z. B. 8"
+              />
+            </div>
+            <div>
+              <div className="text-xs mb-1">Ø Trades/Monat</div>
+              <Input
+                inputMode="numeric"
+                value={avgM}
+                onChange={(e) => setAvgM(e.target.value)}
+                placeholder="z. B. 30"
+              />
+            </div>
+            <div>
+              <div className="text-xs mb-1">Standard R:R</div>
+              <Input
+                value={stdRR}
+                onChange={(e) => setStdRR(e.target.value)}
+                placeholder='z. B. "1:2.0"'
+              />
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Auswahl je Kategorie (nur Library-Items) */}
+          {libLoading && (
+            <div className="opacity-70 text-sm">Lade Library…</div>
+          )}
+          {libErr && (
+            <div className="text-red-600 text-sm">
+              Fehler beim Laden der Library.
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {(["A", "B", "C"] as GameGrade[]).map((grade) => {
+              const items = byGrade[grade];
+              const selectedSet = grade === "A" ? selA : grade === "B" ? selB : selC;
+
+              return (
+                <div key={grade} className="border rounded-lg p-3 min-w-0">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+                    <div className="font-medium">{grade}-Faktoren</div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Badge
+                        variant={
+                          grade === "A"
+                            ? "default"
+                            : grade === "B"
+                            ? "secondary"
+                            : "outline"
+                        }
+                      >
+                        {selectedSet.size} gewählt
+                      </Badge>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 px-2"
+                        onClick={() => selectAll(grade)}
+                      >
+                        alle
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 px-2"
+                        onClick={() => clearAll(grade)}
+                      >
+                        keine
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div
+                    className={cn(
+                      "flex flex-wrap content-start gap-2 overflow-auto",
+                      // begrenze die Höhe adaptiv, damit mobile nicht ewig scrollen muss
+                      "max-h-48 sm:max-h-56 lg:max-h-64"
+                    )}
+                  >
+                    {items.length === 0 && (
+                      <div className="text-xs opacity-70">Keine aktiven Items.</div>
+                    )}
+
+                    {items.map((it) => {
+                      const active = selectedSet.has(it._id);
+                      return (
+                        <button
+                          key={it._id}
+                          type="button"
+                          className={cn(
+                            "rounded-md border text-xs px-2 py-2",
+                            "min-h-[34px] max-w-full truncate",
+                            "transition-colors",
+                            active
+                              ? "bg-primary text-primary-foreground"
+                              : "bg-secondary hover:bg-secondary/80"
+                          )}
+                          onClick={() => ontoggle(grade, it._id)}
+                          aria-pressed={active}
+                          title={it.label}
+                        >
+                          {it.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+
+        <CardFooter className="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-end">
+          <Button
+            variant="secondary"
+            onClick={() => mutatePlan()}
+            className="w-full sm:w-auto"
+          >
+            Neu laden
+          </Button>
+          <Button
+            onClick={save}
+            disabled={saving}
+            className="w-full sm:w-auto"
+          >
+            {saving ? "Speichern…" : "Speichern"}
+          </Button>
+        </CardFooter>
+      </Card>
+    </div>
   );
 }

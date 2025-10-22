@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useSession, signIn } from "next-auth/react";
 import { useRouter } from "next/router";
 import { toast } from "react-toastify";
-import { UserMe } from "@/utils/interface";
+import { UserMe } from "@/utils/interfaces/frequency";
 interface Props {
   children: React.ReactNode;
 }

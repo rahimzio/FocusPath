@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { connectToDatabase } from '../db/mongo';
-import { GoalWithProgress } from '@/utils/interface';
 import { ObjectId } from 'mongodb';
+import { GoalWithProgress } from '@/utils/interfaces/goal';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {

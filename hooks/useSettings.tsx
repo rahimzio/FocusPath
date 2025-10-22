@@ -1,7 +1,7 @@
 "use client";
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { getSession } from "next-auth/react";
-import { UserSettings } from "@/utils/interface";
+import { UserSettings } from "@/utils/interfaces/shared";
 
 export const defaultUserSettings: UserSettings = {
   startPage: "todos",

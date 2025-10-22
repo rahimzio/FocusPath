@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { Task } from "@/utils/interface";
 import { FaCheckCircle, FaTrashAlt, FaPen } from "react-icons/fa";
 import { getEndTime, getHeightFromDuration } from "@/utils/todo/taskUtils";
+import { Task } from "@/utils/interfaces/task";
 
 interface Props {
   UserId:string;

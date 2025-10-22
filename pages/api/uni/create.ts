@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import { connectToDatabase } from "../db/mongo";
 import { ObjectId } from "mongodb";
-import { OnlineModule } from "@/utils/interface";
+import { OnlineModule } from "@/utils/interfaces/task";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {

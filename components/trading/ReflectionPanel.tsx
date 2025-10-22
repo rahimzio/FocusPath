@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { TradeEntry } from "@/utils/interface";
 import {
   Card, CardHeader, CardTitle, CardContent, CardFooter,
 } from "@/components/ui/card";
@@ -17,6 +16,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
+import { TradeEntry } from "@/utils/interfaces/trading";
 
 interface Props {
   trade: TradeEntry;

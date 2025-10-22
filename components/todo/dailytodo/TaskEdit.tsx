@@ -1,6 +1,6 @@
 import React from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Task } from "@/utils/interface";
+import { Task } from "@/utils/interfaces/task";
 
 interface Props {
   editedTask: Task | null;

@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { getSession } from "next-auth/react";
-import { Goal } from "@/utils/interface";
 import {
   Sheet,
   SheetContent,
@@ -19,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
 import GoalCard from "./GoalCard";
 import GoalCreateSheet from "./GoalCreateSheet";
+import { Goal } from "@/utils/interfaces/goal";
 
 interface Props {
   open: boolean;

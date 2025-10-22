@@ -1,8 +1,8 @@
 // pages/api/community/createPost.ts
 import { NextApiRequest, NextApiResponse } from "next";
-import { Category, CommunityPost, PostType, PollOption } from "@/utils/interface";
 import { connectToDatabase } from "../db/mongo";
 import { ObjectId } from "mongodb";
+import { CommunityPost, PostType, Category } from "@/utils/interfaces/shared";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {

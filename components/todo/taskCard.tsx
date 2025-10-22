@@ -1,4 +1,4 @@
-import { Task } from '@/utils/interface';
+import { Task } from '@/utils/interfaces/task';
 import React from 'react';
 
 const TaskCard = ({ task, onDrag }: { task: Task, onDrag: Function }) => {

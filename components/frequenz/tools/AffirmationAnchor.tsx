@@ -1,6 +1,6 @@
 'use client'
+import { AffirmationEntry } from "@/utils/interfaces/frequency";
 import React, { useEffect, useState } from "react";
-import { AffirmationEntry } from "@/utils/interface";
 import { toast } from "react-toastify";
 
 interface Props { userId?: string; }

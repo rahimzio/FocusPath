@@ -3,8 +3,9 @@
 import * as React from 'react';
 import { HelpCircle, CalendarDays } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { clamp, pctTone, Preview, Smoothed, Trend } from '@/utils/interface';
 import { DeltaBadge } from './DeltaBadge';
+import { clamp, pctTone } from '@/utils/interfaces/shared';
+import { Preview, Smoothed, Trend } from '@/utils/interfaces/stats';
 
 export default function TrustTankBar({
   baseConviction,

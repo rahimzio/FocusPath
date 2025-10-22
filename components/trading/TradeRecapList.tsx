@@ -94,6 +94,8 @@ function resultBadgeProps(result: Result) {
       return { variant: "secondary" as const, className: undefined };
     case "loss":
       return { variant: "outline" as const, className: "border-rose-500 text-rose-600" };
+    default:
+      return { variant: "outline" as const, className: undefined };
   }
 }
 function GameBadge({ computed, self }: { computed?: Grade; self?: Grade }) {
@@ -598,16 +600,23 @@ export default function TradeRecapList({ userId }: { userId: string }) {
                           {computedDuration > 0 ? ` (${computedDuration} Min)` : ""}
                         </Badge>
                       ) : null}
-                      {t.session ? <Badge variant="outline">{t.session}</Badge> : null}
-
                       {(() => {
-                        const { variant, className } = resultBadgeProps(t.result);
+                        const props = resultBadgeProps(t.result);
                         return (
-                          <Badge variant={variant} className={className}>
-                            {t.result.toUpperCase()}
+                          <Badge variant={props.variant} className={props.className}>
+                            {(t.result ?? "").toUpperCase()}
                           </Badge>
                         );
                       })()}
+
+                        {(() => {
+                        const props = resultBadgeProps(t.result);
+                        return (
+                          <Badge variant={props.variant} className={props.className ?? undefined}>
+                            {(t.result ?? "").toUpperCase()}
+                          </Badge>
+                        );
+                        })()}
 
                       <Badge
                         variant={pnl >= 0 ? "secondary" : "outline"}

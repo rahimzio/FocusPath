@@ -5,7 +5,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { GoalWithProgress } from "@/utils/interface";
+import { GoalWithProgress } from "@/utils/interfaces/goal";
 
 interface Props {
   editedGoal: GoalWithProgress | null;

@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { connectToDatabase } from '../db/mongo';
-import { expense } from '@/utils/interface';
+import { expense } from '@/utils/interfaces/finance';
 
 const saveExpense = async (req: NextApiRequest, res: NextApiResponse) => {
   const { name, amount,note, category, frequency, dueDate }: expense = req.body;

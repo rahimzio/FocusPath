@@ -1,7 +1,7 @@
 // pages/api/cron/StatsCron.ts
 import cron from "node-cron";
-import { TradeEntry, WeeklyStat } from "@/utils/interface";
 import { connectToDatabase } from "../db/connectToDatabase";
+import { TradeEntry, WeeklyStat } from "@/utils/interfaces/trading";
 
 /** Zeile, die aus der Aggregation zurückkommt */
 interface AggRow {

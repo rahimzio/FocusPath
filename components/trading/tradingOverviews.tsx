@@ -127,6 +127,22 @@ const InchwormPlanner = dynamic<{ userId: string }>(
   },
   { ssr: false, loading: () => <div className="opacity-70">Lade…</div> }
 );
+const GameProgressPlanAware = dynamic<{ userId: string }>(
+  async () => {
+    const mod = await import("./inchworm/GameProgressPlanAware");
+    return (mod as any).default ?? (() => null);
+  },
+  { ssr: false, loading: () => <div className="opacity-70">Lade…</div> }
+);
+
+// ✅ Monats-Verteilung (plan-unabhängig)
+const GameProgressMonthly = dynamic<{ userId: string }>(
+  async () => {
+    const mod = await import("./GameProgressMonthly");
+    return (mod as any).default ?? (() => null);
+  },
+  { ssr: false, loading: () => <div className="opacity-70">Lade…</div> }
+);
 
 const GameProgressTracker = dynamic<{ userId: string }>(
   async () => {
@@ -277,6 +293,28 @@ const TradingHistory = dynamic<{ userId: string }>(
   { ssr: false, loading: () => <div className="opacity-70">Lade…</div> }
 );
 
+/* 🔹 NEU: StatsDashboard (lazy) */
+const StatsDashboard = dynamic<{ userId: string }>(
+  async () => {
+    try {
+      const mod = await import("./StatsDashboard");
+      return (mod as any).default ?? (() => null);
+    } catch {
+      return function Fallback() {
+        return (
+          <Card className="w-full max-w-full overflow-hidden">
+            <CardHeader><CardTitle>Persönliche Stats</CardTitle></CardHeader>
+            <CardContent className="text-sm opacity-70">
+              Die StatsDashboard-Komponente ist noch nicht verfügbar.
+            </CardContent>
+          </Card>
+        );
+      };
+    }
+  },
+  { ssr: false, loading: () => <div className="opacity-70">Lade…</div> }
+);
+
 /* ------------------------------------------------------------------
    Inline-Komponente für Improve-Überblick
 ------------------------------------------------------------------- */
@@ -295,7 +333,7 @@ function ImproveAtAGlance({
       setTodayDrill(localStorage.getItem("inchworm:todayDrill") || "");
       setFocus(localStorage.getItem("inchworm:focus") || "");
       setPeriod(localStorage.getItem("inchworm:period") || "");
-    } catch {}
+    } catch { }
   }, []);
 
   useEffect(() => {
@@ -306,7 +344,7 @@ function ImproveAtAGlance({
           setTodayDrill(localStorage.getItem("inchworm:todayDrill") || "");
           setFocus(localStorage.getItem("inchworm:focus") || "");
           setPeriod(localStorage.getItem("inchworm:period") || "");
-        } catch {}
+        } catch { }
       }
     };
     window.addEventListener("storage", onStorage);
@@ -403,7 +441,7 @@ export default function TradingDashboard() {
         const ls = localStorage.getItem("trading:metricsRange");
         if (ls === "week" || ls === "month" || ls === "all") setMetricsRange(ls as any);
       }
-    } catch {}
+    } catch { }
   }, []);
 
   // ⚙️ Persistiere Auswahl in URL + localStorage
@@ -413,7 +451,7 @@ export default function TradingDashboard() {
       u.searchParams.set("range", metricsRange);
       window.history.replaceState({}, "", u.toString());
       localStorage.setItem("trading:metricsRange", metricsRange);
-    } catch {}
+    } catch { }
   }, [metricsRange]);
 
   if (!userId) return <p className="px-3">Bitte einloggen...</p>;
@@ -424,7 +462,7 @@ export default function TradingDashboard() {
       const u = new URL(window.location.href);
       u.searchParams.set("tab", "improve");
       window.history.replaceState({}, "", u.toString());
-    } catch {}
+    } catch { }
     setTimeout(() => {
       const el = document.getElementById(anchor);
       if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -438,13 +476,13 @@ export default function TradingDashboard() {
       u.searchParams.set("tab", "review");
       u.searchParams.set("weekLabel", weekLabel);
       window.history.replaceState({}, "", u.toString());
-    } catch {}
+    } catch { }
   };
 
   return (
     <div className="mx-auto w-full max-w-screen-lg px-3 sm:px-4 space-y-6 overflow-x-hidden break-words min-w-0">
       {/* Header & Quick Metrics */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 min-w-0 w-full">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 min-w-0 w/full">
         <h1 className="text-2xl font-semibold w-full sm:w-auto">Trading Dashboard</h1>
         <div className="w-full sm:w-auto max-w-full min-w-0 overflow-hidden">
           {/* ⚙️ globaler Zeitraum wird an TradeMetrics durchgereicht */}
@@ -466,7 +504,7 @@ export default function TradingDashboard() {
               const u = new URL(window.location.href);
               u.searchParams.set("tab", "game");
               window.history.replaceState({}, "", u.toString());
-            } catch {}
+            } catch { }
           }}
           title="A/B/C Game Kriterien festlegen und Tages-Game wählen"
           className="whitespace-nowrap"
@@ -481,7 +519,7 @@ export default function TradingDashboard() {
               const u = new URL(window.location.href);
               u.searchParams.set("tab", "improve");
               window.history.replaceState({}, "", u.toString());
-            } catch {}
+            } catch { }
           }}
           title="Inchworm: Monats-Ziele, Drills & Fortschritt"
           className="whitespace-nowrap"
@@ -539,6 +577,11 @@ export default function TradingDashboard() {
             </CardContent>
           </Card>
 
+          {/* 🔹 NEU: Persönliche Stats */}
+          <div className="w-full max-w-full min-w-0">
+            <StatsDashboard userId={userId} />
+          </div>
+
           <div className="w-full max-w-full space-y-4 min-w-0">
             <TradeRecapList userId={userId} />
             <div className="w-full max-w-full overflow-hidden">
@@ -594,7 +637,16 @@ export default function TradingDashboard() {
 
         {/* Improve */}
         <TabsContent value="improve" className="min-w-0 w-full max-w-full">
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 min-w-0">
+          <div className="grid grid-cols-1 gap-4 min-w-0">
+            {/* 1) Game Progress (Plan-bewusst) */}
+            <Card id="progress" className="w-full max-w-full min-w-0 overflow-hidden">
+              <CardHeader><CardTitle>Game Progress</CardTitle></CardHeader>
+              <CardContent className="min-w-0">
+                <GameProgressPlanAware userId={userId} />
+              </CardContent>
+            </Card>
+
+            {/* 2) Inchworm Planner */}
             <Card id="planner" className="w-full max-w-full min-w-0 overflow-hidden">
               <CardHeader><CardTitle>Inchworm Planner</CardTitle></CardHeader>
               <CardContent className="min-w-0">
@@ -602,28 +654,30 @@ export default function TradingDashboard() {
               </CardContent>
             </Card>
 
-            <Card id="progress" className="w-full max-w-full min-w-0 overflow-hidden">
-              <CardHeader><CardTitle>Game Progress</CardTitle></CardHeader>
+            {/* 3) Game Progress (Monate, unabhängig vom Plan) */}
+            <Card className="w-full max-w-full min-w-0 overflow-hidden">
+              <CardHeader><CardTitle>Game Progress (Monate)</CardTitle></CardHeader>
               <CardContent className="min-w-0">
-                <GameProgressTracker userId={userId} />
+                <GameProgressMonthly userId={userId} />
               </CardContent>
             </Card>
 
-            <Card id="drillboard" className="xl:col-span-2 w-full max-w-full min-w-0 overflow-hidden">
+            {/* Rest wie gehabt */}
+            <Card id="drillboard" className="w-full max-w-full min-w-0 overflow-hidden">
               <CardHeader><CardTitle>Game Drillboard</CardTitle></CardHeader>
               <CardContent className="min-w-0">
                 <GameDrillboard userId={userId} />
               </CardContent>
             </Card>
 
-            <Card id="improvement-planner" className="xl:col-span-2 w-full max-w-full min-w-0 overflow-hidden">
+            <Card id="improvement-planner" className="w-full max-w-full min-w-0 overflow-hidden">
               <CardHeader><CardTitle>Inchworm Progress</CardTitle></CardHeader>
               <CardContent className="min-w-0">
                 <InchwormProgress userId={userId} />
               </CardContent>
             </Card>
 
-            <Card className="xl:col-span-2 w-full max-w-full min-w-0 overflow-hidden">
+            <Card className="w-full max-w-full min-w-0 overflow-hidden">
               <CardHeader><CardTitle>Game Improvement Planner</CardTitle></CardHeader>
               <CardContent className="min-w-0">
                 <GameImprovementPlanner userId={userId} />
@@ -631,6 +685,8 @@ export default function TradingDashboard() {
             </Card>
           </div>
         </TabsContent>
+
+
 
         {/* Review */}
         <TabsContent value="review" className="min-w-0 w-full max-w-full space-y-4">
@@ -655,7 +711,7 @@ export default function TradingDashboard() {
                       const u = new URL(window.location.href);
                       u.searchParams.set("weekLabel", weekLabel);
                       window.history.replaceState({}, "", u.toString());
-                    } catch {}
+                    } catch { }
                   }}
                 >
                   Übernehmen
@@ -697,8 +753,8 @@ export default function TradingDashboard() {
         </TabsContent>
 
         {/* ⚙️ NEU: Settings / Anpassungen */}
-        <TabsContent value="settings" className="min-w-0 w-full max-w-full">
-          <Card className="w-full max-w-full overflow-hidden">
+        <TabsContent value="settings" className="min-w-0 w/full max-w-full">
+          <Card className="w/full max-w-full overflow-hidden">
             <CardHeader>
               <CardTitle>Anpassungen – Metriken</CardTitle>
             </CardHeader>

@@ -1,6 +1,6 @@
 // 📁 utils/todo/taskUtils.ts
-import { Task } from "@/utils/interface";
 import { toast } from "react-toastify";
+import { Task } from "../interfaces/task";
 
 /**
  * Konvertiert eine Dauer (HH:MM) in eine visuelle Höhe (z. B. für Kalenderansicht)

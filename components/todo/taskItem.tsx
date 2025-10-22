@@ -1,6 +1,6 @@
 // components/TaskItem.tsx
+import { Task } from "@/utils/interfaces/task";
 import React from "react";
-import { Task } from "@/utils/interface";
 
 interface TaskItemProps {
   task: Task;

@@ -6,8 +6,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { BudgetCategoryEntry } from "@/utils/interface";
 import { X } from "lucide-react";
+import { BudgetCategoryEntry } from "@/utils/interfaces/finance";
 
 interface Props {
   userId: string;

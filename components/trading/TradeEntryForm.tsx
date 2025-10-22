@@ -3,7 +3,6 @@
 import React, { useMemo, useEffect } from "react";
 import { FormProvider, useForm, useFieldArray } from "react-hook-form";
 import useSWR from "swr";
-import { TradeEntry, Account, GameLibrary } from "@/utils/interface";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Card, CardHeader, CardTitle, CardContent, CardFooter,
@@ -24,13 +23,18 @@ import TEFGeneral from "./trade-entry/TEFGeneral";
 import TEFStrategy from "./trade-entry/TEFStrategy";
 import ProcessKPIBadge from "./trade-entry/ProcessKPIBadge";
 import ProcessFocusPanel from "./trade-entry/ProcessFocusPanel";
+import { Account, TradeEntry } from "@/utils/interfaces/trading";
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json());
+/* ————— Fetcher (mit Fehlerbehandlung) ————— */
+const fetcher = async (url: string) => {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+};
 
 /* --- Konstanten --- */
 const SESSIONS = ["Asia", "London", "NewYork", "Overlap"] as const;
 type SessionKey = (typeof SESSIONS)[number];
-
 type BiasExec = "RR" | "RW" | "WR" | "WW";
 
 /* Fallback-Library für mentale Fehler */
@@ -42,6 +46,7 @@ const DEFAULT_EMOTION_LIBRARY: { name: string; items: string[] }[] = [
   { name: "Undiszipliniert", items: ["Regelbruch", "Ablenkung", "Impulsiv"] },
 ];
 
+/* ——— Game-Score Heuristik ——— */
 function computeGameScore(opts: {
   biasExecution?: BiasExec;
   followedSetup?: boolean;
@@ -85,31 +90,21 @@ function minutesBetween(start?: string, end?: string) {
   if ([sh, sm, eh, em].some((n) => Number.isNaN(n))) return 0;
   return Math.max(0, (eh * 60 + em) - (sh * 60 + sm));
 }
-function dateOnly(d?: string) {
-  if (!d) return "";
-  // ISO -> "YYYY-MM-DD"
-  return d.length > 10 ? d.slice(0, 10) : d;
-}
-/** Pflichtfelder prüfen – Draft, wenn etwas fehlt */
+
+/** Pflichtfelder prüfen – Draft, wenn etwas fehlt (Entry ODER Exit reicht) */
 function computeMissingFields(values: any) {
   const missing: string[] = [];
-  const need = {
-    accountId: !!values.accountId,
-    symbol: !!values.symbol,
-    tradeType: !!values.tradeType,
-    entry: Number.isFinite(Number(values.entry)),
-    exit: Number.isFinite(Number(values.exit)),
-    result: values.result && values.result !== "ongoing",
-  };
-  Object.entries(need).forEach(([k, ok]) => { if (!ok) missing.push(k); });
+  const hasEntryOrExit =
+    Number.isFinite(Number(values.entry)) || Number.isFinite(Number(values.exit));
 
-  if (values.result === "BE") {
-    const i = missing.indexOf("pnl");
-    if (i >= 0) missing.splice(i, 1);
-  }
-  if (values.result === "ongoing") {
-    const i = missing.indexOf("result");
-    if (i >= 0) missing.splice(i, 1);
+  if (!values.accountId) missing.push("accountId");
+  if (!values.symbol) missing.push("symbol");
+  if (!values.tradeType) missing.push("tradeType");
+  if (!hasEntryOrExit) missing.push("entry/exit");
+
+  // result nur nötig, wenn nicht "ongoing" (lokaler Sentinel)
+  if (!values.result || values.result === "ongoing") {
+    missing.push("result");
   }
   return missing;
 }
@@ -125,66 +120,87 @@ type PartialExitForm = {
   label?: string;
   price?: number;
   percent?: number; // 0..100
-  at?: string;      // ISO-String oder ""
+  at?: string;
   note?: string;
 };
 
-/** -------- A/B/C Game Library Item -------- */
+/* ——— Formular-Werte ——— */
+type FormValues = Omit<TradeEntry, "processFocus" | "ifThenPlan" | "processIntent"> & {
+  result?: TradeEntry["result"] | "ongoing";
+  startTime?: string;
+  endTime?: string;
+  durationMin?: number;
+  session?: SessionKey;
+  outcomeFlags?: { breakEven?: boolean; stopHit?: boolean };
+  biasExecution?: BiasExec;
+  tradingMistakes?: string[];
+  emotionBefore?: string;
+  viewTimeframes?: string[];
+  entryTimeframe?: string;
+  concepts?: ConceptForm[];
+  location?: string;
+  gameComputed?: "A" | "B" | "C";
+  gameSelf?: "A" | "B" | "C";
+  gameItems?: string[];               // speichert Keys wie "A:Label"
+  gameCatalogScore?: number;          // Ø-Punkte (0..3)
+  gameCatalogGrade?: "A" | "B" | "C";
+  customMistake?: string;
+  strategyAdherence?: "yes" | "partial" | "no";
+  hasPartialExits?: boolean;
+  partialExits?: PartialExitForm[];
+  processIntent?: string;
+  processFocus?: string[];
+  ifThenPlan?: string;
+  processAdherence?: number;
+  tiltNoticed?: boolean;
+  cooldownDone?: boolean;
+  processDebrief?: string;
+  hidePnLUntilDebrief?: boolean;
+  luckFactor?: "positive" | "neutral" | "negative";
+  processNotes?: string;
+};
+
 type GameItem = {
   _id: string;
   userId: string;
   label: string;
   game: "A" | "B" | "C";
-  points?: number; // default A=3, B=2, C=1
+  points?: number;
   active?: boolean;
-  tags?: string[];
 };
 
 interface Props {
   date: string;
   userId: string;
-  onCreated: () => void;
   initialData?: TradeEntry;
+  onCreated?: () => void;
+  onUpdated?: () => void;
+  mode?: "create" | "edit";
+}
+
+/* 🔸 S-Game Regel: mind. 3 A-Items, und KEIN B/C ausgewählt */
+function isSGame(selectedKeys?: string[]): boolean {
+  const arr = Array.isArray(selectedKeys) ? selectedKeys : [];
+  let a = 0, hasBC = false;
+  for (const k of arr) {
+    if (k.startsWith("A:")) a++;
+    else if (k.startsWith("B:") || k.startsWith("C:")) { hasBC = true; break; }
+  }
+  return a >= 3 && !hasBC;
+}
+
+/* kleines Hilfs-Mapping für Badge-Varianten */
+function gradeBadgeVariant(g: "S" | "A" | "B" | "C" | undefined) {
+  if (g === "S" || g === "A") return "default" as const;
+  if (g === "B") return "secondary" as const;
+  return "outline" as const;
 }
 
 export default function TradeEntryForm({
-  date, userId, onCreated, initialData,
+  date, userId, initialData, onCreated, onUpdated,
 }: Props) {
   // --- Form Setup
-  const methods = useForm<TradeEntry & {
-    startTime?: string;
-    endTime?: string;
-    durationMin?: number;
-    session?: SessionKey;
-    outcomeFlags?: { breakEven?: boolean; stopHit?: boolean };
-    biasExecution?: BiasExec;
-    tradingMistakes?: string[];
-    emotionBefore?: string;
-    viewTimeframes?: string[];
-    entryTimeframe?: string;
-    concepts?: ConceptForm[];
-    location?: string;
-    gameComputed?: "A" | "B" | "C";
-    gameSelf?: "A" | "B" | "C";
-    gameItems?: string[];               // speichert Keys wie "A:Label"
-    gameCatalogScore?: number;          // Ø-Punkte (0..3)
-    gameCatalogGrade?: "A" | "B" | "C";
-    customMistake?: string;
-    strategyAdherence?: "yes" | "partial" | "no";
-    hasPartialExits?: boolean;
-    partialExits?: PartialExitForm[];
-    // in useForm defaultValues ergänzen:
-    processIntent?: string;                 // 1-Satz-Intention (Pre)
-    processFocus?: string[];               // Auswahl aus Shortlist
-    ifThenPlan?: string;                   // "Wenn X, dann Y"
-    processAdherence?: number;
-    tiltNoticed?: boolean;                // Tilt bemerkt?
-    cooldownDone?: boolean;               // Kurzer Reset gemacht?
-    processDebrief?: string;              // 1-Satz-Reflexion (Post)
-    hidePnLUntilDebrief?: boolean;        // UI-Flag (lokal)
-    luckFactor?: "positive" | "neutral" | "negative";
-    processNotes?: string;
-  }>({
+  const methods = useForm<FormValues>({
     defaultValues: {
       ...initialData,
       date,
@@ -200,7 +216,7 @@ export default function TradeEntryForm({
       lotSize: (initialData as any)?.lotSize ?? undefined,
       potentialLoss: (initialData as any)?.potentialLoss ?? undefined,
       riskReward: (initialData as any)?.riskReward || "",
-      notes: initialData?.notes || "",
+      notes: (initialData as any)?.notes || "",
       emotionBefore: (initialData as any)?.emotionBefore || "Neutral",
       followedSetup: (initialData as any)?.followedSetup || false,
       respectedStopLoss: (initialData as any)?.respectedStopLoss || false,
@@ -225,7 +241,6 @@ export default function TradeEntryForm({
       customMistake: "",
       strategyAdherence: (initialData as any)?.strategyAdherence || undefined,
       hasPartialExits: (initialData as any)?.hasPartialExits || false,
-      // in useForm defaultValues ergänzen:
       processIntent: (initialData as any)?.processIntent || "",
       processFocus: (initialData as any)?.processFocus || [],
       ifThenPlan: (initialData as any)?.ifThenPlan || "",
@@ -237,15 +252,15 @@ export default function TradeEntryForm({
       luckFactor: (initialData as any)?.luckFactor ?? "neutral",
       processNotes: (initialData as any)?.processNotes ?? "",
       partialExits: Array.isArray((initialData as any)?.partialExits)
-        ? ((initialData as any)?.partialExits as any[]).map((p) => ({
-          label: p?.label ?? "",
-          price: Number.isFinite(Number(p?.price)) ? Number(p?.price) : undefined,
-          percent: Number.isFinite(Number(p?.percent)) ? Number(p?.percent) : undefined,
-          at: p?.at ?? "",
-          note: p?.note ?? "",
-        }))
+        ? ((initialData as any)?.partialExits as any[]).map((p, idx: number) => ({
+            label: p?.label ?? `TP ${idx + 1}`,
+            price: Number.isFinite(Number(p?.price)) ? Number(p?.price) : undefined,
+            percent: Number.isFinite(Number(p?.percent)) ? Number(p?.percent) : undefined,
+            at: p?.at ?? "",
+            note: p?.note ?? "",
+          }))
         : [],
-    } as any,
+    } as Partial<FormValues>,
   });
 
   const { control, handleSubmit, watch, setValue } = methods;
@@ -276,11 +291,9 @@ export default function TradeEntryForm({
     [emotionLibrary]
   );
 
-  /* -------- 🆕 A/B/C Game Library laden (richtige API-Struktur: { items }) -------- */
-  // 🆕 A/B/C Game Library laden (neues Response-Format: { items, nextCursor, summary })
+  /* -------- A/B/C Game Library laden -------- */
   type GameLibItem = { _id: string; userId: string; label: string; game: "A" | "B" | "C"; points?: number; active?: boolean };
-
-  const { data: gameLibRes, error: gameLibErr, isLoading: gameLibLoading } = useSWR<{
+  const { data: gameLibRes, error: gameLibErr } = useSWR<{
     items: GameLibItem[];
     nextCursor?: string | null;
     summary?: any;
@@ -289,7 +302,6 @@ export default function TradeEntryForm({
     fetcher
   );
 
-  // Sichtbares Logging zum Debuggen (kannst du später wieder entfernen)
   useEffect(() => {
     if (userId) {
       console.log("[TEF] gameLibrary response:", { count: gameLibRes?.items?.length ?? 0, items: gameLibRes?.items });
@@ -297,30 +309,13 @@ export default function TradeEntryForm({
     }
   }, [userId, gameLibRes, gameLibErr]);
 
-  // Items → Gruppen A/B/C mappen
-  const gameLib: GameLibrary = useMemo(() => {
-    const A: string[] = [], B: string[] = [], C: string[] = [];
-    const items = Array.isArray(gameLibRes?.items) ? gameLibRes!.items : [];
-    for (const it of items) {
-      if (!it?.label || !it?.game) continue;
-      if (it.game === "A") A.push(it.label);
-      else if (it.game === "B") B.push(it.label);
-      else if (it.game === "C") C.push(it.label);
-    }
-    return { A, B, C };
-  }, [gameLibRes?.items]);
-
   const gameItems = gameLibRes?.items ?? [];
+  const itemsByGrade = useMemo(() => ({
+    A: gameItems.filter((i) => i.game === "A"),
+    B: gameItems.filter((i) => i.game === "B"),
+    C: gameItems.filter((i) => i.game === "C"),
+  }), [gameItems]);
 
-  const itemsByGrade = useMemo(() => {
-    return {
-      A: gameItems.filter((i) => i.game === "A"),
-      B: gameItems.filter((i) => i.game === "B"),
-      C: gameItems.filter((i) => i.game === "C"),
-    };
-  }, [gameItems]);
-
-  // Map für Punkte je Auswahl-Key ("A:Label" etc.)
   const pointsMap = useMemo(() => {
     const m = new Map<string, number>();
     for (const it of gameItems) {
@@ -340,7 +335,7 @@ export default function TradeEntryForm({
     }
   }, [v.followedSetup, v.respectedStopLoss, v.managedRisk, v.disciplineScore, setValue]);
 
-  // Live-Game (Bias/Exec/Mistakes -> separater Heuristik-Score)
+  // Live-Game (Bias/Exec/Mistakes -> Heuristik)
   const gameComputedLive = useMemo(() => {
     const r = computeGameScore({
       biasExecution: v.biasExecution as BiasExec | undefined,
@@ -349,7 +344,7 @@ export default function TradeEntryForm({
       managedRisk: v.managedRisk,
       conceptsCount: v.concepts?.length ?? 0,
       session: v.session as SessionKey | undefined,
-      result: v.result,
+      result: v.result as any,
       breakEven: v.outcomeFlags?.breakEven,
       stopHit: v.outcomeFlags?.stopHit,
       mistakes: v.tradingMistakes,
@@ -377,7 +372,7 @@ export default function TradeEntryForm({
     setValue("tradingMistakes", cur, { shouldDirty: true });
   };
 
-  /* -------- 🆕 Game Items toggeln -------- */
+  // Game Items toggeln
   const toggleGameItem = (grade: "A" | "B" | "C", label: string) => {
     const cur = new Set<string>(Array.isArray(v.gameItems) ? v.gameItems : []);
     const key = `${grade}:${label}`;
@@ -386,14 +381,13 @@ export default function TradeEntryForm({
     setValue("gameItems", Array.from(cur), { shouldDirty: true });
   };
 
-  /* -------- 🆕 Score/Grade aus selektierten GameItems berechnen (Ø Punkte) -------- */
+  // Score/Grade aus selektierten GameItems berechnen (Ø Punkte)
   useEffect(() => {
     const selected = Array.isArray(v.gameItems) ? v.gameItems : [];
     const n = selected.length;
     let sum = 0;
     for (const k of selected) sum += pointsMap.get(k) ?? 0;
     const avg = n > 0 ? sum / n : 0;
-    // Grade aus Ø-Punkten ableiten
     const grade: "A" | "B" | "C" = avg >= 2.5 ? "A" : avg >= 1.5 ? "B" : "C";
 
     if ((v.gameCatalogScore ?? 0) !== Number(avg.toFixed(2))) {
@@ -404,31 +398,39 @@ export default function TradeEntryForm({
     }
   }, [v.gameItems, pointsMap, setValue, v.gameCatalogScore, v.gameCatalogGrade]);
 
+  // 🔸 Live S-Badge (Display only)
+  const isS = useMemo(() => isSGame(v.gameItems), [v.gameItems]);
+  const liveDisplayGrade: "S" | "A" | "B" | "C" =
+    isS
+      ? "S"
+      : ((v.gameCatalogGrade as "A" | "B" | "C" | undefined) ?? v.gameSelf ?? gameComputedLive.grade);
+
   // Prozent-Summe Partial Exits
   const percentSum = useMemo(() => {
     const arr = Array.isArray(v.partialExits) ? v.partialExits : [];
-    return arr.reduce((acc, it) => {
+    return arr.reduce((acc: any, it: PartialExitForm) => {
       const n = Number(it?.percent);
       return acc + (Number.isFinite(n) ? n : 0);
     }, 0);
   }, [v.partialExits]);
+
   // SUBMIT (final/draft)
-  const onSubmit = async (values: any, forceStatus?: "final" | "draft") => {
+  const onSubmit = async (values: FormValues, forceStatus?: "final" | "draft") => {
     setPending(true);
     try {
-      const missing = computeMissingFields(values);
+      let vals: any = { ...values };
+      const missing = computeMissingFields(vals);
 
-      // ongoing ⇒ Draft + kein result übertragen
+      // "ongoing" ⇒ Draft + kein result übertragen
       let forceDraftByOngoing = false;
-      if (values.result === "ongoing") {
+      if (vals.result === "ongoing") {
         forceDraftByOngoing = true;
-        values = { ...values };
-        delete values.result;
+        delete vals.result;
       }
 
       // Partial-Exits: Validierung Summe ≤ 100
-      if (values.hasPartialExits) {
-        const sum = (Array.isArray(values.partialExits) ? values.partialExits : []).reduce(
+      if (vals.hasPartialExits) {
+        const sum = (Array.isArray(vals.partialExits) ? vals.partialExits : []).reduce(
           (acc: number, it: any) => {
             const n = Number(it?.percent);
             return acc + (Number.isFinite(n) ? n : 0);
@@ -442,20 +444,21 @@ export default function TradeEntryForm({
         }
       }
 
+      // ⚠️ Backend akzeptiert nur A|B|C → S bleibt Anzeige-Only!
       const preferredGrade: "A" | "B" | "C" =
-        (values.gameCatalogGrade as "A" | "B" | "C" | undefined) ??
-        (values.gameSelf as "A" | "B" | "C" | undefined) ??
+        (vals.gameCatalogGrade as "A" | "B" | "C" | undefined) ??
+        (vals.gameSelf as "A" | "B" | "C" | undefined) ??
         computeGameScore({
-          biasExecution: values.biasExecution,
-          followedSetup: values.followedSetup,
-          respectedStopLoss: values.respectedStopLoss,
-          managedRisk: values.managedRisk,
-          conceptsCount: values.concepts?.length ?? 0,
-          session: values.session,
-          result: values.result,
-          breakEven: values.outcomeFlags?.breakEven,
-          stopHit: values.outcomeFlags?.stopHit,
-          mistakes: values.tradingMistakes,
+          biasExecution: vals.biasExecution,
+          followedSetup: vals.followedSetup,
+          respectedStopLoss: vals.respectedStopLoss,
+          managedRisk: vals.managedRisk,
+          conceptsCount: vals.concepts?.length ?? 0,
+          session: vals.session as any,
+          result: vals.result as any,
+          breakEven: vals.outcomeFlags?.breakEven,
+          stopHit: vals.outcomeFlags?.stopHit,
+          mistakes: vals.tradingMistakes,
         }).grade;
 
       const num = (x: any, d = 0) => {
@@ -477,72 +480,72 @@ export default function TradeEntryForm({
         forceDraftByOngoing ? "draft" : desiredStatus;
 
       // Partial-Exits sanitisieren
-      const partialExitsSan = Array.isArray(values.partialExits)
-        ? values.partialExits
-          .map((p: PartialExitForm, idx: number) => {
-            const label = strTrim(p?.label) ?? `TP ${idx + 1}`;
-            const price = numOpt(p?.price);
-            let percent = numOpt(p?.percent);
-            if (percent !== undefined) {
-              if (percent < 0) percent = 0;
-              if (percent > 100) percent = 100;
-            }
-            const at = strTrim(p?.at);
-            const note = strTrim(p?.note);
-            if (!label && price === undefined && percent === undefined && !at && !note) {
-              return null;
-            }
-            return { label: label ?? undefined, price, percent, at, note };
-          })
-          .filter(Boolean)
+      const partialExitsSan = Array.isArray(vals.partialExits)
+        ? vals.partialExits
+            .map((p: PartialExitForm, idx: number) => {
+              const label = strTrim(p?.label) ?? `TP ${idx + 1}`;
+              const price = numOpt(p?.price);
+              let percent = numOpt(p?.percent);
+              if (percent !== undefined) {
+                if (percent < 0) percent = 0;
+                if (percent > 100) percent = 100;
+              }
+              const at = strTrim(p?.at);
+              const note = strTrim(p?.note);
+              if (!label && price === undefined && percent === undefined && !at && !note) {
+                return null;
+              }
+              return { label: label ?? undefined, price, percent, at, note };
+            })
+            .filter(Boolean)
         : undefined;
 
       const payload: any = {
-        ...values,
+        ...vals,
         userId,
-        processIntent: values.processIntent || undefined,
-        processFocus: Array.isArray(values.processFocus) ? values.processFocus : undefined,
-        ifThenPlan: values.ifThenPlan || undefined,
-        processAdherence: Number(values.processAdherence ?? 0),
-        tiltNoticed: !!values.tiltNoticed,
-        cooldownDone: !!values.cooldownDone,
-        processDebrief: values.processDebrief || undefined,
-        hidePnLUntilDebrief: !!values.hidePnLUntilDebrief,
-        entry: num(values.entry),
-        exit: num(values.exit),
-        pnl: num(values.pnl),
-        lotSize: numOpt(values.lotSize),
-        potentialLoss: numOpt(values.potentialLoss),
-        disciplineScore: num(values.disciplineScore),
-        rating: values?.rating !== undefined ? num(values.rating) : undefined,
-        durationMin: num(values.durationMin ?? minutesBetween(values.startTime, values.endTime)),
+        processIntent: vals.processIntent || undefined,
+        processFocus: Array.isArray(vals.processFocus) ? vals.processFocus : undefined,
+        ifThenPlan: vals.ifThenPlan || undefined,
+        processAdherence: Number(vals.processAdherence ?? 0),
+        tiltNoticed: !!vals.tiltNoticed,
+        cooldownDone: !!vals.cooldownDone,
+        processDebrief: vals.processDebrief || undefined,
+        hidePnLUntilDebrief: !!vals.hidePnLUntilDebrief,
+        entry: num(vals.entry),
+        exit: num(vals.exit),
+        pnl: num(vals.pnl),
+        lotSize: numOpt(vals.lotSize),
+        potentialLoss: numOpt(vals.potentialLoss),
+        disciplineScore: num(vals.disciplineScore),
+        rating: vals?.rating !== undefined ? num(vals.rating) : undefined,
+        durationMin: num(vals.durationMin ?? minutesBetween(vals.startTime, vals.endTime)),
         outcomeFlags: {
-          breakEven: !!values?.outcomeFlags?.breakEven,
-          stopHit: !!values?.outcomeFlags?.stopHit,
+          breakEven: !!vals?.outcomeFlags?.breakEven,
+          stopHit: !!vals?.outcomeFlags?.stopHit,
         },
-        luckFactor: (values.luckFactor === "positive" || values.luckFactor === "negative" || values.luckFactor === "neutral")
-          ? values.luckFactor
+        luckFactor: (vals.luckFactor === "positive" || vals.luckFactor === "negative" || vals.luckFactor === "neutral")
+          ? vals.luckFactor
           : "neutral",
-        processNotes: typeof values.processNotes === "string" ? values.processNotes.trim() : undefined,
-        tradingMistakes: Array.isArray(values.tradingMistakes) ? values.tradingMistakes : [],
-        viewTimeframes: Array.isArray(values.viewTimeframes) ? values.viewTimeframes : [],
-        concepts: Array.isArray(values.concepts)
-          ? values.concepts.map((c: any) => ({
-            name: String(c?.name || ""),
-            direction: c?.direction || undefined,
-            timeframe: String(c?.timeframe || ""),
-            note: c?.note ? String(c.note) : undefined,
-          }))
+        processNotes: typeof vals.processNotes === "string" ? vals.processNotes.trim() : undefined,
+        tradingMistakes: Array.isArray(vals.tradingMistakes) ? vals.tradingMistakes : [],
+        viewTimeframes: Array.isArray(vals.viewTimeframes) ? vals.viewTimeframes : [],
+        concepts: Array.isArray(vals.concepts)
+          ? vals.concepts.map((c: any) => ({
+              name: String(c?.name || ""),
+              direction: c?.direction || undefined,
+              timeframe: String(c?.timeframe || ""),
+              note: c?.note ? String(c.note) : undefined,
+            }))
           : [],
-        gameItems: Array.isArray(values.gameItems) ? values.gameItems : [],
-        gameSelf: values.gameSelf ?? undefined,
-        gameCatalogScore: num(values.gameCatalogScore),
-        gameCatalogGrade: values.gameCatalogGrade ?? undefined,
-        gameComputed: preferredGrade,
-        strategy: values.strategy ?? values.strategy_name ?? undefined,
-        strategyAdherence: values.strategyAdherence ?? undefined,
-        hasPartialExits: !!values.hasPartialExits,
-        partialExits: values.hasPartialExits && partialExitsSan && partialExitsSan.length
+        gameItems: Array.isArray(vals.gameItems) ? vals.gameItems : [],
+        gameSelf: vals.gameSelf ?? undefined,
+        gameCatalogScore: num(vals.gameCatalogScore),
+        gameCatalogGrade: vals.gameCatalogGrade ?? undefined,
+        gameComputed: preferredGrade,  // ⚠️ hier bleibt's bei A/B/C
+        strategy: vals.strategy ?? vals.strategy_name ?? undefined,
+        strategyAdherence: vals.strategyAdherence ?? undefined,
+        hasPartialExits: !!vals.hasPartialExits,
+        partialExits: vals.hasPartialExits && partialExitsSan && partialExitsSan.length
           ? partialExitsSan
           : undefined,
         missing,
@@ -557,6 +560,7 @@ export default function TradeEntryForm({
           body: JSON.stringify(payload),
         });
         if (!resp.ok) throw new Error(`Update fehlgeschlagen: ${resp.status}`);
+        onUpdated?.() ?? onCreated?.();
       } else {
         const resp = await fetch("/api/trading/create", {
           method: "POST",
@@ -564,9 +568,8 @@ export default function TradeEntryForm({
           body: JSON.stringify(payload),
         });
         if (!resp.ok) throw new Error(`Create fehlgeschlagen: ${resp.status}`);
+        onCreated?.();
       }
-
-      onCreated();
     } catch (e) {
       console.error(e);
     } finally {
@@ -574,8 +577,7 @@ export default function TradeEntryForm({
     }
   };
 
-  const onSubmitFinal = (vals: any) => onSubmit(vals, "final");
-  const onSubmitDraft = (vals: any) => onSubmit(vals, "draft");
+  const onSubmitFinal = (vals: FormValues) => onSubmit(vals, "final");
 
   /** ---------- UI ---------- */
   return (
@@ -586,8 +588,8 @@ export default function TradeEntryForm({
           <CardHeader className="flex items-center justify-between sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
             <CardTitle>{initialData ? "Trade bearbeiten" : "Neuer Trade"}</CardTitle>
             <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="text-sm">
-                Game: {(v.gameCatalogGrade as "A" | "B" | "C" | undefined) ?? v.gameSelf ?? gameComputedLive.grade}
+              <Badge variant={gradeBadgeVariant(liveDisplayGrade)} className="text-sm">
+                Game: {liveDisplayGrade}
               </Badge>
               <Badge variant="outline" className="text-sm">
                 Disziplin: {Math.round(Number(v.disciplineScore ?? 0))}%
@@ -606,119 +608,12 @@ export default function TradeEntryForm({
               <TabsList className="flex w-full overflow-x-auto whitespace-nowrap">
                 <TabsTrigger value="general">General</TabsTrigger>
                 <TabsTrigger value="strategy">Strategie</TabsTrigger>
-                {/* 🆕 neuer Tab */}
                 <TabsTrigger value="trading-game">Trading Game</TabsTrigger>
               </TabsList>
 
               {/* --- GENERAL --- */}
               <TabsContent value="general" className="space-y-6">
-                <TabsContent value="process" className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  <ProcessFocusPanel
-                    value={{
-                      focus: v.processFocus ?? [],
-                      ifThen: v.ifThenPlan ?? "",
-                      intent: v.processIntent ?? "",
-                    }}
-                    onChange={(nv) => {
-                      setValue("processFocus", nv.focus, { shouldDirty: true });
-                      setValue("ifThenPlan", nv.ifThen ?? "", { shouldDirty: true });
-                      setValue("processIntent", nv.intent ?? "", { shouldDirty: true });
-                    }}
-                  />
-                  <ProcessKPIBadge
-                    value={{
-                      adherence: v.processAdherence ?? 0,
-                      tiltNoticed: v.tiltNoticed ?? false,
-                      cooldownDone: v.cooldownDone ?? false,
-                      debrief: v.processDebrief ?? "",
-                    }}
-                    onChange={(nv) => {
-                      setValue("processAdherence", nv.adherence ?? 0, { shouldDirty: true });
-                      setValue("tiltNoticed", !!nv.tiltNoticed, { shouldDirty: true });
-                      setValue("cooldownDone", !!nv.cooldownDone, { shouldDirty: true });
-                      setValue("processDebrief", nv.debrief ?? "", { shouldDirty: true });
-                    }}
-                  />
-                </TabsContent>
-
                 <TEFGeneral userId={userId} />
-
-                {/* Mentale Fehler */}
-                <div className="space-y-2">
-                  <FormLabel>Mentale Fehler</FormLabel>
-                  <div
-                    className="flex flex-wrap gap-2"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    {allMistakeChoices.map((m) => {
-                      const active = (v.tradingMistakes ?? []).includes(m);
-                      return (
-                        <button
-                          key={m}
-                          type="button"
-                          onMouseDown={(e) => e.preventDefault()}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            toggleMistake(m);
-                          }}
-                          className={[
-                            "px-3 py-1 rounded-md text-sm border",
-                            active ? "bg-primary text-primary-foreground" : "bg-secondary"
-                          ].join(" ")}
-                          aria-pressed={active}
-                        >
-                          {m}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <FormField
-                    control={control}
-                    name="customMistake"
-                    render={({ field }) => (
-                      <FormItem className="mt-2">
-                        <FormLabel className="text-xs text-muted-foreground">Eigenen Punkt hinzufügen</FormLabel>
-                        <div className="flex gap-2">
-                          <FormControl>
-                            <Input
-                              placeholder="z. B. FOMO-ReEntry"
-                              value={field.value ?? ""}
-                              onChange={field.onChange}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                  e.preventDefault();
-                                  const val = String(field.value || "").trim();
-                                  if (val) {
-                                    toggleMistake(val);
-                                    field.onChange("");
-                                  }
-                                }
-                              }}
-                            />
-                          </FormControl>
-                          <button
-                            type="button"
-                            onMouseDown={(e) => e.preventDefault()}
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              const val = String(field.value || "").trim();
-                              if (val) {
-                                toggleMistake(val);
-                                field.onChange("");
-                              }
-                            }}
-                            className="px-3 py-1 rounded-md text-sm border bg-background"
-                          >
-                            Hinzufügen
-                          </button>
-                        </div>
-                      </FormItem>
-                    )}
-                  />
-                </div>
               </TabsContent>
 
               {/* --- STRATEGY --- */}
@@ -726,15 +621,19 @@ export default function TradeEntryForm({
                 <TEFStrategy userId={userId} />
               </TabsContent>
 
-              {/* --- 🆕 TRADING GAME (A/B/C Faktoren) --- */}
+              {/* --- TRADING GAME --- */}
               <TabsContent value="trading-game" className="space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="text-sm text-muted-foreground">
-                    Wähle die erfüllten Faktoren – daraus wird Ø-Punkte & Game berechnet.
+                    Wähle die erfüllten Faktoren – daraus wird Ø-Punkte &amp; Game berechnet.
+                    {/** kleine Hilfe zur S-Regel */}
+                    <div className="text-xs mt-1 opacity-70">
+                      S-Game: mindestens <b>3× A</b> ausgewählt und <b>keine</b> B/C-Faktoren aktiv.
+                    </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Badge variant={v.gameCatalogGrade === "A" ? "default" : v.gameCatalogGrade === "B" ? "secondary" : "outline"}>
-                      Game: {v.gameCatalogGrade ?? "-"}
+                    <Badge variant={gradeBadgeVariant(liveDisplayGrade)}>
+                      Game: {liveDisplayGrade}
                     </Badge>
                     <Badge variant="outline">Ø Punkte: {(v.gameCatalogScore ?? 0).toFixed(2)}</Badge>
                   </div>
@@ -786,7 +685,7 @@ export default function TradeEntryForm({
             <Button
               type="button"
               variant="secondary"
-              onClick={() => handleSubmit((vals) => onSubmit(vals, "draft"))()}
+              onClick={() => methods.handleSubmit((vals) => onSubmit(vals, "draft"))()}
               title="Speichert den Trade als unvollständig (Entwurf)"
               disabled={pending}
             >

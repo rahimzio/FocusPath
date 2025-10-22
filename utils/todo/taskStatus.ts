@@ -1,7 +1,7 @@
 // 🧩 taskStatus.ts – Funktionen zum Abschließen/Rückgängigmachen von Tasks und Subtasks
 import { useCallback } from "react";
-import { Task, SubTask } from "../interface";
 import { toast } from "react-toastify";
+import { Task, SubTask } from "../interfaces/task";
 
 /**
  * Aktualisiert den Status einer Aufgabe (checked = true → abgeschlossen)

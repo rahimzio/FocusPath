@@ -1,5 +1,6 @@
 // /lib/api/goal.ts
-import type { CreateGoalBody, Goal } from "@/utils/interface";
+
+import { CreateGoalBody, Goal } from "@/utils/interfaces/goal";
 
 async function j<T>(res: Response): Promise<T> {
   if (!res.ok) {

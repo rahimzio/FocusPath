@@ -1,7 +1,7 @@
 import type { NextApiRequest as Req3, NextApiResponse as Res3 } from 'next';
-import type { FrequencyDoc, FrequencyTaskTemplate, FrequencyTaskInstance } from '@/utils/interface';
 import { requireCollection as requireCol3 } from '@/lib/requireCollection';
 import { connectToDatabase } from '../db/connectToDatabase';
+import { FrequencyTaskInstance, FrequencyDoc, FrequencyTaskTemplate } from '@/utils/interfaces/frequency';
 
 export default async function handlerBulkCreateDaily(req: Req3, res: Res3) {
   if (req.method !== 'POST') {

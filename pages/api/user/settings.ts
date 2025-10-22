@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import { connectToDatabase } from "../db/mongo";
-import { UserConfigDocument } from "@/utils/interface";
+import { UserConfigDocument } from "@/utils/interfaces/shared";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { db } = await connectToDatabase();

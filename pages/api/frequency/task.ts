@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { connectToDatabase } from "../db/mongo";
-import { Task } from "@/utils/interface"; // Dein bestehendes Task-Interface
 import { ObjectId } from "mongodb";
+import { Task } from "@/utils/interfaces/task";
 
 interface FrequencyRecommendation {
   title: string;

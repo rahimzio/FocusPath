@@ -2,96 +2,73 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { connectToDatabase } from "../db/mongo";
 
-type AccountDoc = {
-  _id: any;
-  type?: string;               // "account"
-  userId: string;
-  name?: string;
-  broker?: string;
-  currency?: string;
-  startingBalance?: number;
-  currentBalance?: number;
-  realizedPnl?: number;
-  riskPerTrade?: number;       // in %
-  createdAt?: string;
-  updatedAt?: string;
-  archived?: boolean;
-  deleted?: boolean;
-};
-
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== "GET") return res.status(405).json({ message: "Method not allowed" });
-
-  const { userId, includeArchived } = req.query as {
-    userId?: string;
-    includeArchived?: string;
-  };
-
-  if (!userId || typeof userId !== "string") {
-    return res.status(400).json({ message: "Missing userId" });
-  }
+  if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
 
   try {
-    const { db } = await connectToDatabase();
-    const col = db.collection<AccountDoc>("trading");
+    const userId = typeof req.query.userId === "string" ? req.query.userId : undefined;
+    if (!userId) return res.status(400).json({ error: "userId ist erforderlich" });
 
-    // Indizes (idempotent)
+    const { db } = await connectToDatabase();
+    const col = db.collection("trading");
+
+    // 🔧 WICHTIG für Cosmos (Mongo API):
+    // Filter-Gleichheitsfelder (vorn) + Sort-Felder (hinten, mit Richtungen) exakt in einem Index.
     try {
       await Promise.all([
-        col.createIndex({ userId: 1, type: 1, archived: 1, deleted: 1, createdAt: -1 }),
-        col.createIndex({ userId: 1, type: 1, name: 1 }),
+        // Standard-Sort: updatedAt desc, _id desc
+        col.createIndex({ userId: 1, type: 1, archived: 1, deleted: 1, updatedAt: -1, _id: -1 }),
+        // Alternativ-Sort nach name asc (falls du irgendwo sort({name:1}) nutzt)
+        col.createIndex({ userId: 1, type: 1, archived: 1, deleted: 1, name: 1, _id: -1 }),
+        // Schneller Lookup ohne Sort (als Fallback)
+        col.createIndex({ userId: 1, type: 1, archived: 1, deleted: 1, _id: -1 }),
       ]);
-    } catch {}
+    } catch {
+      // Index-Erstellung ist idempotent; Fehler hier sind i. d. R. unkritisch
+    }
 
-    const match: any = {
-      userId,
+    const baseFilter: any = {
       type: "account",
+      userId,
+      archived: { $ne: true },
       deleted: { $ne: true },
-      ...(includeArchived === "true" ? {} : { archived: { $ne: true } }),
     };
 
-    const docs = await col
-      .find(match, {
-        projection: {
-          userId: 1,
-          name: 1,
-          broker: 1,
-          currency: 1,
-          startingBalance: 1,
-          currentBalance: 1,
-          realizedPnl: 1,
-          riskPerTrade: 1,
-          createdAt: 1,
-          updatedAt: 1,
-        },
-      })
-      .sort({ createdAt: -1, name: 1 })
-      .toArray();
+    // Optional: ?sort=name|updatedAt  /  ?dir=asc|desc
+    const sortKey = req.query.sort === "name" ? "name" : "updatedAt";
+    const dir = String(req.query.dir || "desc").toLowerCase() === "asc" ? 1 : -1;
+    const sort: any = sortKey === "name" ? { name: 1, _id: -1 } : { updatedAt: -1, _id: -1 };
 
-    const accounts = docs.map((d) => {
-      const current =
-        typeof d.currentBalance === "number"
-          ? d.currentBalance
-          : (typeof d.startingBalance === "number" ? d.startingBalance : undefined);
+    let docs: any[] = [];
+    try {
+      docs = await col.find(baseFilter).sort(sort).limit(500).toArray();
+    } catch (e: any) {
+      // Cosmos Composite-Index-Fehler → Fallback auf _id:-1
+      const msg = String(e?.message || "");
+      const isCosmosCompositeIdxError =
+        e?.code === 2 || /composite index/i.test(msg) || /order by query/i.test(msg);
+      if (!isCosmosCompositeIdxError) throw e;
 
-      return {
-        _id: String(d._id),
-        userId: d.userId, // ✅ wichtig für Frontend-Typ
-        name: d.name,
-        broker: d.broker,
-        currency: d.currency,
-        startingBalance: typeof d.startingBalance === "number" ? d.startingBalance : undefined,
-        currentBalance: current,
-        realizedPnl: typeof d.realizedPnl === "number" ? d.realizedPnl : undefined,
-        riskPerTrade: typeof d.riskPerTrade === "number" ? d.riskPerTrade : undefined,
-        createdAt: d.createdAt,
-        updatedAt: d.updatedAt,
-      };
-    });
+      docs = await col.find(baseFilter).sort({ _id: -1 }).limit(500).toArray();
+    }
+
+    const accounts = docs.map((d) => ({
+      _id: String(d._id),
+      userId: d.userId,
+      name: d.name ?? "",
+      broker: d.broker ?? "",
+      currency: d.currency ?? "",
+      startingBalance: Number(d.startingBalance ?? 0),
+      currentBalance: Number(d.currentBalance ?? 0),
+      realizedPnl: Number(d.realizedPnl ?? 0),
+      riskPerTrade: Number(d.riskPerTrade ?? 0),
+      createdAt: d.createdAt,
+      updatedAt: d.updatedAt,
+    }));
 
     return res.status(200).json({ accounts });
   } catch (err: any) {
     console.error("getAllAccounts error:", err);
-    return res.status(500).json({ message: "server error" });
+    return res.status(500).json({ error: err?.message ?? "Internal Server Error" });
   }
 }

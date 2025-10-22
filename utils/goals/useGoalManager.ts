@@ -1,7 +1,8 @@
 // utils/goals/useGoalManager.ts
 import { useState, useEffect } from "react";
-import { Goal, SubTask, Task } from "@/utils/interface";
 import { getSession } from "next-auth/react";
+import { Goal } from "../interfaces/goal";
+import { Task, SubTask } from "../interfaces/task";
 
 export function useGoalManager() {
   const [goals, setGoals] = useState<Goal[]>([]);

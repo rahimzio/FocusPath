@@ -1,7 +1,7 @@
 "use client";
 
+import { Task } from "@/utils/interfaces/task";
 import React, { useState } from "react";
-import { Task } from "@/utils/interface";
 import { FaTrashAlt, FaPen } from "react-icons/fa";
 
 interface Props {

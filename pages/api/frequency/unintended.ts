@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import { connectToDatabase } from "../db/mongo";
-import { ActionLog } from "@/utils/interface";
+import { ActionLog } from "@/utils/interfaces/frequency";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
@@ -22,7 +22,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         typ: "unintended_action",
         meta: { reason, taskId },
         createdAt: new Date().toISOString(),
-        FileType2Icon: "action_log",
         logType: "unintended_action"
     };
     const result = await collection.insertOne(log as unknown as ActionLog);

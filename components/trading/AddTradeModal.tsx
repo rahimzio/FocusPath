@@ -6,8 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Button } from "@/components/ui/button";
 import { mutate } from "swr";
 import TradeEntryForm from "./TradeEntryForm";
-
-type TradeDoc = any;
+import { TradeEntry } from "@/utils/interfaces/trading";
 
 interface Props {
   userId: string;
@@ -15,16 +14,31 @@ interface Props {
   defaultDate?: string;
 }
 
+/** Normalisiert evtl. Legacy-Felder für das Formular */
+function normalizeTrade(doc: any): TradeEntry {
+  const notes =
+    Array.isArray(doc?.notes) ? doc.notes.filter(Boolean).join("\n") : (typeof doc?.notes === "string" ? doc.notes : undefined);
+
+  return {
+    ...doc,
+    _id: String(doc?._id ?? ""),
+    userId: String(doc?.userId ?? ""),
+    date: String(doc?.date ?? "").slice(0, 10),
+    notes,
+  } as TradeEntry;
+}
+
 export default function AddTradeModal({ userId, trigger, defaultDate }: Props) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<"create" | "edit">("create");
-  const [initialData, setInitialData] = useState<TradeDoc | null>(null);
+  const [initialData, setInitialData] = useState<TradeEntry | null>(null);
   const [loading, setLoading] = useState(false);
 
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const dateForForm = initialData?.date ?? defaultDate ?? today;
 
   const refreshCaches = useCallback(() => {
+    // alle Trading-SWR-Keys invalidieren
     mutate((key: string) => typeof key === "string" && key.startsWith("/api/trading/"));
   }, []);
 
@@ -34,6 +48,16 @@ export default function AddTradeModal({ userId, trigger, defaultDate }: Props) {
     setOpen(true);
   };
 
+  // Modal schließen → State aufräumen
+  const handleOpenChange = (v: boolean) => {
+    setOpen(v);
+    if (!v) {
+      setMode("create");
+      setInitialData(null);
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     const handler = async (e: Event) => {
       const custom = e as CustomEvent<{ id: string }>;
@@ -41,10 +65,14 @@ export default function AddTradeModal({ userId, trigger, defaultDate }: Props) {
       if (!id) return;
       try {
         setLoading(true);
-        const res = await fetch(`/api/trading/getById?id=${id}&userId=${userId}`);
-        if (!res.ok) throw new Error(`Fetch failed ${res.status}`);
+        const res = await fetch(`/api/trading/getById?id=${encodeURIComponent(id)}&userId=${encodeURIComponent(userId)}`);
+        if (!res.ok) {
+          const text = await res.text().catch(() => "");
+          throw new Error(`Fetch failed ${res.status} ${text}`);
+        }
         const json = await res.json();
-        setInitialData(json.trade);
+        const trade = normalizeTrade(json?.trade);
+        setInitialData(trade);
         setMode("edit");
         setOpen(true);
       } catch (err) {
@@ -53,18 +81,18 @@ export default function AddTradeModal({ userId, trigger, defaultDate }: Props) {
         setLoading(false);
       }
     };
+
     window.addEventListener("trade-edit", handler as EventListener);
     return () => window.removeEventListener("trade-edit", handler as EventListener);
   }, [userId]);
 
-  const onCreated = () => {
-    setOpen(false);
-    setInitialData(null);
+  const onCreatedOrUpdated = () => {
+    handleOpenChange(false);
     refreshCaches();
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       {trigger ? (
         <DialogTrigger asChild>{trigger}</DialogTrigger>
       ) : (
@@ -86,8 +114,10 @@ export default function AddTradeModal({ userId, trigger, defaultDate }: Props) {
             <TradeEntryForm
               userId={userId}
               date={dateForForm}
-              onCreated={onCreated}
+              onCreated={onCreatedOrUpdated}
+              onUpdated={onCreatedOrUpdated}
               initialData={initialData || undefined}
+              mode={mode}
             />
           </div>
         )}

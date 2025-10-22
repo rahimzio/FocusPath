@@ -2,8 +2,8 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import { ObjectId } from "mongodb";
 import { connectToDatabase } from "../db/mongo";
-import { UserAccount } from "@/utils/interface";
 import { getCached, setCached } from "@/utils/redis";
+import { UserAccount } from "@/utils/interfaces/trading";
 
 function mapAccount(doc: any): UserAccount {
   if (!doc) return doc;

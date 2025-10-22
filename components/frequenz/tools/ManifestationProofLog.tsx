@@ -1,7 +1,7 @@
 'use client';
 
+import { ManifestationProof } from '@/utils/interfaces/frequency';
 import React, { useMemo, useState } from 'react';
-import { ManifestationProof } from '@/utils/interface';
 
 interface Props {
   initial?: ManifestationProof[];

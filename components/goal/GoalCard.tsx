@@ -1,5 +1,4 @@
 import React from "react";
-import { Goal } from "@/utils/interface";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Progress } from "@/components/ui/progress";
@@ -15,6 +14,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { normalizeGoalType, computeGoalProgress } from "@/utils/goals/progress";
+import { Goal } from "@/utils/interfaces/goal";
 
 interface GoalCardProps {
   goal: Goal;

@@ -1,4 +1,5 @@
-import { GoalWithProgress, Task } from "@/utils/interface";
+import { GoalWithProgress } from "@/utils/interfaces/goal";
+import { Task } from "@/utils/interfaces/task";
 
 export type DayScore = "L" | "M" | "W" | "W+";
 export type WeekScore = "L" | "M" | "W" | "S";

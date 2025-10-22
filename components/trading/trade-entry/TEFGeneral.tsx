@@ -1,9 +1,10 @@
+// TEFGeneral.tsx
 "use client";
 
 import React from "react";
 import useSWR from "swr";
 import { useFormContext } from "react-hook-form";
-import { Account, BiasExec } from "@/utils/interface";
+import { Account, BiasExec } from "@/utils/interfaces/trading";
 
 import {
   FormField, FormItem, FormLabel, FormControl, FormMessage,
@@ -19,31 +20,96 @@ import { Button } from "@/components/ui/button";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from "recharts";
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json());
+/* ---------------------- Fetcher ---------------------- */
+const fetcher = async (url: string) => {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+};
 
+/* ---------------------- Consts ----------------------- */
 const SESSIONS = ["Asia", "London", "NewYork", "Overlap"] as const;
 type SessionKey = (typeof SESSIONS)[number];
 
 // FX: 0.0001, JPY: 0.01
 const pipSizeFor = (symbol: string) => (/JPY/i.test(symbol) ? 0.01 : 0.0001);
 const PIP_VALUE_PER_LOT = 10;
-
 const PAIRS_LS_KEY = "tef_pairs_v1";
 
-const MENTAL = {
-  emotions: ["Neutral", "Angst", "Gier", "Wut", "Overconfidence", "Undiszipliniert", "Euphorie", "Frust"],
-};
+const DEFAULT_PROCESS_FOCUS = [
+  "Setup exakt befolgen",
+  "SL strikt respektieren",
+  "Nicht jagen / FOMO parken",
+  "Größe ≤ 0.5R bis A-Setup",
+  "Ruhe vor Entry (3 Atemzüge)",
+  "Kein Revenge / kein Add-on ohne Plan",
+];
 
+/* ---------------------- Utils ------------------------ */
 function dateOnly(d?: string) {
   if (!d) return "";
   return d.length > 10 ? d.slice(0, 10) : d;
 }
 
+/** Schlanker Form-Wert-Typ nur für Felder, die TEFGeneral wirklich nutzt */
+type TEFValues = {
+  accountId?: string;
+  date?: string;
+
+  startTime?: string;
+  endTime?: string;
+  session?: SessionKey;
+
+  symbol?: string;
+  tradeType?: "buy" | "sell";
+
+  entry?: number | "";
+  exit?: number | "";
+  pnl?: number | "";
+  lotSize?: number | "";
+
+  stopPrice?: number | "";
+  targetPrice?: number | "";
+
+  potentialLoss?: number | "";
+  riskReward?: string;
+
+  result?: "ongoing" | "win" | "loss" | "BE";
+
+  outcomeFlags?: { stopHit?: boolean; breakEven?: boolean };
+
+  followedSetup?: boolean;
+  respectedStopLoss?: boolean;
+  managedRisk?: boolean;
+  disciplineScore?: number;
+
+  emotionBefore?: string;
+  luckFactor?: "positive" | "neutral" | "negative";
+  biasExecution?: BiasExec;
+
+  processNotes?: string;
+
+  // 🔹 NEU/RESTORED
+  tradingMistakes?: string[];
+
+  // 🔹 Process Block (unten)
+  processFocus?: string[];          // max 2 empfohlen
+  ifThenPlan?: string;
+  processIntent?: string;
+  processAdherence?: number;        // 0..100
+  tiltNoticed?: boolean;
+  cooldownDone?: boolean;
+  processDebrief?: string;
+
+  hasPartialExits?: boolean;
+  partialExits?: Array<{ label?: string; price?: number; percent?: number }>;
+};
+
 export default function TEFGeneral({ userId }: { userId: string }) {
-  const { control, setValue, watch } = useFormContext<any>();
+  const { control, setValue, watch } = useFormContext<TEFValues>();
   const v = watch();
 
-  // Accounts laden
+  /* ---------------- Accounts laden ---------------- */
   const { data: accountData } = useSWR<{ accounts: Account[] }>(
     userId ? `/api/trading/getAllAccounts?userId=${userId}` : null,
     fetcher
@@ -52,7 +118,7 @@ export default function TEFGeneral({ userId }: { userId: string }) {
   const selectedAccount = accounts.find((a) => a._id === v.accountId);
   const accountCcy = selectedAccount?.currency || "";
 
-  // Pairs lokal + Persistenz
+  /* ---------------- Pairs Persistenz ---------------- */
   const [pairs, setPairs] = React.useState<string[]>(["EURUSD", "GBPUSD", "BTCUSD"]);
   const [newPair, setNewPair] = React.useState("");
 
@@ -64,12 +130,12 @@ export default function TEFGeneral({ userId }: { userId: string }) {
       if (Array.isArray(parsed) && parsed.every((x) => typeof x === "string")) {
         setPairs(parsed);
       }
-    } catch { }
+    } catch {}
   }, []);
   React.useEffect(() => {
     try {
       localStorage.setItem(PAIRS_LS_KEY, JSON.stringify(pairs));
-    } catch { }
+    } catch {}
   }, [pairs]);
 
   const addPair = () => {
@@ -79,11 +145,11 @@ export default function TEFGeneral({ userId }: { userId: string }) {
     setNewPair("");
   };
 
-  // Auto-Berechnungen
+  /* --------------- Auto-Berechnungen --------------- */
   const [autoLoss, setAutoLoss] = React.useState(true);
   const [autoRR, setAutoRR] = React.useState(true);
 
-  const num = (x: any) => {
+  const num = (x: unknown) => {
     const n = Number(x);
     return Number.isFinite(n) ? n : 0;
   };
@@ -114,11 +180,12 @@ export default function TEFGeneral({ userId }: { userId: string }) {
     const risk = calcRiskMoney();
     if (risk <= 0) return "";
 
+    // Disziplin-Autoberechnung
     const a = v.followedSetup === true ? 1 : 0;
     const b = v.respectedStopLoss === true ? 1 : 0;
     const c = v.managedRisk === true ? 1 : 0;
     const score = Math.round(((a + b + c) / 3) * 100);
-    setValue("disciplineScore", score)
+    setValue("disciplineScore", score);
 
     const hasTarget =
       v.targetPrice !== undefined && v.targetPrice !== null && v.targetPrice !== "";
@@ -139,7 +206,7 @@ export default function TEFGeneral({ userId }: { userId: string }) {
     if (!Number.isFinite(ratio) || ratio <= 0) return "";
 
     return `1:${(Math.round(ratio * 100) / 100).toFixed(2)}`;
-  }, [v.entry, v.exit, v.targetPrice, v.lotSize, v.symbol, v.pnl, calcRiskMoney]);
+  }, [v.entry, v.exit, v.targetPrice, v.lotSize, v.symbol, v.pnl, calcRiskMoney, setValue, v.followedSetup, v.respectedStopLoss, v.managedRisk]);
 
   React.useEffect(() => {
     if (!autoLoss) return;
@@ -169,9 +236,9 @@ export default function TEFGeneral({ userId }: { userId: string }) {
   ];
   const COLORS = ["#10b981", "#e5e7eb"];
 
-
-  /* ---- Teil-Exits (Zeit & Notizen entfernt) ---- */
-  const partials: any[] = Array.isArray(v.partialExits) ? v.partialExits : [];
+  /* ---- Teil-Exits (Zeit & Notizen UI-Entfernung) ---- */
+  const partials: Array<{ label?: string; price?: number; percent?: number }> =
+    Array.isArray(v.partialExits) ? v.partialExits : [];
   const percentSum = partials.reduce((acc, it) => {
     const n = Number(it?.percent);
     return acc + (Number.isFinite(n) ? n : 0);
@@ -185,18 +252,50 @@ export default function TEFGeneral({ userId }: { userId: string }) {
         label: `TP ${partials.length + 1}`,
         price: undefined,
         percent: remaining > 0 ? Number(remaining.toFixed(2)) : undefined,
-        // ✅ at & note entfernt
       },
     ];
     setValue("partialExits", arr, { shouldDirty: true });
   };
-
   const removePartial = (idx: number) => {
     const arr = [...partials];
     arr.splice(idx, 1);
     setValue("partialExits", arr, { shouldDirty: true });
   };
 
+  /* ---------------- Trading Mistakes ---------------- */
+  const { data: emoLib } = useSWR<{ categories: Array<{ name: string; items: string[] }> }>(
+    userId ? `/api/trading/emotion-library` : null,
+    fetcher
+  );
+  const mistakeSuggestions: string[] = React.useMemo(() => {
+    const set = new Set<string>();
+    (emoLib?.categories ?? []).forEach((c) => (c.items || []).forEach((i) => set.add(i)));
+    // Falls gewünscht weitere Defaults pushen:
+    // set.add("Ablenkung"); // ist schon in DEFAULTS ("Undiszipliniert" → "Ablenkung")
+    return Array.from(set).slice(0, 24);
+  }, [emoLib]);
+
+  const mistakes: string[] = Array.isArray(v.tradingMistakes) ? v.tradingMistakes : [];
+  const [mistakeInput, setMistakeInput] = React.useState("");
+
+  const addMistake = (label: string) => {
+    const raw = (label || "").trim();
+    if (!raw) return;
+    const exists = mistakes.some((m) => m.toLowerCase() === raw.toLowerCase());
+    if (exists) {
+      setMistakeInput("");
+      return;
+    }
+    const next = [...mistakes, raw];
+    setValue("tradingMistakes", next, { shouldDirty: true });
+    setMistakeInput("");
+  };
+  const removeMistake = (label: string) => {
+    const next = mistakes.filter((m) => m !== label);
+    setValue("tradingMistakes", next, { shouldDirty: true });
+  };
+
+  /* ------------------- Render ------------------- */
   return (
     <>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -226,7 +325,7 @@ export default function TEFGeneral({ userId }: { userId: string }) {
           )}
         />
 
-        {/* Datum unter Account */}
+        {/* Datum */}
         <FormField
           control={control}
           name="date"
@@ -463,7 +562,7 @@ export default function TEFGeneral({ userId }: { userId: string }) {
               </FormControl>
               <FormMessage />
 
-              {/* ✅ Teil-Exits: nur Label / Preis / % schließen */}
+              {/* Teil-Exits */}
               <div className="mt-3 space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="flex items-center gap-2 text-sm">
@@ -577,7 +676,8 @@ export default function TEFGeneral({ userId }: { userId: string }) {
             </FormItem>
           )}
         />
-        {/* ✅ Prozess-Häkchen für Disziplin (wirken auf den Kreis) */}
+
+        {/* Prozess-Checkboxen */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
           <FormField control={control} name="followedSetup" render={({ field }) => (
             <FormItem className="flex items-center gap-3">
@@ -604,6 +704,7 @@ export default function TEFGeneral({ userId }: { userId: string }) {
             </FormItem>
           )} />
         </div>
+
         {/* Potentieller Verlust */}
         <FormField
           control={control}
@@ -726,7 +827,7 @@ export default function TEFGeneral({ userId }: { userId: string }) {
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={(e) => e.stopPropagation()}
               >
-                {MENTAL.emotions.map((em) => {
+                {["Neutral", "Angst", "Gier", "Wut", "Overconfidence", "Undiszipliniert", "Euphorie", "Frust"].map((em) => {
                   const active = field.value === em;
                   return (
                     <button
@@ -753,7 +854,7 @@ export default function TEFGeneral({ userId }: { userId: string }) {
           )}
         />
 
-        {/* Glück/Varianz & Prozess-Notizen */}
+        {/* Glück/Varianz & Bias */}
         <FormField control={control} name="luckFactor" render={({ field }) => (
           <FormItem>
             <FormLabel>Glück / Varianz (optional)</FormLabel>
@@ -770,7 +871,6 @@ export default function TEFGeneral({ userId }: { userId: string }) {
             <FormMessage />
           </FormItem>
         )} />
-
         <FormField control={control} name="biasExecution" render={({ field }) => (
           <FormItem>
             <FormLabel>Bias/Execution</FormLabel>
@@ -788,6 +888,7 @@ export default function TEFGeneral({ userId }: { userId: string }) {
           </FormItem>
         )} />
 
+        {/* Freitext Notizen */}
         <FormField control={control} name="processNotes" render={({ field }) => (
           <FormItem className="sm:col-span-2">
             <FormLabel>Notizen zum Trade & Denkprozess</FormLabel>
@@ -802,6 +903,81 @@ export default function TEFGeneral({ userId }: { userId: string }) {
             <FormMessage />
           </FormItem>
         )} />
+      </div>
+
+      {/* Trading Mistakes (Tags) */}
+      <div className="mt-6 space-y-2">
+        <FormLabel>Trading Mistakes</FormLabel>
+        <div className="flex gap-2">
+          <Input
+            value={mistakeInput}
+            onChange={(e) => setMistakeInput(e.target.value)}
+            placeholder='z. B. "Ablenkung", "Revenge", "SL verschoben" …'
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                addMistake(mistakeInput);
+              }
+            }}
+          />
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => addMistake(mistakeInput)}
+            onMouseDown={(e) => e.preventDefault()}
+          >
+            Hinzufügen
+          </Button>
+        </div>
+
+        {!!mistakeSuggestions.length && (
+          <div className="flex flex-wrap gap-2 mt-2">
+            {mistakeSuggestions
+              .filter((s) => !mistakes.some((m) => m.toLowerCase() === s.toLowerCase()))
+              .slice(0, 18)
+              .map((s) => (
+                <Button
+                  key={s}
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => addMistake(s)}
+                  onMouseDown={(e) => e.preventDefault()}
+                  title={`Vorschlag: ${s}`}
+                >
+                  {s}
+                </Button>
+              ))}
+          </div>
+        )}
+
+        {mistakes.length > 0 ? (
+          <div className="flex flex-wrap gap-2 mt-2">
+            {mistakes.map((m) => (
+              <span
+                key={m}
+                className="text-xs bg-secondary text-secondary-foreground px-2 py-1 rounded-md flex items-center gap-2"
+                title={m}
+              >
+                {m}
+                <button
+                  type="button"
+                  className="opacity-70 hover:opacity-100"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    removeMistake(m);
+                  }}
+                  onMouseDown={(e) => e.preventDefault()}
+                  aria-label={`Mistake ${m} entfernen`}
+                >
+                  ✕
+                </button>
+              </span>
+            ))}
+          </div>
+        ) : (
+          <div className="text-sm opacity-60">Noch keine Mistakes hinzugefügt.</div>
+        )}
       </div>
 
       {/* Mini-Chart */}
@@ -819,6 +995,90 @@ export default function TEFGeneral({ userId }: { userId: string }) {
           </ResponsiveContainer>
         </AspectRatio>
         <div className="text-center mt-2 text-sm">Disziplin: {v.disciplineScore ?? 0}%</div>
+      </div>
+
+      {/* -------------------------------------------------- */}
+      {/* 🔻 Prozess-Panel – KOMPAKT & AM ENDE               */}
+      {/* -------------------------------------------------- */}
+      <div className="mt-8 space-y-4">
+        <div className="rounded-lg border p-4">
+          <div className="text-sm font-medium mb-2">Process-Schwerpunkte (heute)</div>
+
+          {/* Fokus (max 2) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {DEFAULT_PROCESS_FOCUS.map((opt) => {
+              const selected = Array.isArray(v.processFocus) && v.processFocus.includes(opt);
+              return (
+                <label key={opt} className="flex items-center gap-2 border rounded-md px-2 py-1 text-sm">
+                  <Checkbox
+                    checked={selected}
+                    onCheckedChange={(checked) => {
+                      const cur = Array.isArray(v.processFocus) ? [...v.processFocus] : [];
+                      if (checked) {
+                        if (cur.length >= 2 && !cur.includes(opt)) {
+                          // ersetze ältesten, damit max 2 aktiv bleiben
+                          cur.shift();
+                        }
+                        if (!cur.includes(opt)) cur.push(opt);
+                      } else {
+                        const idx = cur.indexOf(opt);
+                        if (idx >= 0) cur.splice(idx, 1);
+                      }
+                      setValue("processFocus", cur, { shouldDirty: true });
+                    }}
+                  />
+                  {opt}
+                </label>
+              );
+            })}
+          </div>
+
+          {/* Intention */}
+          <div className="mt-3">
+            <FormLabel>Intention (1 Satz)</FormLabel>
+            <Input
+              placeholder="Worauf fokussierst du dich prozessual?"
+              value={v.processIntent ?? ""}
+              onChange={(e) => setValue("processIntent", e.target.value, { shouldDirty: true })}
+            />
+          </div>
+
+          <div className="text-xs text-muted-foreground mt-2">
+            Tipp: Wähle max. 2 Schwerpunkte – Inchworm: erst hinten stabilisieren, dann vorne ausbauen.
+          </div>
+        </div>
+
+        <div className="rounded-lg border p-4">
+          <div className="text-sm font-medium mb-2">Process-KPI</div>
+
+          {/* Switches */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
+            <label className="flex items-center gap-2 text-sm">
+              <Checkbox
+                checked={!!v.tiltNoticed}
+                onCheckedChange={(c) => setValue("tiltNoticed", !!c, { shouldDirty: true })}
+              />
+              Tilt bemerkt
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <Checkbox
+                checked={!!v.cooldownDone}
+                onCheckedChange={(c) => setValue("cooldownDone", !!c, { shouldDirty: true })}
+              />
+              Kurzer Cooldown durchgeführt
+            </label>
+          </div>
+
+          {/* Debrief */}
+          <div className="mt-3">
+            <FormLabel>Post-Briefing (1 Satz)</FormLabel>
+            <Input
+              placeholder="Was lief prozessual gut/schlecht?"
+              value={v.processDebrief ?? ""}
+              onChange={(e) => setValue("processDebrief", e.target.value, { shouldDirty: true })}
+            />
+          </div>
+        </div>
       </div>
     </>
   );

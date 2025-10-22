@@ -1,6 +1,6 @@
 import React, { useState } from "react";
-import { OnlineModule } from "@/utils/interface";
 import ProgressBar from "./ProgressBar";
+import { OnlineModule } from "@/utils/interfaces/task";
 
 interface Props {
   module: OnlineModule | null;

@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { connectToDatabase } from "../db/mongo";
-import { FinanceIncome } from "@/utils/interface";
 import { insertFinance } from "@/lib/api/finance";
+import { FinanceIncome } from "@/utils/interfaces/finance";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") return res.status(405).json({ message: "Use POST." });

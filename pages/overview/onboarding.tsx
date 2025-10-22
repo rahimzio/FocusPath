@@ -3,12 +3,12 @@
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/router";
-import { AvoidItem, UserMe } from "@/utils/interface";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { toast } from "react-toastify";
+import { AvoidItem, UserMe } from "@/utils/interfaces/frequency";
 
 export default function OnboardingPage() {
   const { data: session, status } = useSession();

@@ -6,9 +6,8 @@ import { connectToDatabase } from "../db/mongo";
 const COLLECTION_NAME = "trading";
 const RECORD_TYPE = "gameLibrary";
 
-// 🔎 kleines Log-Helper
-const dbg = (...args: any[]) =>
-  console.log("[/api/trading/gameLibrary]", ...args);
+// compact logger
+const dbg = (...args: any[]) => console.log("[/api/trading/gameLibrary]", ...args);
 
 /* ---------- helpers ---------- */
 const toStr = (v: any) => (v === undefined || v === null ? undefined : String(v));
@@ -22,17 +21,22 @@ const toNum = (v: any, def?: number) => {
 };
 const toBool = (v: any) => v === true || v === "true" || v === 1 || v === "1";
 
-const clampGame = (g: any): "A" | "B" | "C" | undefined => {
+// clamp
+const clampGame = (g: any): "S" | "A" | "B" | "C" | undefined => {
   const s = String(g || "").toUpperCase();
-  return (["A", "B", "C"] as const).includes(s as any) ? (s as any) : undefined;
+  return (["S", "A", "B", "C"] as const).includes(s as any) ? (s as any) : undefined;
 };
-const defaultPoints = (g: "A" | "B" | "C") => (g === "A" ? 3 : g === "B" ? 2 : 1);
+
+// Punkte (optional, S = 4)
+const defaultPoints = (g: "S" | "A" | "B" | "C") => (g === "S" ? 4 : g === "A" ? 3 : g === "B" ? 2 : 1);
+
 
 function sanitizeTags(raw: any): string[] | undefined {
   if (!Array.isArray(raw)) return undefined;
   const out = raw.map((x) => trimOrUndef(x)).filter((x): x is string => !!x);
   return out.length ? out : undefined;
 }
+const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /* ---------- handler ---------- */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -41,6 +45,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     dbg("→", req.method, "query=", req.query);
     const { db } = await connectToDatabase();
     const col = db.collection(COLLECTION_NAME);
+
+    // defensive indexes (idempotent)
+    try {
+      await Promise.all([
+        col.createIndex({ recordType: 1, userId: 1, active: 1, archived: 1, game: 1, label: 1 }),
+        col.createIndex({ recordType: 1, userId: 1, label: 1, game: 1 }),
+        col.createIndex({ recordType: 1, userId: 1, tags: 1 }),
+      ]);
+    } catch {}
 
     switch (req.method) {
       case "GET": {
@@ -60,50 +73,44 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
 
         const match: any = { recordType: RECORD_TYPE, userId };
+
         const g = clampGame(game);
         if (g) match.game = g;
-        if (active !== undefined) match.active = toBool(active);
+
+        // default: nur nicht-archivierte zeigen
         if (archived !== undefined) match.archived = toBool(archived);
+        else match.archived = { $ne: true };
+
+        if (active !== undefined) match.active = toBool(active);
+
         if (q && q.trim()) {
+          const rx = escapeRegex(q.trim());
           match.$or = [
-            { label: { $regex: q.trim(), $options: "i" } },
-            { tags: { $elemMatch: { $regex: q.trim(), $options: "i" } } },
+            { label: { $regex: rx, $options: "i" } },
+            { tags: { $elemMatch: { $regex: rx, $options: "i" } } },
           ];
         }
+
         if (cursor) {
-          try { match._id = { $lt: new ObjectId(String(cursor)) }; } catch {}
+          try {
+            match._id = { $lt: new ObjectId(String(cursor)) };
+          } catch {}
         }
 
         const limit = Math.min(Math.max(Number(limitRaw ?? 100), 1), 500);
 
-        // 🔎 Vorab: grobe Zählung für Diagnose
+        // diagnostics
         const totalForUser = await col.countDocuments({ recordType: RECORD_TYPE, userId });
         const totalActiveForUser = await col.countDocuments({ recordType: RECORD_TYPE, userId, active: { $ne: false } });
         dbg("match=", match, "limit=", limit, "| totals:", { totalForUser, totalActiveForUser });
 
         const docs = await col.find(match).sort({ _id: -1 }).limit(limit).toArray();
 
-        // 🔎 kurze Vorschau der ersten Doku
-        if (docs.length) {
-          const d0 = docs[0];
-          dbg("found", docs.length, "items. first=", {
-            _id: String(d0._id),
-            userId: d0.userId,
-            label: d0.label,
-            game: d0.game,
-            points: d0.points,
-            active: d0.active,
-            archived: d0.archived,
-          });
-        } else {
-          dbg("found 0 items for match.");
-        }
-
         const items = docs.map((d: any) => ({
           _id: String(d._id),
           userId: d.userId,
           label: d.label,
-          game: d.game,
+          game: d.game as "A" | "B" | "C",
           points: Number(d.points ?? defaultPoints(d.game)),
           active: d.active !== false,
           tags: Array.isArray(d.tags) ? d.tags : [],
@@ -112,14 +119,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           updatedAt: d.updatedAt,
         }));
 
-        // 🔎 Verteilung A/B/C + Ø Punkte (nur Diagnose)
-        const counts = { A: 0, B: 0, C: 0 } as Record<"A"|"B"|"C", number>;
+        // optional: kleine Verteilung für Log
+        const counts = { A: 0, B: 0, C: 0 } as Record<"A" | "B" | "C", number>;
         let sumPts = 0;
-        items.forEach(it => { counts[it.game as "A"|"B"|"C"]++; sumPts += it.points; });
+        items.forEach((it) => {
+          counts[it.game]++; sumPts += it.points;
+        });
         const avgPts = items.length ? (sumPts / items.length).toFixed(2) : "0.00";
         dbg("distribution=", counts, "avgPoints=", avgPts);
 
         const nextCursor = items.length === limit ? items[items.length - 1]._id : null;
+
+        // cache a bit on edge
+        res.setHeader("Cache-Control", "s-maxage=120, stale-while-revalidate=300");
         dbg("← GET 200 in", Date.now() - startedAt, "ms");
         return res.status(200).json({ items, nextCursor });
       }
@@ -129,16 +141,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         dbg("POST body=", body ? Object.keys(body) : "∅");
 
         const userId = trimOrUndef(body.userId);
-        if (!userId) {
-          dbg("✖ POST missing userId");
-          return res.status(400).json({ error: "userId ist erforderlich" });
-        }
+        if (!userId) return res.status(400).json({ error: "userId ist erforderlich" });
 
         const label = trimOrUndef(body.label);
-        if (!label) {
-          dbg("✖ POST missing label");
-          return res.status(400).json({ error: "label ist erforderlich" });
-        }
+        if (!label) return res.status(400).json({ error: "label ist erforderlich" });
 
         const game = clampGame(body.game) ?? "A";
         const points = toNum(body.points, defaultPoints(game));
@@ -173,14 +179,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         dbg(req.method, "body keys=", Object.keys(body || {}), "query=", req.query);
 
         const idRaw = (req.query.id ?? body.id) as string | undefined;
-        if (!idRaw) {
-          dbg("✖", req.method, "missing id");
-          return res.status(400).json({ error: "id ist erforderlich" });
-        }
+        if (!idRaw) return res.status(400).json({ error: "id ist erforderlich" });
 
         let _id: ObjectId;
         try { _id = new ObjectId(String(idRaw)); } catch {
-          dbg("✖ invalid ObjectId:", idRaw);
           return res.status(400).json({ error: "id ist ungültig" });
         }
 
@@ -216,7 +218,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           else unset.archived = "";
         }
 
-        // Aufräumen
+        // cleanup
         Object.keys(set).forEach((k) => {
           const v = (set as any)[k];
           if (v === undefined || (Array.isArray(v) && v.length === 0)) delete (set as any)[k];
@@ -227,7 +229,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         });
 
         if (Object.keys(set).length === 1 && Object.keys(unset).length === 0) {
-          dbg("✖ nothing to update");
           return res.status(400).json({ error: "Keine gültigen Felder zum Aktualisieren übergeben." });
         }
 
@@ -251,7 +252,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         let _id: ObjectId;
         try { _id = new ObjectId(String(idRaw)); } catch {
-          dbg("✖ invalid ObjectId:", idRaw);
           return res.status(400).json({ error: "id ist ungültig" });
         }
 
@@ -262,20 +262,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (userId) match.userId = userId;
 
         if (mode === "archive") {
-          dbg("archive match=", match);
           const upd = await col.updateOne(match, {
             $set: { archived: true, updatedAt: new Date().toISOString() },
           });
-          dbg("archive matched=", upd.matchedCount);
           if (upd.matchedCount === 0) {
             return res.status(404).json({ error: "Item nicht gefunden (oder gehört nicht zu userId/recordType)." });
           }
           return res.status(200).json({ ok: true, mode: "archived", id: String(_id) });
         }
 
-        dbg("hard delete match=", match);
         const del = await col.deleteOne(match);
-        dbg("deleted=", del.deletedCount);
         if (del.deletedCount !== 1) {
           return res.status(404).json({ error: "Item nicht gefunden (oder gehört nicht zu userId/recordType)." });
         }
@@ -283,7 +279,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       default:
-        dbg("✖ method not allowed:", req.method);
         return res.status(405).json({ error: "Method not allowed" });
     }
   } catch (err: any) {

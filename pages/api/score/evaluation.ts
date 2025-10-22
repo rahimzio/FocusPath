@@ -1,5 +1,6 @@
 // utils/evaluation.ts
-import { Task } from "@/utils/interface";
+
+import { Task } from "@/utils/interfaces/task";
 
 export type DayRating = "L" | "M" | "W" | "W+";
 

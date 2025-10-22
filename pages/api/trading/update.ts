@@ -41,7 +41,7 @@ function adherenceOk(a: any): "yes" | "partial" | "no" | undefined {
   const s = String(a ?? "").toLowerCase();
   if (s === "yes" || s === "partial" || s === "no") return s as any;
   return undefined;
-};
+}
 
 const biasExecOk = (b: any) => {
   const s = String(b || "").toUpperCase();
@@ -53,7 +53,11 @@ const sessionOk = (s: any) => {
 };
 const gradeOk = (g: any) => {
   const v = String(g || "").toUpperCase();
-  return (["A", "B", "C"] as const).includes(v as any) ? (v as any) : undefined;
+  return (["S", "A", "B", "C"] as const).includes(v as any) ? (v as any) : undefined;
+};
+const luckOk = (v: any): "positive" | "neutral" | "negative" | undefined => {
+  const s = String(v ?? "").toLowerCase();
+  return s === "positive" || s === "neutral" || s === "negative" ? (s as any) : undefined;
 };
 
 type Concept = { name: string; direction?: "bullish" | "bearish" | "neutral"; timeframe?: string; note?: string };
@@ -75,10 +79,17 @@ function sanitizeConcepts(raw: any): Concept[] | undefined {
 }
 function sanitizeStringArray(raw: any): string[] | undefined {
   if (!Array.isArray(raw)) return undefined;
-  const vals = raw
-    .map((x) => trimOrUndef(x))
-    .filter((x): x is string => !!x);
+  const vals = raw.map((x) => trimOrUndef(x)).filter((x): x is string => !!x);
   return vals.length ? vals : undefined;
+}
+function sanitizeIdArray(raw: any): string[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const set = new Set<string>();
+  for (const x of raw) {
+    const s = trimOrUndef(x);
+    if (s) set.add(s);
+  }
+  return set.size ? Array.from(set) : undefined;
 }
 const shouldUnset = (v: any) =>
   v === null || v === "" || (Array.isArray(v) && v.length === 0);
@@ -99,8 +110,6 @@ function sanitizePartialExits(raw: any): PartialExit[] | undefined {
     }
     const at = trimOrUndef(it?.at);
     const note = trimOrUndef(it?.note);
-
-    // nur behalten, wenn wenigstens etwas gesetzt ist
     if (!label && price === undefined && percent === undefined && !at && !note) continue;
     out.push({ label, price, percent, at, note });
   }
@@ -214,7 +223,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       v ? (set.notes = v) : (unset.notes = "");
     }
 
-    // --- Reflection / Journal (NEU) ---
+    // --- Reflection / Journal ---
     if ("reflectionNotes" in body) {
       const v = trimOrUndef(body.reflectionNotes);
       if (v !== undefined) set.reflectionNotes = v;
@@ -229,6 +238,53 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const v = toBool(body.tiltDetected);
       if (v) set.tiltDetected = true;
       else unset.tiltDetected = "";
+    }
+
+    // --- Prozesse / Journal (NEU) ---
+    if ("processIntent" in body) {
+      const v = trimOrUndef(body.processIntent);
+      v ? (set.processIntent = v) : (unset.processIntent = "");
+    }
+    if ("processFocus" in body) {
+      const arr = sanitizeStringArray(body.processFocus);
+      arr ? (set.processFocus = arr) : (unset.processFocus = "");
+    }
+    if ("ifThenPlan" in body) {
+      const v = trimOrUndef(body.ifThenPlan);
+      v ? (set.ifThenPlan = v) : (unset.ifThenPlan = "");
+    }
+    if ("processNotes" in body) {
+      const v = trimOrUndef(body.processNotes);
+      v ? (set.processNotes = v) : (unset.processNotes = "");
+    }
+    // luckFactor als Union "positive" | "neutral" | "negative"
+    if ("luckFactor" in body) {
+      const s = String(body.luckFactor ?? "").toLowerCase();
+      if (s === "positive" || s === "neutral" || s === "negative") set.luckFactor = s;
+      else unset.luckFactor = "";
+    }
+    if ("processAdherence" in body) {
+      const v = toNum(body.processAdherence);
+      v === undefined ? (unset.processAdherence = "") : (set.processAdherence = v);
+    }
+    if ("tiltNoticed" in body) {
+      const v = toBool(body.tiltNoticed);
+      if (v) set.tiltNoticed = true;
+      else unset.tiltNoticed = "";
+    }
+    if ("cooldownDone" in body) {
+      const v = toBool(body.cooldownDone);
+      if (v) set.cooldownDone = true;
+      else unset.cooldownDone = "";
+    }
+    if ("processDebrief" in body) {
+      const v = trimOrUndef(body.processDebrief);
+      v ? (set.processDebrief = v) : (unset.processDebrief = "");
+    }
+    if ("hidePnLUntilDebrief" in body) {
+      const v = toBool(body.hidePnLUntilDebrief);
+      if (v) set.hidePnLUntilDebrief = true;
+      else unset.hidePnLUntilDebrief = "";
     }
 
     // --- Zeiten/Session ---
@@ -301,19 +357,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const v = gradeOk(body.gameSelf);
       v ? (set.gameSelf = v) : (unset.gameSelf = "");
     }
-    // --- Strategy Adherence (Tri-State) ---
-    if ("strategyAdherence" in body) {
-      const v = adherenceOk(body.strategyAdherence);
-      v ? (set.strategyAdherence = v) : (unset.strategyAdherence = "");
+    if ("gameItems" in body) {
+      const v = sanitizeIdArray(body.gameItems);
+      v ? (set.gameItems = v) : (unset.gameItems = "");
+    }
+    if ("gameCatalogScore" in body) {
+      const v = toNum(body.gameCatalogScore);
+      v === undefined ? (unset.gameCatalogScore = "") : (set.gameCatalogScore = v);
+    }
+    if ("gameCatalogGrade" in body) {
+      const v = gradeOk(body.gameCatalogGrade);
+      v ? (set.gameCatalogGrade = v) : (unset.gameCatalogGrade = "");
     }
 
-    // --- RiskReward (String) ---
+    // --- RiskReward / Confluences ---
     if ("riskReward" in body) {
       const v = trimOrUndef(body.riskReward);
       v ? (set.riskReward = v) : (unset.riskReward = "");
     }
-
-    // --- Confluences (Array<string>) ---
     if ("confluences" in body) {
       const v = sanitizeStringArray(body.confluences);
       v ? (set.confluences = v) : (unset.confluences = "");
@@ -343,7 +404,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       v === undefined ? (unset.targetPrice = "") : (set.targetPrice = v);
     }
 
-    // --- Mentales ---
+    // --- Mentales & Prozessnotizen ---
     if ("emotionBefore" in body) {
       const v = trimOrUndef(body.emotionBefore);
       v ? (set.emotionBefore = v) : (unset.emotionBefore = "");
@@ -364,7 +425,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       v === undefined ? (unset.disciplineScore = "") : (set.disciplineScore = v);
     }
 
-    // --- Partial Exits (NEU) ---
+    // --- Partial Exits ---
     if ("hasPartialExits" in body || "partialExits" in body) {
       const flag = toBool(body.hasPartialExits);
       const list = sanitizePartialExits(body.partialExits);
@@ -464,12 +525,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (balanceOps.length) {
         const now = new Date().toISOString();
         for (const op of balanceOps) {
+          // 🛡️ Sicher: accountId als ObjectId casten (falls möglich); zusätzlich archived/deleted guard
           let accountFilter: any;
           try {
-            accountFilter = { _id: new ObjectId(op.accountId), type: "account", ...(userId ? { userId } : {}), deleted: { $ne: true } };
+            accountFilter = {
+              _id: new ObjectId(op.accountId),
+              type: "account",
+              ...(userId ? { userId } : {}),
+              deleted: { $ne: true },
+              archived: { $ne: true },
+            };
           } catch {
-            // Fallback, falls accountId bereits als String-_id gespeichert wurde
-            accountFilter = { _id: op.accountId as any, type: "account", ...(userId ? { userId } : {}), deleted: { $ne: true } };
+            accountFilter = {
+              _id: op.accountId as any,
+              type: "account",
+              ...(userId ? { userId } : {}),
+              deleted: { $ne: true },
+              archived: { $ne: true },
+            };
           }
 
           await col.updateOne(

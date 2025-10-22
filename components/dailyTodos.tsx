@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Task, GoalWithProgress, SubTask } from "@/utils/interface";
+import { useState, useEffect, useMemo } from "react";
 import SheetWithCreateTask from "./todo/popUpCreateTask";
 import { useDailyRatingAutoSave } from "@/hooks/useDailyRatingAutoSave";
 import {
@@ -18,17 +17,34 @@ import ProgressBar from "./todo/ProgressBar";
 import DeleteRecurringTaskDialog from "./todo/DeleteRecurringTask";
 import CalendarSelector from "./todo/dailytodo/CalenderSelector";
 import NoTimeTaskList from "./todo/dailytodo/NoTimeTaskList";
-import { checkOverlappingTasks, convertToMinutes, deleteEntireSeries, getEndTime, getHeightFromDuration, handleCheckTask as handleCheckTaskExternal } from "@/utils/todo/taskUtils";
+import {
+  checkOverlappingTasks,
+  convertToMinutes,
+  deleteEntireSeries,
+  getEndTime,
+  getHeightFromDuration,
+  handleCheckTask as handleCheckTaskExternal,
+} from "@/utils/todo/taskUtils";
 import TaskListTimeBased from "./todo/dailytodo/TimeTaskOrder";
 import TaskDetailModal from "./todo/dailytodo/TaskDetail";
 import TaskEditModal from "./todo/dailytodo/TaskEdit";
 import GoalEditModal from "./todo/dailytodo/GoalEdit";
 import ReflectionHistory from "./frequenz/ReflectionHistory";
-import useTaskDeletion, { handleDeleteSeries, confirmDeleteWithSeries, deleteSingleInstance } from "@/utils/todo/TaskDeletion";
-import { handleCheckSubTask as handleCheckSubTaskExternal, useSubtaskCompletion } from "@/utils/todo/taskStatus";
+import useTaskDeletion, {
+  handleDeleteSeries,
+  confirmDeleteWithSeries,
+  deleteSingleInstance,
+} from "@/utils/todo/TaskDeletion";
+import {
+  handleCheckSubTask as handleCheckSubTaskExternal,
+  useSubtaskCompletion,
+} from "@/utils/todo/taskStatus";
 import { getSession } from "next-auth/react";
-import AvoidChecklist from "./frequenz/avoidCheckList";
+import AvoidChecklist, { type AvoidSummary } from "./frequenz/avoidCheckList";
 import ReflectionBlocks from "./frequenz/ReflectionBlocks";
+import { GoalWithProgress } from "@/utils/interfaces/goal";
+import { Task } from "@/utils/interfaces/task";
+
 function getWeekString(date: Date) {
   const firstDay = new Date(date.getFullYear(), 0, 1);
   const pastDays = Math.floor((+date - +firstDay) / 86400000);
@@ -40,6 +56,36 @@ function formatDate(date: Date): string {
   return local.toISOString().split("T")[0];
 }
 
+// === NEU: Ampellogik für den DO/DON'T-Button ===
+function getAvoidBtnTone(
+  s: AvoidSummary | null
+): {
+  label: string;
+  className: string;
+} {
+  if (!s || (!s.anyDoChecked && !s.anyDontChecked)) {
+    return { label: "DOs & DON'Ts (0)", className: "bg-red-500 text-white" };
+  }
+  if (s.allDosDone && s.allDontsAvoided) {
+    const total = (s.doCount || 0) + (s.dontCount || 0);
+    const done = (s.doDoneCount || 0) + (s.dontAvoidedCount || 0);
+    return {
+      label: `DOs & DON'Ts (${done}/${total})`,
+      className: "bg-green-600 text-white",
+    };
+  }
+  if (s.anyDontViolated) {
+    const total = (s.doCount || 0) + (s.dontCount || 0);
+    const done = (s.doDoneCount || 0) + (s.dontAvoidedCount || 0);
+    return {
+      label: `DOs & DON'Ts (${done}/${total})`,
+      className: "bg-yellow-500 text-black",
+    };
+  }
+  const total = (s?.doCount || 0) + (s?.dontCount || 0);
+  const done = (s?.doDoneCount || 0) + (s?.dontAvoidedCount || 0);
+  return { label: `DOs & DON'Ts (${done}/${total})`, className: "bg-blue-500 text-white" };
+}
 
 const DailyTaskList = () => {
   const [userId, setUserId] = useState("");
@@ -60,6 +106,11 @@ const DailyTaskList = () => {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [showReflection, setShowReflection] = useState(true);
   const [isCreateOpenMobile, setIsCreateOpenMobile] = useState(false);
+
+  // === NEU: Mobile Toggle + Status für AvoidChecklist ===
+  const [avoidOpenMobile, setAvoidOpenMobile] = useState(false);
+  const [avoidSummary, setAvoidSummary] = useState<AvoidSummary | null>(null);
+  const avoidTone = useMemo(() => getAvoidBtnTone(avoidSummary), [avoidSummary]);
 
   useEffect(() => {
     getSession().then((session) => {
@@ -147,7 +198,13 @@ const DailyTaskList = () => {
             <div key={goal._id} className="p-3 rounded-lg border border-[#e5e5ea]">
               <div className="flex justify-between items-center mb-1">
                 <h3 className="font-medium text-[#1c1c1e]">{goal.title}</h3>
-                <button onClick={() => { setEditedGoal(goal); setIsGoalEditDialogOpen(true); }} className="text-[#007AFF] hover:underline text-sm">
+                <button
+                  onClick={() => {
+                    setEditedGoal(goal);
+                    setIsGoalEditDialogOpen(true);
+                  }}
+                  className="text-[#007AFF] hover:underline text-sm"
+                >
                   <FaEdit />
                 </button>
               </div>
@@ -181,10 +238,10 @@ const DailyTaskList = () => {
 
   function calculateDayScore(tasks: Task[], goals: GoalWithProgress[]): string {
     const total = tasks.length;
-    const completed = tasks.filter(t => t.status === "completed").length;
+    const completed = tasks.filter((t) => t.status === "completed").length;
     const percent = tasks.length ? (completed / tasks.length) * 100 : 0;
-    const allGoalTasksDone = tasks.filter(t => t.goalId).every(t => t.status === "completed");
-    const allImportantDone = tasks.filter(t => t.points && t.points > 7).every(t => t.status === "completed");
+    const allGoalTasksDone = tasks.filter((t) => t.goalId).every((t) => t.status === "completed");
+    const allImportantDone = tasks.filter((t) => t.points && t.points > 7).every((t) => t.status === "completed");
     if (percent === 100) return "W+ Day";
     if (percent >= 85 && allGoalTasksDone && allImportantDone) return "W Day";
     if (percent >= 50) return "M Day";
@@ -212,9 +269,13 @@ const DailyTaskList = () => {
       setIsSavingDayScore(false);
     }
   }
+
   return (
     <div className="space-y-6 px-4 sm:px-6 md:px-8 pt-4 pb-8 overflow-x-hidden">
-      <div className="flex items-center justify-between bg-white border border-[#e5e5ea] rounded-xl px-4 py-3 shadow hover:shadow-md cursor-pointer transition" onClick={() => setShowCalendar(!showCalendar)}>
+      <div
+        className="flex items-center justify-between bg-white border border-[#e5e5ea] rounded-xl px-4 py-3 shadow hover:shadow-md cursor-pointer transition"
+        onClick={() => setShowCalendar(!showCalendar)}
+      >
         <div className="flex items-center gap-2 text-sm font-medium text-[#1c1c1e]">
           <FaCalendarAlt className="text-[#007AFF]" />
           {selectedDate ? new Date(selectedDate).toLocaleDateString("de-DE") : "Heute"}
@@ -254,13 +315,32 @@ const DailyTaskList = () => {
           />
         </div>
       )}
+
       {budgetInfo && (
-        <p className="text-center text-sm text-green-700 font-medium">
-          {budgetInfo}
-        </p>
+        <p className="text-center text-sm text-green-700 font-medium">{budgetInfo}</p>
       )}
-      <AvoidChecklist userId={userId} date={selectedDate} />
-      {/* Toggle: Mobile */}
+
+      {/* === NEU: Mobil-Button für DOs/DON'Ts mit Ampel === */}
+      <button
+        onClick={() => setAvoidOpenMobile((v) => !v)}
+        className={`sm:hidden w-full py-2 rounded-lg font-medium shadow transition ${avoidTone.className}`}
+      >
+        {avoidOpenMobile ? "DOs & DON'Ts ausblenden" : avoidTone.label}
+      </button>
+
+      {/* Mobil: Section nur anzeigen, wenn geöffnet */}
+      {avoidOpenMobile && (
+        <div className="sm:hidden">
+          <AvoidChecklist userId={userId} date={selectedDate} onSummaryChange={setAvoidSummary} />
+        </div>
+      )}
+
+      {/* Desktop: Section immer sichtbar */}
+      <div className="hidden sm:block">
+        <AvoidChecklist userId={userId} date={selectedDate} onSummaryChange={setAvoidSummary} />
+      </div>
+
+      {/* Toggle: Mobile für Reflexion */}
       <button
         onClick={() => setShowReflection(!showReflection)}
         className="block sm:hidden w-full py-2 rounded-lg bg-blue-500 text-white mb-4"
@@ -268,7 +348,7 @@ const DailyTaskList = () => {
         {showReflection ? "Reflexion ausblenden" : "Reflexion anzeigen"}
       </button>
 
-      {/* Toggle: Desktop */}
+      {/* Toggle: Desktop für Reflexion */}
       <div className="hidden sm:block">
         <button
           onClick={() => setShowReflection(!showReflection)}
@@ -291,21 +371,15 @@ const DailyTaskList = () => {
           <ReflectionBlocks userId={userId} date={selectedDate} />
         </div>
       )}
+
       <p className="text-center text-sm text-[#20253b] font-medium rounded-xl shadow border-[#e5e5ea] font-wweight-600 py-2">
         Bisheriges Tages Rating <span className="underline">{dayScore}</span>
       </p>
-      <button
-        className="mt-2 px-4 py-2 bg-blue-600 text-white rounded"
-        onClick={handleSaveDayScore}
-        disabled={isSavingDayScore}
-      >
+      <button className="mt-2 px-4 py-2 bg-blue-600 text-white rounded" onClick={handleSaveDayScore} disabled={isSavingDayScore}>
         {isSavingDayScore ? "Speichern..." : "Tagesbewertung speichern"}
       </button>
-      {saveSuccess && (
-        <p className="text-center text-sm text-green-700 mt-1">
-          Erfolgreich gespeichert
-        </p>
-      )}
+      {saveSuccess && <p className="text-center text-sm text-green-700 mt-1">Erfolgreich gespeichert</p>}
+
       {renderGoalsWithProgress()}
 
       <button
@@ -342,8 +416,6 @@ const DailyTaskList = () => {
         />
       </div>
 
-
-
       <TaskDetailModal
         userId={userId}
         selectedTask={selectedTask}
@@ -351,6 +423,7 @@ const DailyTaskList = () => {
         selectedDate={selectedDate}
         handleCheckSubTask={handleCheckSubTask}
       />
+
       <TaskListTimeBased
         UserId={userId}
         tasks={tasks}
@@ -367,6 +440,7 @@ const DailyTaskList = () => {
         convertToMinutes={convertToMinutes}
         checkOverlappingTasks={checkOverlappingTasks}
       />
+
       <TaskEditModal
         userId={userId}
         editedTask={editedTask}
@@ -400,7 +474,8 @@ const DailyTaskList = () => {
       />
 
       {userId && <SheetWithCreateTask userId={userId} onTaskCreated={handleTaskCreated} />}
-       {/* Mobil: eigenes FAB (Plus-Icon) steuert das Sheet kontrolliert */}
+
+      {/* Mobil: eigenes FAB (Plus-Icon) steuert das Sheet kontrolliert */}
       {userId && (
         <>
           {/* Sheet im kontrollierten Modus (ohne eigenen Trigger sichtbar) */}
@@ -408,11 +483,8 @@ const DailyTaskList = () => {
             <SheetWithCreateTask
               userId={userId}
               onTaskCreated={handleTaskCreated}
-              open={isCreateOpenMobile}                 // ⬅️ kontrolliert
-              onOpenChange={setIsCreateOpenMobile}      // ⬅️ kontrolliert
-              /* optional: falls dein Sheet intern einen Button rendert,
-                 kannst du in popUpCreateTask eine prop wie hideTrigger einführen
-                 und hier hideTrigger an true setzen. */
+              open={isCreateOpenMobile}
+              onOpenChange={setIsCreateOpenMobile}
             />
           </div>
 

@@ -2,7 +2,16 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import { connectToDatabase } from "../db/mongo";
 import { ObjectId } from "mongodb";
-import { Comment } from "@/utils/interface";
+
+interface CommunityComment {
+  _id: ObjectId;
+  userId: string;
+  userEmail: string;
+  comment: string;
+  createdAt: string;
+  upvotes: string[];
+  downvotes: string[];
+}
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
@@ -18,7 +27,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const { db } = await connectToDatabase();
 
-    const newComment: Comment = {
+
+
+    const newComment: CommunityComment = {
       _id: new ObjectId(),
       userId,
       userEmail,

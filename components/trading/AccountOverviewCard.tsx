@@ -20,7 +20,7 @@ import {
   DialogFooter,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Account } from "@/utils/interface";
+import { Account } from "@/utils/interfaces/trading";
 
 type StatsData = {
   count: number;

@@ -2,146 +2,130 @@
 
 import * as React from "react";
 import useSWR from "swr";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 
-type TradeLite = {
-  _id: string;
-  userId: string;
-  createdAt?: string;
-  date?: string;
-  gameComputed?: "A" | "B" | "C";
-  gameCatalogGrade?: "A" | "B" | "C";
-  status?: "final" | "draft";
-};
+const fetcher = (url: string) => fetch(url).then(r => r.json());
 
-type Bucket = {
-  label: string; // z. B. "2025-09"
-  a: number;
-  b: number;
-  c: number;
-  total: number;
-};
-
-const fetcher = async (url: string) => {
-  const res = await fetch(url);
-  let json: any = null;
-  try {
-    json = await res.json();
-  } catch {}
-  if (!res.ok) return { items: [] };
-
-  // robustes Normalisieren: akzeptiere {items}, {trades}, {data}
-  const items: TradeLite[] =
-    (Array.isArray(json?.items) && json.items) ||
-    (Array.isArray(json?.trades) && json.trades) ||
-    (Array.isArray(json?.data) && json.data) ||
-    [];
-
-  return { items };
-};
-
-function monthBucket(iso?: string) {
-  if (!iso) return "unknown";
-  const d = new Date(iso);
-  if (Number.isNaN(+d)) return "unknown";
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-}
-
-export default function GameProgressTracker({ userId, months = 3 }: { userId: string; months?: number }) {
-  const { data, error, isLoading } = useSWR<{ items: TradeLite[] }>(
-    userId ? `/api/trading/getRecent?userId=${userId}&limit=${Math.max(100, months * 120)}` : null,
-    fetcher
+export default function GameProgressTracker({ userId }: { userId: string }) {
+  const key = React.useMemo(
+    () => (userId ? `/api/trading/inchworm/progress?userId=${userId}` : null),
+    [userId]
   );
+  const { data, isLoading, error, mutate } = useSWR(key, fetcher, { revalidateOnFocus: false });
 
-  const buckets = React.useMemo<Bucket[]>(() => {
-    const map = new Map<string, Bucket>();
-    const trades = data?.items ?? [];
-    for (const t of trades) {
-      const label = monthBucket(t.date || t.createdAt);
-      if (!map.has(label)) map.set(label, { label, a: 0, b: 0, c: 0, total: 0 });
-      const b = map.get(label)!;
-      const g = (t.gameCatalogGrade || t.gameComputed || "C") as "A" | "B" | "C";
-      if (g === "A") b.a += 1;
-      else if (g === "B") b.b += 1;
-      else b.c += 1;
-      b.total += 1;
-    }
-    return Array.from(map.values())
-      .sort((x, y) => x.label.localeCompare(y.label))
-      .slice(-months);
-  }, [data?.items, months]);
+  // ⏱️ Sofort aktualisieren, wenn der Plan gespeichert wurde (CustomEvent + localStorage-Änderung)
+  React.useEffect(() => {
+    const onPlanEvent = () => mutate();
+    const onStorage = (e: StorageEvent) => {
+      if (!e.key) return;
+      if (e.key.startsWith("inchworm:plan:")) mutate();
+    };
+    window.addEventListener("inchworm-plan-updated", onPlanEvent as any);
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener("inchworm-plan-updated", onPlanEvent as any);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, [mutate]);
+
+  const periodLabel = React.useMemo(() => {
+    const s = data?.period?.start;
+    const e = data?.period?.end;
+    if (s && e) return `${s} → ${e}`;
+    return s || e || "—";
+  }, [data?.period]);
+
+  // kleine Helper, damit in der UI nichts knallt
+  const hrA = Math.round(((data?.hitRate?.A ?? 0) * 100));
+  const hrB = Math.round(((data?.hitRate?.B ?? 0) * 100));
+  const hrC = Math.round(((data?.hitRate?.C ?? 0) * 100));
+
+  const delta = (n?: number) => (Number.isFinite(Number(n)) ? Number(n) : 0);
+  const badgeDelta = (v?: number) =>
+    v == null ? null : (
+      <span className={delta(v) > 0 ? "text-emerald-600 ml-2" : delta(v) < 0 ? "text-rose-600 ml-2" : "text-muted-foreground ml-2"}>
+        {delta(v) > 0 ? "▲" : delta(v) < 0 ? "▼" : "•"} {delta(v)}
+      </span>
+    );
 
   return (
-    <Card className="w-full max-w-full min-w-0 overflow-hidden">
-      <CardHeader className="w-full max-w-full min-w-0">
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <div className="min-w-0">
-            <CardTitle className="truncate">Game Progress Tracker</CardTitle>
-            <CardDescription className="truncate">
-              Verteilung A/B/C nach Monaten – Sicht auf Fortschritt des Inchworm-Prozesses.
-            </CardDescription>
-          </div>
+    <Card className="w-full max-w-full overflow-hidden">
+      <CardHeader className="flex flex-col gap-1">
+        <CardTitle>Game Progress</CardTitle>
+        <div className="text-sm text-muted-foreground">
+          Zeitraum: <span className="font-medium">{periodLabel}</span>
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-3 w-full max-w-full min-w-0">
-        {error && <div className="text-red-600">Fehler beim Laden.</div>}
-        {isLoading && <div className="opacity-70">Lade…</div>}
-        {!isLoading && !error && buckets.length === 0 && (
-          <div className="text-sm text-muted-foreground">Noch keine Trades vorhanden.</div>
-        )}
+      <CardContent className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Plan vs Realität */}
+        <div className="rounded-md border p-3">
+          <div className="font-medium mb-2">Plan vs. Realität</div>
 
-        {buckets.map((b) => {
-          const total = Math.max(1, b.total);
-          const pa = Math.round((b.a / total) * 100);
-          const pb = Math.round((b.b / total) * 100);
-          const pc = Math.max(0, 100 - pa - pb); // rest, gekappt
+          {isLoading && <div className="opacity-70 text-sm">Lade…</div>}
+          {error && <div className="text-red-600 text-sm">Fehler beim Laden.</div>}
 
-          return (
-            <div key={b.label} className="rounded-md border p-3 w-full max-w-full min-w-0">
-              <div className="flex items-center justify-between gap-2 flex-wrap">
-                <div className="font-medium">{b.label}</div>
-                <div className="flex items-center gap-2 text-xs">
-                  <Badge className="bg-emerald-600 text-white">A {b.a}</Badge>
-                  <Badge className="bg-amber-600 text-white">B {b.b}</Badge>
-                  <Badge variant="outline" className="border-rose-500 text-rose-600">C {b.c}</Badge>
+          {!isLoading && !error && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-3 gap-2 text-sm">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Badge className="bg-emerald-600 text-white shrink-0">A</Badge>
+                  <span className="truncate">Hit-Rate: {hrA}%</span>
+                </div>
+                <div className="flex items-center gap-2 min-w-0">
+                  <Badge className="bg-amber-600 text-white shrink-0">B</Badge>
+                  <span className="truncate">Hit-Rate: {hrB}%</span>
+                </div>
+                <div className="flex items-center gap-2 min-w-0">
+                  <Badge className="border-rose-500 text-rose-600 shrink-0" variant="outline">C</Badge>
+                  <span className="truncate">Hit-Rate: {hrC}%</span>
                 </div>
               </div>
 
-              {/* Progressbar: flex statt inline-block → sicher keine Überläufe */}
-              <div className="mt-3 w-full h-3 rounded-md overflow-hidden border bg-muted/40">
-                <div className="flex h-full w-full">
-                  <div
-                    className="h-full bg-emerald-500"
-                    style={{ width: `${pa}%` }}
-                    aria-label={`A ${pa}%`}
-                  />
-                  <div
-                    className="h-full bg-amber-500"
-                    style={{ width: `${pb}%` }}
-                    aria-label={`B ${pb}%`}
-                  />
-                  <div
-                    className="h-full bg-rose-500"
-                    style={{ width: `${pc}%` }}
-                    aria-label={`C ${pc}%`}
-                  />
+              <div className="text-xs text-muted-foreground">
+                Hit-Rate = Anteil deiner Trades im Zeitraum, die mindestens einen <b>geplanten</b> Faktor der Kategorie enthalten.
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                <div className="rounded border p-2">
+                  <div className="opacity-70">Ø Trades/Tag</div>
+                  <div className="font-medium">
+                    {data?.actual?.perDay ?? 0}
+                    {badgeDelta(data?.deltaToTarget?.perDay)}
+                  </div>
+                </div>
+                <div className="rounded border p-2">
+                  <div className="opacity-70">Ø Trades/Woche</div>
+                  <div className="font-medium">
+                    {data?.actual?.perWeek ?? 0}
+                    {badgeDelta(data?.deltaToTarget?.perWeek)}
+                  </div>
+                </div>
+                <div className="rounded border p-2">
+                  <div className="opacity-70">Ø Trades/Monat</div>
+                  <div className="font-medium">
+                    {data?.actual?.perMonth ?? 0}
+                    {badgeDelta(data?.deltaToTarget?.perMonth)}
+                  </div>
                 </div>
               </div>
 
-              <div className="mt-2 text-xs text-muted-foreground">
-                Anteil: A {pa}% • B {pb}% • C {pc}%
+              <div className="text-xs opacity-70">
+                Trades im Zeitraum: <b>{data?.totals?.trades ?? 0}</b>
               </div>
             </div>
-          );
-        })}
+          )}
+        </div>
 
-        <Separator />
-
-        <div className="text-xs text-muted-foreground break-words">
-          Hinweis: Es wird versucht, <code>gameCatalogGrade</code> zu verwenden, sonst <code>gameComputed</code>.
+        {/* Platz für Add-ons (S-Quote, R:R-Zielerfüllung, Top geplante Faktoren, …) */}
+        <div className="rounded-md border p-3">
+          <div className="font-medium mb-2">Nächste Schritte</div>
+          <ul className="list-disc pl-5 text-sm space-y-1">
+            <li>S-Game-Quote (nur Trades, die ausschließlich A-Faktoren erfüllen).</li>
+            <li>Standard-R:R gegen tatsächliche R:R-Kennzahl prüfen (falls vorhanden).</li>
+            <li>Top geplante Faktoren (A/B/C) vs. tatsächliche Erfüllung je Faktor.</li>
+          </ul>
         </div>
       </CardContent>
     </Card>

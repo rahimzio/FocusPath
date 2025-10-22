@@ -1,5 +1,5 @@
 import { connectToDatabase } from "../pages/api/db/mongo";
-import { ActionLog, DailyMindset, DailyScores } from "../utils/interface";
+import { ActionLog, DailyMindset, DailyScores } from "./interfaces/frequency";
 
 /**
  * Recalculate daily scores for a user on a specific date.

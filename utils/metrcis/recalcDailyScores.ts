@@ -1,5 +1,5 @@
 import { connectToDatabase } from "@/pages/api/db/mongo";
-import { ActionLog, DailyMindset, DailyScores } from "@/utils/interface";
+import { ActionLog, DailyMindset, DailyScores } from "../interfaces/frequency";
 
 function clamp(val: number, min: number, max: number) {
   return Math.max(min, Math.min(max, val));

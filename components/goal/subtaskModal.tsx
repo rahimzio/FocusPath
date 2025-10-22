@@ -1,6 +1,6 @@
 // components/goals/SubtaskModal.tsx
+import { Task, SubTask } from "@/utils/interfaces/task";
 import React from "react";
-import { SubTask, Task } from "@/utils/interface";
 
 interface Props {
   task: Task | null;

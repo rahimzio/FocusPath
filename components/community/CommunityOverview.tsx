@@ -4,7 +4,7 @@ import PostList from "./PostList";
 import CreatePostModal from "./CreatePostModal";
 import CreateUserTopicModal from "./CreateUserTopicModal";
 import { useSession } from "next-auth/react";
-import { Post } from "@/utils/interface";
+import { Post } from "@/utils/interfaces/shared";
 
 const CommunityOverviews = () => {
   const { data: session } = useSession();

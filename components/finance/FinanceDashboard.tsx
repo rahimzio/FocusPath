@@ -24,13 +24,13 @@ import SavingGoalsOverview from "./SavingGoalsOverview";
 import MetricCard from "./MetricCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-import type { SavingEntry } from "@/utils/interface";
 import AccountsOverview from "./AccountsOverview";
 import ExpensesList from "./ExpensesList";
 import MonthlyPlanEditor from "./MonthlyPlanEditor";
 import ActivePlanSummary from "./ActivePlanSummary";
 import FinancialSummary from "./financialSummary";
 import AccountsManager from "./AccountManager";
+import { SavingEntry } from "@/utils/interfaces/finance";
 
 /** Einheitlicher ISO-KW-Key: "YYYY-ww" (ohne 'W') */
 function getISOWeekKey(date: Date) {

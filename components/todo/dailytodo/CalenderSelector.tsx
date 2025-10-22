@@ -1,6 +1,6 @@
+import { Task } from "@/utils/interfaces/task";
 import React from "react";
 import Calendar, { CalendarProps } from "react-calendar";
-import { Task } from "@/utils/interface";
 
 type Props = {
   selectedDate: string;

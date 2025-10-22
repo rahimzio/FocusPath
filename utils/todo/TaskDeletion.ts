@@ -1,6 +1,6 @@
 // 📁 useTaskDeletion.ts
-import { Task } from "../interface";
 import { toast } from "react-toastify";
+import { Task } from "../interfaces/task";
 
 interface Props {
   selectedDate: string;

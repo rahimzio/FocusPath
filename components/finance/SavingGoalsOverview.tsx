@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import AddSavingGoalModal from "./AddSavingGoalModal";
-import type { SavingGoal } from "@/utils/interface";
+import { SavingGoal } from "@/utils/interfaces/finance";
 
 function fmtEUR(n: number) {
   return new Intl.NumberFormat("de-DE", {

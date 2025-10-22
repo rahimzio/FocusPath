@@ -1,14 +1,13 @@
 // components/goals/GoalContainerSection.tsx
 
 import React from "react";
-import { Goal, Task } from "@/utils/interface";
-
-// NEU: Helpers für Typ- und Status-Normalisierung
 import {
   normalizeGoalType,
   isTaskTodo,
   isTaskDone,
 } from "@/utils/goals/progress";
+import { Goal } from "@/utils/interfaces/goal";
+import { Task } from "@/utils/interfaces/task";
 
 interface Props {
   title: string;

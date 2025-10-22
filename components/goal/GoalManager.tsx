@@ -6,10 +6,10 @@ import GoalHeader from "./GoalsHeader";
 import GoalContainerSection from "./GoalsContainer";
 import SubtaskModal from "./subtaskModal";
 import NewGoalForm from "./createGoal";
-import { Task, Goal } from "@/utils/interface";
 
 // NEU: falls ein Goal ohne berechneten Progress reinkommt (Sicherheitsnetz)
 import { computeGoalProgress } from "@/utils/goals/progress";
+import { Goal } from "@/utils/interfaces/goal";
 
 export default function GoalPage() {
   const {

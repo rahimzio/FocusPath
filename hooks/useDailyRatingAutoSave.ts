@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import dayjs from "dayjs";
-import { Task, GoalWithProgress } from "@/utils/interface";
+import { GoalWithProgress } from "@/utils/interfaces/goal";
+import { Task } from "@/utils/interfaces/task";
 
 export function useDailyRatingAutoSave({ userId, tasks, goals }: {
   userId: string;

@@ -1,6 +1,5 @@
 // components/MonthlyGoalOverview.tsx
 import React, { useEffect, useMemo, useState } from "react";
-import { Goal } from "@/utils/interface";
 import {
   format,
   parseISO,
@@ -23,6 +22,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { computeGoalProgress } from "@/utils/goals/progress";
 import { patchGoalProgress, updateGoal } from "@/lib/api/goal";
+import { Goal } from "@/utils/interfaces/goal";
 
 interface Props {
   goals: Goal[];

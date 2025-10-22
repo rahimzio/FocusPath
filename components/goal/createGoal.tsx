@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { CreateTaskBody, Goal } from "@/utils/interface";
 import { getSession } from "next-auth/react";
 import { createGoal } from "@/lib/api/goal";
 import { mergeCreatedGoal, computeGoalProgress } from "@/utils/goals/progress";
 import { startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
+import { Goal } from "@/utils/interfaces/goal";
+import { CreateTaskBody } from "@/utils/interfaces/task";
 
 interface Props {
   onGoalCreated: (goal: Goal) => void;

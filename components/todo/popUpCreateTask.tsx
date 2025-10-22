@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Task, Goal, SubTask } from "@/utils/interface";
 import {
   Sheet,
   SheetContent,
@@ -11,6 +10,8 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { v4 as uuidv4 } from "uuid";
+import { Goal } from "@/utils/interfaces/goal";
+import { SubTask, Task } from "@/utils/interfaces/task";
 
 // ✅ Lokaler UI-Typ: macht Subtask-Titel optional, ohne dein globales Interface anfassen zu müssen
 type UISubTask = Omit<SubTask, "name"> & { name?: string };

@@ -1,5 +1,5 @@
+import { Task } from "@/utils/interfaces/task";
 import React from "react";
-import { Task } from "@/utils/interface";
 import { FaCheckCircle, FaTrashAlt, FaPen } from "react-icons/fa";
 
 interface NoTimeTaskListProps {
