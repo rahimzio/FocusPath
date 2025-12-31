@@ -37,6 +37,7 @@ const defaultItemsAdmin = [
   { title: "Goals", url: "/overview/goals", icon: Calendar },
   { title: "Finanzen", url: "/overview/finance", icon: Calendar },
   { title: "Trading", url: "/overview/trading", icon: Search },
+  { title: "Tradingold", url: "/overview/trading2", icon: Search },
   { title: "sport", url: "/overview/sport", icon: Settings },
   { title: "Community", url: "/overview/community", icon: Inbox },
   { title: "Settings", url: "/Settings", icon: Settings },

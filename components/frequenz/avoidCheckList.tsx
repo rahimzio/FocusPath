@@ -1,11 +1,30 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+
+/** Zusammenfassung für den Ampel-Button oben */
+export type AvoidSummary = {
+  // DOs (hier nicht implementiert → 0/false, damit Typen passen)
+  doCount: number;
+  doDoneCount: number;
+  anyDoChecked: boolean;
+  allDosDone: boolean;
+
+  // DON'Ts
+  dontCount: number;
+  dontAvoidedCount: number;   // wie viele DON'Ts heute NICHT getan wurden (gut)
+  anyDontChecked: boolean;    // hat der User heute irgendwas an-/umgeschaltet?
+  anyDontViolated: boolean;   // wurde mindestens ein DON'T gemacht (schlecht)?
+  allDontsAvoided: boolean;   // alle DON'Ts vermieden?
+};
 
 interface Props {
   userId: string;
   /** optional, wird aktuell nur zur Anzeige verwendet (toggle API schreibt auf "heute") */
   date: string;
+
+  /** -> Für den Ampel-Button: ruft bei jeder Änderung die Summary hoch */
+  onSummaryChange?: (s: AvoidSummary) => void;
 }
 
 type DontItem = {
@@ -16,11 +35,37 @@ type DontItem = {
   didAvoid: boolean;
 };
 
-export default function AvoidChecklist({ userId, date }: Props) {
+export default function AvoidChecklist({ userId, date, onSummaryChange }: Props) {
   const [items, setItems] = useState<DontItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  /**
+   * Heuristik, um „noch nichts angekreuzt“ (→ roter Button) abzubilden:
+   * Wir merken uns lokal, ob der User an diesem Tag etwas umgeschaltet hat.
+   * Dadurch ist anyDontChecked nur true, wenn heute eine Aktion passiert ist.
+   */
+  const touchedKey = `avoid:touched:${userId}:${date}`;
+  const touchedSetRef = useRef<Set<string>>(new Set());
+
+  // beim Mount/Datumswechsel ggf. aus localStorage laden
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(touchedKey);
+      touchedSetRef.current = raw ? new Set(JSON.parse(raw)) : new Set();
+    } catch {
+      touchedSetRef.current = new Set();
+    }
+  }, [touchedKey]);
+
+  function persistTouched() {
+    try {
+      localStorage.setItem(touchedKey, JSON.stringify(Array.from(touchedSetRef.current)));
+    } catch {
+      // ignore
+    }
+  }
 
   async function load() {
     if (!userId) return;
@@ -55,9 +100,41 @@ export default function AvoidChecklist({ userId, date }: Props) {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId]);
+  }, [userId, date]);
 
-  const allAvoided = useMemo(() => items.length && items.every((i) => i.didAvoid), [items]);
+  const allAvoided = useMemo(
+    () => items.length > 0 && items.every((i) => i.didAvoid),
+    [items],
+  );
+
+  // ---- Summary für den Ampel-Button berechnen & nach oben melden
+  const summary: AvoidSummary = useMemo(() => {
+    const dontCount = items.length;
+    const dontAvoidedCount = items.filter((i) => i.didAvoid).length;
+    const anyDontViolated = items.some((i) => i.didAvoid === false);
+    const allDontsAvoided = dontCount > 0 && dontAvoidedCount === dontCount;
+
+    // „irgendwas angekreuzt“ = heute mindestens ein Toggle gemacht
+    const anyDontChecked = touchedSetRef.current.size > 0;
+
+    return {
+      // DOs sind in dieser Komponente nicht enthalten → neutral setzen
+      doCount: 0,
+      doDoneCount: 0,
+      anyDoChecked: false,
+      allDosDone: false,
+
+      dontCount,
+      dontAvoidedCount,
+      anyDontChecked,
+      anyDontViolated,
+      allDontsAvoided,
+    };
+  }, [items]);
+
+  useEffect(() => {
+    onSummaryChange?.(summary);
+  }, [summary, onSummaryChange]);
 
   async function toggle(name: string, nextDidAvoid: boolean) {
     const it = items.find((x) => x.name === name);
@@ -72,7 +149,13 @@ export default function AvoidChecklist({ userId, date }: Props) {
       const r = await fetch('/api/frequency/toggleTaskStatus', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, name: it.name, points: it.points, isDont: true, done }),
+        body: JSON.stringify({
+          userId,
+          name: it.name,
+          points: it.points,
+          isDont: true,
+          done,
+        }),
       });
       const j = await r.json();
       if (!j?.ok) throw new Error(j?.error || `HTTP ${r.status}`);
@@ -81,6 +164,10 @@ export default function AvoidChecklist({ userId, date }: Props) {
       setItems((prev) =>
         prev.map((x) => (x.name === name ? { ...x, didAvoid: nextDidAvoid } : x)),
       );
+
+      // Touch-Flag für diesen Tag setzen (wir merken: es gab heute Aktivität)
+      touchedSetRef.current.add(name);
+      persistTouched();
     } catch (e: any) {
       console.error(e);
       setError(e?.message || 'Fehler beim Speichern');
@@ -98,6 +185,19 @@ export default function AvoidChecklist({ userId, date }: Props) {
   }
 
   if (!items.length) {
+    // Auch in diesem Fall sinnvoll: Summary senden (alles 0/false),
+    // damit dein Button oben ggf. rot bleibt.
+    onSummaryChange?.({
+      doCount: 0,
+      doDoneCount: 0,
+      anyDoChecked: false,
+      allDosDone: false,
+      dontCount: 0,
+      dontAvoidedCount: 0,
+      anyDontChecked: touchedSetRef.current.size > 0,
+      anyDontViolated: false,
+      allDontsAvoided: false,
+    });
     return null;
   }
 
@@ -152,7 +252,9 @@ export default function AvoidChecklist({ userId, date }: Props) {
           {allAvoided ? (
             <span className="text-emerald-600">Stark – alle DON’Ts vermieden!</span>
           ) : (
-            <span className="text-gray-600">Einzelne Ausrutscher sind ok – wichtig ist die Linie.</span>
+            <span className="text-gray-600">
+              Einzelne Ausrutscher sind ok – wichtig ist die Linie.
+            </span>
           )}
         </div>
       </div>

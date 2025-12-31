@@ -7,7 +7,7 @@ import { useSession } from "next-auth/react";
 
 // Wir tippen die Props hier inline, dann musst du nichts extra importieren
 const TradingDashboard = dynamic<{ userId: string }>(
-  () => import("@/components/trading1/TradingDashboard"),
+  () => import("@/components/trading/tradingOverviews"),
   {
     loading: () => (
       <p className="p-4 text-sm text-muted-foreground">

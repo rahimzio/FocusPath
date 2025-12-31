@@ -7,8 +7,6 @@ import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-
-import AddTradeModal from "./AddTradeModal";
 import TradeRecapList from "./TradeRecapList";
 import TradeMetrics from "./TradeMetrics";
 import PerformanceChart from "./PerformanceChart";
@@ -22,8 +20,19 @@ import WeeklyStatsCard from "./WeeklyStatsCard";
 import AccountManager from "./AccountManager";
 import AddAccountModal from "./AddAccountModal";
 import AddStrategyModal from "./AddStrategyModal";
+import TradeEntryForm from "./TradeEntryForm";
+import AddTradeModal from "./AddTradeModal";
 
 /* -------- Lazy Imports mit Fallbacks -------- */
+// --- Debug-Toggle: Abschnitte einzeln aktivieren ---
+const SHOW_TABS_HEADER = true;
+const SHOW_TAB_OVERVIEW = true;
+const SHOW_TAB_GAME = true;
+const SHOW_TAB_IMPROVE = true;
+const SHOW_TAB_REVIEW = true;
+const SHOW_TAB_COMPONENTS = true;
+const SHOW_TAB_ACCOUNTS = true;
+const SHOW_TAB_SETTINGS = true;
 
 // Wish vs Reality
 const WishGainVsReality = dynamic(async () => {
@@ -360,39 +369,80 @@ function ImproveAtAGlance({
     return () => window.removeEventListener("game-picker-change", handler as any);
   }, []);
 
-  return (
-    <Card className="mb-4 w-full max-w-full overflow-hidden">
-      <CardHeader>
-        <CardTitle>Improve – Überblick</CardTitle>
-      </CardHeader>
-      <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <div className="rounded-lg border p-3">
-          <div className="text-xs text-muted-foreground mb-1">Aktiver Zeitraum</div>
-          <div className="font-medium">{period || "— noch kein Zeitraum gesetzt —"}</div>
-          <Button variant="ghost" size="sm" className="mt-2" onClick={() => onJump("planner")}>
-            Zeitraum & Ziele setzen
-          </Button>
-        </div>
+return (
+  <Card className="mb-4 w-full max-w-full min-w-0 overflow-hidden">
+    <CardHeader className="pb-3">
+      <CardTitle className="text-base sm:text-lg">
+        Improve – Überblick
+      </CardTitle>
+    </CardHeader>
 
-        <div className="rounded-lg border p-3">
-          <div className="text-xs text-muted-foreground mb-1">Heutiger Drill</div>
-          <div className="font-medium break-words">{todayDrill || "— noch kein Drill geplant —"}</div>
-          <Button variant="ghost" size="sm" className="mt-2" onClick={() => onJump("drillboard")}>
-            Drillboard öffnen
-          </Button>
+    <CardContent
+      className="
+        grid grid-cols-1 sm:grid-cols-3
+        gap-3 sm:gap-4
+        w-full max-w-full min-w-0
+      "
+    >
+      {/* Aktiver Zeitraum */}
+      <div className="rounded-lg border p-3 sm:p-4 w-full max-w-full min-w-0">
+        <div className="text-xs text-muted-foreground mb-1">
+          Aktiver Zeitraum
         </div>
+        <div className="font-medium break-words">
+          {period || "— noch kein Zeitraum gesetzt —"}
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="mt-2 w-full sm:w-auto justify-center"
+          onClick={() => onJump("planner")}
+        >
+          Zeitraum & Ziele setzen
+        </Button>
+      </div>
 
-        <div className="rounded-lg border p-3">
-          <div className="text-xs text-muted-foreground mb-1">Fokus (Inchworm)</div>
-          <div className="font-medium break-words">{focus || "— noch kein Fokus gesetzt —"}</div>
-          <div className="text-xs mt-2">Tages-Game: <b>{todayGrade}</b></div>
-          <Button variant="ghost" size="sm" className="mt-2" onClick={() => onJump("progress")}>
-            Fortschritt ansehen
-          </Button>
+      {/* Heutiger Drill */}
+      <div className="rounded-lg border p-3 sm:p-4 w-full max-w-full min-w-0">
+        <div className="text-xs text-muted-foreground mb-1">
+          Heutiger Drill
         </div>
-      </CardContent>
-    </Card>
-  );
+        <div className="font-medium break-words">
+          {todayDrill || "— noch kein Drill geplant —"}
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="mt-2 w-full sm:w-auto justify-center"
+          onClick={() => onJump("drillboard")}
+        >
+          Drillboard öffnen
+        </Button>
+      </div>
+
+      {/* Fokus (Inchworm) */}
+      <div className="rounded-lg border p-3 sm:p-4 w-full max-w-full min-w-0">
+        <div className="text-xs text-muted-foreground mb-1">
+          Fokus (Inchworm)
+        </div>
+        <div className="font-medium break-words">
+          {focus || "— noch kein Fokus gesetzt —"}
+        </div>
+        <div className="text-xs mt-2">
+          Tages-Game: <b>{todayGrade}</b>
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="mt-2 w-full sm:w-auto justify-center"
+          onClick={() => onJump("progress")}
+        >
+          Fortschritt ansehen
+        </Button>
+      </div>
+    </CardContent>
+  </Card>
+);
 }
 
 /* Helper – aktuelles Monats-Segment (W1..W4) als Label "YYYY-MM Wn" */
@@ -480,324 +530,477 @@ export default function TradingDashboard() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-screen-lg px-3 sm:px-4 space-y-6 overflow-x-hidden break-words min-w-0">
+    <div className="mx-auto w-full max-w-screen-lg px-3 sm:px-4 space-y-6 overflow-x-hidden break-words min-w-0 pb-24">
+      {/* global: no-scrollbar helper */}
+      <style jsx global>{`
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      `}</style>
+
       {/* Header & Quick Metrics */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 min-w-0 w/full">
-        <h1 className="text-2xl font-semibold w-full sm:w-auto">Trading Dashboard</h1>
-        <div className="w-full sm:w-auto max-w-full min-w-0 overflow-hidden">
-          {/* ⚙️ globaler Zeitraum wird an TradeMetrics durchgereicht */}
+      <div className="w-full flex flex-col gap-3 sm:gap-4 min-w-0">
+        <h1 className="text-2xl font-semibold text-left sm:text-left">
+          Trading Dashboard
+        </h1>
+        <div className="w-full max-w-full min-w-0 overflow-hidden">
           <TradeMetrics userId={userId} range={metricsRange} />
         </div>
       </div>
 
       {/* Quick Actions */}
-      <div className="flex flex-wrap gap-2 w-full max-w-full min-w-0">
-        <AddTradeModal userId={userId} />
-        <Button variant="secondary" onClick={() => setFiltersOpen(!filtersOpen)}>Filter</Button>
-        <AddStrategyModal userId={userId} />
-        <AddAccountModal userId={userId} />
-        <Button
-          variant="outline"
-          onClick={() => {
-            setTab("game");
-            try {
-              const u = new URL(window.location.href);
-              u.searchParams.set("tab", "game");
-              window.history.replaceState({}, "", u.toString());
-            } catch { }
-          }}
-          title="A/B/C Game Kriterien festlegen und Tages-Game wählen"
-          className="whitespace-nowrap"
+      <div className="w-full max-w-full min-w-0">
+        <div
+          role="toolbar"
+          aria-label="Schnellaktionen"
+          className="w-full "
         >
-          A/B/C Game setzen
-        </Button>
-        <Button
-          variant="outline"
-          onClick={() => {
-            setTab("improve");
-            try {
-              const u = new URL(window.location.href);
-              u.searchParams.set("tab", "improve");
-              window.history.replaceState({}, "", u.toString());
-            } catch { }
-          }}
-          title="Inchworm: Monats-Ziele, Drills & Fortschritt"
-          className="whitespace-nowrap"
-        >
-          Improve (Inchworm)
-        </Button>
+          <div className="flex flex-wrap sm:flex-wrap items-center gap-2 py-1">
+            <div className="shrink-0">
+              <AddTradeModal userId={userId} />
+            </div>
 
-        {/* Quick-Button für Review/History */}
-        <div className="flex items-center gap-2">
-          <input
-            className="border rounded px-2 py-1 text-sm"
-            value={weekLabel}
-            onChange={(e) => setWeekLabel(e.target.value)}
-            title='Week Label im Format "YYYY-MM Wn" (z. B. "2025-09 W3")'
-          />
-          <Button variant="outline" onClick={gotoReview} className="whitespace-nowrap" title="Weekly Review & History öffnen">
-            Review (Week/Month/Quarter)
-          </Button>
+            <div className="shrink-0">
+              <AddStrategyModal userId={userId} />
+            </div>
+
+            <div className="shrink-0">
+              <Button
+                variant="secondary"
+                onClick={() => setFiltersOpen(!filtersOpen)}
+                className="whitespace-nowrap w-full sm:w-auto"
+              >
+                Filter
+              </Button>
+            </div>
+
+            <div className="shrink-0">
+              <AddAccountModal userId={userId} />
+            </div>
+
+            <div className="shrink-0">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setTab("game");
+                  try {
+                    const u = new URL(window.location.href);
+                    u.searchParams.set("tab", "game");
+                    window.history.replaceState({}, "", u.toString());
+                  } catch {}
+                }}
+                title="A/B/C Game Kriterien festlegen und Tages-Game wählen"
+                className="whitespace-nowrap w-full sm:w-auto"
+              >
+                A/B/C Game setzen
+              </Button>
+            </div>
+
+            <div className="shrink-0">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setTab("improve");
+                  try {
+                    const u = new URL(window.location.href);
+                    u.searchParams.set("tab", "improve");
+                    window.history.replaceState({}, "", u.toString());
+                  } catch {}
+                }}
+                title="Inchworm: Monats-Ziele, Drills & Fortschritt"
+                className="whitespace-nowrap w-full sm:w-auto"
+              >
+                Improve (Inchworm)
+              </Button>
+            </div>
+
+            <div className="shrink-0 flex items-center gap-2">
+              <input
+                className="border rounded px-2 py-1 text-sm w-[160px] sm:w-auto"
+                value={weekLabel}
+                onChange={(e) => setWeekLabel(e.target.value)}
+                title='Week Label im Format "YYYY-MM Wn" (z. B. "2025-09 W3")'
+              />
+              <Button
+                variant="outline"
+                onClick={gotoReview}
+                className="whitespace-nowrap w-full sm:w-auto"
+                title="Weekly Review & History öffnen"
+              >
+                Review (Week/Month/Quarter)
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Main Tabs */}
-      <Tabs value={tab} onValueChange={(v) => setTab(v as any)} className="space-y-4 w-full max-w-full min-w-0">
-        <TabsList className="w-full overflow-x-auto whitespace-nowrap flex gap-1 p-1 min-w-0">
-          <TabsTrigger value="overview" className="flex-1 sm:flex-none min-w-[110px]">Übersicht</TabsTrigger>
-          <TabsTrigger value="game" className="flex-1 sm:flex-none min-w-[110px]">Game</TabsTrigger>
-          <TabsTrigger value="improve" className="flex-1 sm:flex-none min-w-[110px]">Improve</TabsTrigger>
-          <TabsTrigger value="review" className="flex-1 sm:flex-none min-w-[110px]">Review</TabsTrigger>
-          <TabsTrigger value="components" className="flex-1 sm:flex-none min-w-[110px]">Komponenten</TabsTrigger>
-          <TabsTrigger value="accounts" className="flex-1 sm:flex-none min-w-[110px]">Accounts</TabsTrigger>
-          {/* ⚙️ NEU: Settings */}
-          <TabsTrigger value="settings" className="flex-1 sm:flex-none min-w-[110px]">Einstellungen</TabsTrigger>
-        </TabsList>
+      {/* Tabs Wrapper */}
+      <Tabs
+        value={tab}
+        onValueChange={(v) => setTab(v as any)}
+        className="space-y-4 w-full max-w-full min-w-0"
+      >
+        {SHOW_TABS_HEADER && (
+          <Tabs
+            value={tab}
+            onValueChange={(v) => setTab(v as any)}
+            className="space-y-4 w-full max-w-full min-w-0 mt-3"
+          >
+            <div className="w-full">
+              <TabsList
+                aria-label="Trading-Ansichten"
+                className="flex flex-wrap flex flex-wrap gap-2 p-1 w-full"
+              >
+                <TabsTrigger
+                  value="overview"
+                  className="flex-1 sm:flex-none min-w-[7rem] sm:min-w-0 w-full sm:flex-1 sm:min-w-[7rem]"
+                >
+                  Übersicht
+                </TabsTrigger>
+                <TabsTrigger
+                  value="game"
+                  className="flex-1 sm:flex-none min-w-[7rem] sm:min-w-0 w-full sm:flex-1 sm:min-w-[7rem]"
+                >
+                  Game
+                </TabsTrigger>
+                <TabsTrigger
+                  value="improve"
+                  className="flex-1 sm:flex-none min-w-[7rem] sm:min-w-0 w-full sm:flex-1 sm:min-w-[7rem]"
+                >
+                  Improve
+                </TabsTrigger>
+                <TabsTrigger
+                  value="review"
+                  className="flex-1 sm:flex-none min-w-[7rem] sm:min-w-0 w-full sm:flex-1 sm:min-w-[7rem]"
+                >
+                  Review
+                </TabsTrigger>
+                <TabsTrigger
+                  value="components"
+                  className="hidden md:inline-flex flex-none w-full sm:flex-1 sm:min-w-[7rem]"
+                >
+                  Komponenten
+                </TabsTrigger>
+                <TabsTrigger
+                  value="accounts"
+                  className="flex-1 sm:flex-none min-w-[7rem] sm:min-w-0 w-full sm:flex-1 sm:min-w-[7rem]"
+                >
+                  Accounts
+                </TabsTrigger>
+                <TabsTrigger
+                  value="settings"
+                  className="flex-1 sm:flex-none min-w-[7rem] sm:min-w-0 w-full sm:flex-1 sm:min-w-[7rem]"
+                >
+                  Einstellungen
+                </TabsTrigger>
+              </TabsList>
+            </div>
+
+
+          </Tabs>
+        )}
+
+
+
 
         {/* Übersicht */}
         <TabsContent value="overview" className="min-w-0 w-full max-w-full">
-          <ImproveAtAGlance onJump={jumpToImprove} />
+          {SHOW_TAB_OVERVIEW && (
+            <div className="w-full max-w-full min-w-0 space-y-4 sm:space-y-6">
+              {/* Improve – Überblick */}
+              <div className="w-full max-w-full min-w-0">
+                <ImproveAtAGlance onJump={jumpToImprove} />
+              </div>
 
-          <Card className="mb-4 w-full max-w-full overflow-hidden">
-            <CardHeader>
-              <CardTitle>Heutiges Game wählen</CardTitle>
-            </CardHeader>
-            <CardContent className="min-w-0">
-              <GamePicker userId={userId} />
-            </CardContent>
-          </Card>
+              {/* Heutiges Game wählen */}
+              <Card className="mb-4 w-full max-w-full min-w-0 overflow-hidden">
+                <CardHeader>
+                  <CardTitle>Heutiges Game wählen</CardTitle>
+                </CardHeader>
+                <CardContent className="min-w-0">
+                  <GamePicker userId={userId} />
+                </CardContent>
+              </Card>
 
-          {/* Day Reflection */}
-          <Card id="day-reflection" className="mb-4 w-full max-w-full overflow-hidden">
-            <CardHeader>
-              <CardTitle>Day Reflection</CardTitle>
-            </CardHeader>
-            <CardContent className="min-w-0">
-              <TradeDayReflection userId={userId} />
-            </CardContent>
-          </Card>
+              {/* Day Reflection */}
+              <Card
+                id="day-reflection"
+                className="mb-4 w-full max-w-full min-w-0 overflow-hidden"
+              >
+                <CardHeader>
+                  <CardTitle>Day Reflection</CardTitle>
+                </CardHeader>
+                <CardContent className="min-w-0">
+                  <TradeDayReflection userId={userId} />
+                </CardContent>
+              </Card>
 
-          {/* 🔹 NEU: Persönliche Stats */}
-          <div className="w-full max-w-full min-w-0">
-            <StatsDashboard userId={userId} />
-          </div>
+              {/* Stats Dashboard */}
+              <div className="w-full max-w-full min-w-0">
+                <StatsDashboard userId={userId} />
+              </div>
 
-          <div className="w-full max-w-full space-y-4 min-w-0">
-            <TradeRecapList userId={userId} />
-            <div className="w-full max-w-full overflow-hidden">
-              <GameDistributionCard />
+              {/* Recap + Game Distribution */}
+              <div className="w-full max-w-full min-w-0 space-y-4">
+                <TradeRecapList userId={userId} />
+                <div className="w-full max-w-full min-w-0 overflow-hidden">
+                  <GameDistributionCard />
+                </div>
+              </div>
+
+              {/* Charts & Strategien */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2 sm:mt-4 min-w-0">
+                {/* Performance Chart */}
+                <Card className="w-full max-w-full min-w-0 overflow-hidden">
+                  <CardHeader>
+                    <CardTitle>Performance Chart</CardTitle>
+                  </CardHeader>
+                  <CardContent className="min-w-0">
+                    <div className="h-[260px] sm:h-[320px] md:h-[46vh] min-h-[220px]">
+                      <PerformanceChart userId={userId} />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Fehler & Reflexion */}
+                <Card className="w-full max-w-full min-w-0 overflow-hidden">
+                  <CardHeader>
+                    <CardTitle>Fehler & Reflexion</CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid grid-cols-1 gap-4 min-w-0">
+                    <div className="min-h-[220px] w-full max-w-full min-w-0">
+                      <MistakePatternChart userId={userId} />
+                    </div>
+                    <div className="w-full max-w-full min-w-0">
+                      <TradeReflection userId={userId} />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Strategien & Monatliche Stats */}
+                <Card className="md:col-span-2 w-full max-w-full min-w-0 overflow-hidden">
+                  <CardHeader>
+                    <CardTitle>Strategien & Monatliche Stats</CardTitle>
+                  </CardHeader>
+                  <CardContent className="min-w-0 space-y-3">
+                    <div className="w-full max-w-full min-w-0 overflow-x-auto">
+                      <StrategyPills userId={userId} />
+                    </div>
+                    <div className="w-full max-w-full min-w-0 overflow-hidden">
+                      <MonthlyStatsOverlay userId={userId} />
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
             </div>
-          </div>
-
-          {/* Charts & Reflection Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 min-w-0">
-            <Card className="w-full max-w-full min-w-0 overflow-hidden">
-              <CardHeader><CardTitle>Performance Chart</CardTitle></CardHeader>
-              <CardContent className="min-w-0">
-                <PerformanceChart userId={userId} />
-              </CardContent>
-            </Card>
-
-            <Card className="w-full max-w-full min-w-0 overflow-hidden">
-              <CardHeader><CardTitle>Fehler & Reflexion</CardTitle></CardHeader>
-              <CardContent className="grid grid-cols-1 gap-4 min-w-0">
-                <MistakePatternChart userId={userId} />
-                <TradeReflection userId={userId} />
-              </CardContent>
-            </Card>
-
-            <Card className="md:col-span-2 w-full max-w-full min-w-0 overflow-hidden">
-              <CardHeader><CardTitle>Strategien & Monatliche Stats</CardTitle></CardHeader>
-              <CardContent className="min-w-0">
-                <StrategyPills userId={userId} />
-                <MonthlyStatsOverlay userId={userId} />
-              </CardContent>
-            </Card>
-          </div>
+          )}
         </TabsContent>
 
         {/* Game */}
         <TabsContent value="game" className="min-w-0 w-full max-w-full">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 min-w-0">
-            <Card id="game-library" className="w-full max-w-full min-w-0 overflow-hidden">
-              <CardHeader><CardTitle>Game Library (A/B/C definieren)</CardTitle></CardHeader>
-              <CardContent className="min-w-0">
-                <GameLibrary userId={userId} />
-              </CardContent>
-            </Card>
+          {SHOW_TAB_GAME && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 min-w-0">
+              <Card id="game-library" className="w-full max-w-full min-w-0 overflow-hidden">
+                <CardHeader>
+                  <CardTitle>Game Library (A/B/C definieren)</CardTitle>
+                </CardHeader>
+                <CardContent className="min-w-0">
+                  <GameLibrary userId={userId} />
+                </CardContent>
+              </Card>
 
-            <Card className="w-full max-w-full min-w-0 overflow-hidden">
-              <CardHeader><CardTitle>Game Auswahl</CardTitle></CardHeader>
-              <CardContent className="min-w-0">
-                <GamePicker userId={userId} />
-              </CardContent>
-            </Card>
-          </div>
+              <Card className="w-full max-w-full min-w-0 overflow-hidden">
+                <CardHeader>
+                  <CardTitle>Game Auswahl</CardTitle>
+                </CardHeader>
+                <CardContent className="min-w-0">
+                  <GamePicker userId={userId} />
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </TabsContent>
 
         {/* Improve */}
         <TabsContent value="improve" className="min-w-0 w-full max-w-full">
-          <div className="grid grid-cols-1 gap-4 min-w-0">
-            {/* 1) Game Progress (Plan-bewusst) */}
-            <Card id="progress" className="w-full max-w-full min-w-0 overflow-hidden">
-              <CardHeader><CardTitle>Game Progress</CardTitle></CardHeader>
-              <CardContent className="min-w-0">
-                <GameProgressPlanAware userId={userId} />
-              </CardContent>
-            </Card>
+          {SHOW_TAB_IMPROVE && (
+            <div className="grid grid-cols-1 gap-4 min-w-0">
+              <Card id="progress" className="w-full max-w-full min-w-0 overflow-hidden">
+                <CardHeader>
+                  <CardTitle>Game Progress</CardTitle>
+                </CardHeader>
+                <CardContent className="min-w-0">
+                  <GameProgressPlanAware userId={userId} />
+                </CardContent>
+              </Card>
 
-            {/* 2) Inchworm Planner */}
-            <Card id="planner" className="w-full max-w-full min-w-0 overflow-hidden">
-              <CardHeader><CardTitle>Inchworm Planner</CardTitle></CardHeader>
-              <CardContent className="min-w-0">
-                <InchwormPlanner userId={userId} />
-              </CardContent>
-            </Card>
+              <Card id="planner" className="w-full max-w-full min-w-0 overflow-hidden">
+                <CardHeader>
+                  <CardTitle>Inchworm Planner</CardTitle>
+                </CardHeader>
+                <CardContent className="min-w-0">
+                  <InchwormPlanner userId={userId} />
+                </CardContent>
+              </Card>
 
-            {/* 3) Game Progress (Monate, unabhängig vom Plan) */}
-            <Card className="w-full max-w-full min-w-0 overflow-hidden">
-              <CardHeader><CardTitle>Game Progress (Monate)</CardTitle></CardHeader>
-              <CardContent className="min-w-0">
-                <GameProgressMonthly userId={userId} />
-              </CardContent>
-            </Card>
+              <Card className="w/full max-w-full min-w-0 overflow-hidden">
+                <CardHeader>
+                  <CardTitle>Game Progress (Monate)</CardTitle>
+                </CardHeader>
+                <CardContent className="min-w-0">
+                  <GameProgressMonthly userId={userId} />
+                </CardContent>
+              </Card>
 
-            {/* Rest wie gehabt */}
-            <Card id="drillboard" className="w-full max-w-full min-w-0 overflow-hidden">
-              <CardHeader><CardTitle>Game Drillboard</CardTitle></CardHeader>
-              <CardContent className="min-w-0">
-                <GameDrillboard userId={userId} />
-              </CardContent>
-            </Card>
+              <Card id="drillboard" className="w-full max-w-full min-w-0 overflow-hidden">
+                <CardHeader>
+                  <CardTitle>Game Drillboard</CardTitle>
+                </CardHeader>
+                <CardContent className="min-w-0">
+                  <GameDrillboard userId={userId} />
+                </CardContent>
+              </Card>
 
-            <Card id="improvement-planner" className="w-full max-w-full min-w-0 overflow-hidden">
-              <CardHeader><CardTitle>Inchworm Progress</CardTitle></CardHeader>
-              <CardContent className="min-w-0">
-                <InchwormProgress userId={userId} />
-              </CardContent>
-            </Card>
+              <Card id="improvement-planner" className="w/full max-w-full min-w-0 overflow-hidden">
+                <CardHeader>
+                  <CardTitle>Inchworm Progress</CardTitle>
+                </CardHeader>
+                <CardContent className="min-w-0">
+                  <InchwormProgress userId={userId} />
+                </CardContent>
+              </Card>
 
-            <Card className="w-full max-w-full min-w-0 overflow-hidden">
-              <CardHeader><CardTitle>Game Improvement Planner</CardTitle></CardHeader>
-              <CardContent className="min-w-0">
-                <GameImprovementPlanner userId={userId} />
-              </CardContent>
-            </Card>
-          </div>
+              <Card className="w/full max-w-full min-w-0 overflow-hidden">
+                <CardHeader>
+                  <CardTitle>Game Improvement Planner</CardTitle>
+                </CardHeader>
+                <CardContent className="min-w-0">
+                  <GameImprovementPlanner userId={userId} />
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </TabsContent>
 
-
-
         {/* Review */}
-        <TabsContent value="review" className="min-w-0 w-full max-w-full space-y-4">
-          <Card className="w-full max-w-full overflow-hidden">
-            <CardHeader>
-              <CardTitle>Weekly Review</CardTitle>
-            </CardHeader>
-            <CardContent className="min-w-0 space-y-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <label className="text-sm">Week Label:</label>
-                <input
-                  className="border rounded px-2 py-1 text-sm"
-                  value={weekLabel}
-                  onChange={(e) => setWeekLabel(e.target.value)}
-                  title='Format "YYYY-MM Wn" (z. B. "2025-09 W3")'
-                />
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => {
-                    try {
-                      const u = new URL(window.location.href);
-                      u.searchParams.set("weekLabel", weekLabel);
-                      window.history.replaceState({}, "", u.toString());
-                    } catch { }
-                  }}
-                >
-                  Übernehmen
-                </Button>
-              </div>
-              <WeeklyTradingReflection userId={userId} label={weekLabel} />
-            </CardContent>
-          </Card>
+        <TabsContent value="review" className="min-w-0 w/full max-w-full space-y-4">
+          {SHOW_TAB_REVIEW && (
+            <>
+              <Card className="w/full max-w-full overflow-hidden">
+                <CardHeader>
+                  <CardTitle>Weekly Review</CardTitle>
+                </CardHeader>
+                <CardContent className="min-w-0 space-y-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="text-sm">Week Label:</label>
+                    <input
+                      className="border rounded px-2 py-1 text-sm w-[160px] sm:w-auto"
+                      value={weekLabel}
+                      onChange={(e) => setWeekLabel(e.target.value)}
+                      title='Format "YYYY-MM Wn" (z. B. "2025-09 W3")'
+                    />
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => {
+                        try {
+                          const u = new URL(window.location.href);
+                          u.searchParams.set("weekLabel", weekLabel);
+                          window.history.replaceState({}, "", u.toString());
+                        } catch { }
+                      }}
+                    >
+                      Übernehmen
+                    </Button>
+                  </div>
+                  <WeeklyTradingReflection userId={userId} label={weekLabel} />
+                </CardContent>
+              </Card>
 
-          <Card className="w-full max-w-full overflow-hidden">
-            <CardHeader>
-              <CardTitle>History (Week → Month → Quarter)</CardTitle>
-            </CardHeader>
-            <CardContent className="min-w-0">
-              <TradingHistory userId={userId} />
-            </CardContent>
-          </Card>
+              <Card className="w/full max-w-full overflow-hidden">
+                <CardHeader>
+                  <CardTitle>History (Week → Month → Quarter)</CardTitle>
+                </CardHeader>
+                <CardContent className="min-w-0">
+                  <TradingHistory userId={userId} />
+                </CardContent>
+              </Card>
+            </>
+          )}
         </TabsContent>
 
         {/* Komponenten */}
-        <TabsContent value="components" className="min-w-0 w-full max-w-full">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 min-w-0">
-            <RecapAccordion />
-            <TradeEntryFAB userId={userId} />
-            <WeeklyStatsCard userId={userId} />
-            <div className="lg:col-span-2 min-w-0 w-full max-w-full overflow-hidden">
-              <WishGainVsReality />
+        <TabsContent value="components" className="min-w-0 w/full max-w-full">
+          {SHOW_TAB_COMPONENTS && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 min-w-0">
+              <RecapAccordion />
+              <TradeEntryFAB userId={userId} />
+              <WeeklyStatsCard userId={userId} />
+              <div className="lg:col-span-2 min-w-0 w/full max-w-full overflow-hidden">
+                <WishGainVsReality />
+              </div>
             </div>
-          </div>
+          )}
         </TabsContent>
 
         {/* Accounts */}
-        <TabsContent value="accounts" className="min-w-0 w-full max-w-full">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mb-3 min-w-0">
-            <h2 className="text-lg font-semibold">Accounts verwalten</h2>
-            <AddAccountModal userId={userId} />
-          </div>
-          <AccountManager userId={userId} />
+        <TabsContent value="accounts" className="min-w-0 w/full max-w-full">
+          {SHOW_TAB_ACCOUNTS && (
+            <>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mb-3 min-w-0">
+                <h2 className="text-lg font-semibold">Accounts verwalten</h2>
+                <AddAccountModal userId={userId} />
+              </div>
+              <AccountManager userId={userId} />
+            </>
+          )}
         </TabsContent>
 
-        {/* ⚙️ NEU: Settings / Anpassungen */}
+        {/* ⚙️ Settings */}
         <TabsContent value="settings" className="min-w-0 w/full max-w-full">
-          <Card className="w/full max-w-full overflow-hidden">
-            <CardHeader>
-              <CardTitle>Anpassungen – Metriken</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="text-sm text-muted-foreground">
-                Lege fest, aus welchem Zeitraum die **Trading-Metriken** berechnet werden. Diese Auswahl wirkt global auf die Kacheln im Header (und kann später auch für weitere Widgets übernommen werden).
-              </div>
+          {SHOW_TAB_SETTINGS && (
+            <Card className="w/full max-w-full overflow-hidden">
+              <CardHeader>
+                <CardTitle>Anpassungen – Metriken</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="text-sm text-muted-foreground">
+                  Lege fest, aus welchem Zeitraum die <b>Trading-Metriken</b> berechnet werden …
+                </div>
 
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  variant={metricsRange === "week" ? "default" : "outline"}
-                  onClick={() => setMetricsRange("week")}
-                  title="Letzte 7 Tage"
-                  size="sm"
-                  className="whitespace-nowrap"
-                >
-                  Letzte 7 Tage
-                </Button>
-                <Button
-                  variant={metricsRange === "month" ? "default" : "outline"}
-                  onClick={() => setMetricsRange("month")}
-                  title="Letzte 30 Tage"
-                  size="sm"
-                  className="whitespace-nowrap"
-                >
-                  Letzter Monat (30 Tage)
-                </Button>
-                <Button
-                  variant={metricsRange === "all" ? "default" : "outline"}
-                  onClick={() => setMetricsRange("all")}
-                  title="Gesamtzeitraum (All-Time)"
-                  size="sm"
-                  className="whitespace-nowrap"
-                >
-                  Gesamt (All-Time)
-                </Button>
-              </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant={metricsRange === "week" ? "default" : "outline"}
+                    onClick={() => setMetricsRange("week")}
+                    size="sm"
+                    className="whitespace-nowrap"
+                  >
+                    Letzte 7 Tage
+                  </Button>
+                  <Button
+                    variant={metricsRange === "month" ? "default" : "outline"}
+                    onClick={() => setMetricsRange("month")}
+                    size="sm"
+                    className="whitespace-nowrap"
+                  >
+                    Letzter Monat (30 Tage)
+                  </Button>
+                  <Button
+                    variant={metricsRange === "all" ? "default" : "outline"}
+                    onClick={() => setMetricsRange("all")}
+                    size="sm"
+                    className="whitespace-nowrap"
+                  >
+                    Gesamt (All-Time)
+                  </Button>
+                </div>
 
-              <div className="text-xs text-muted-foreground">
-                Persistenz: URL-Parameter <code>?range={metricsRange}</code> und <code>localStorage["trading:metricsRange"]</code>.
-              </div>
-            </CardContent>
-          </Card>
+                <div className="text-xs text-muted-foreground">
+                  Persistenz: URL-Parameter <code>?range={metricsRange}</code> und{" "}
+                  <code>localStorage["trading:metricsRange"]</code>.
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
       </Tabs>
     </div>
