@@ -177,6 +177,7 @@ export interface TradeEntry {
   _id?: string;
   type?: string;         // z.B. "trading_trade_v1" (aus DB)
   userId: string;
+  accountId?: string;
 
   // Basis
   date: string;          // Format: YYYY-MM-DD

@@ -3,60 +3,73 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { ObjectId } from "mongodb";
 import { connectToDatabase } from "@/pages/api/db/mongo";
 import { TradingSetup } from "../../../../components/trading1/interface";
+
+type SetupGameGrade = "S" | "A" | "B" | "C";
+
 type DbTradingSetup = Omit<TradingSetup, "_id"> & {
   _id: ObjectId;
-  type: string;
+  type: "trading_setup_v2";
+
+  // ✅ Setup Game (Frontend-konform)
+  setupSelectedIds?: string[];
+  setupAvgPoints?: number;
+  setupGameGrade?: SetupGameGrade;
+
+  date?: string; // YYYY-MM-DD
 };
+
+function toDateOnly(s?: string) {
+  return s ? String(s).slice(0, 10) : "";
+}
+
+function uniqStrings(input: any): string[] | undefined {
+  if (!Array.isArray(input)) return undefined;
+
+  const out: string[] = [];
+  const seen = new Set<string>();
+
+  for (const raw of input) {
+    const s = String(raw ?? "").trim();
+    if (!s || seen.has(s)) continue;
+    seen.add(s);
+    out.push(s);
+  }
+
+  return out.length ? out : undefined;
+}
 
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
   if (req.method !== "POST") {
-    return res
-      .status(405)
-      .json({ message: "Method not allowed. Use POST." });
+    return res.status(405).json({ message: "Method not allowed. Use POST." });
   }
 
   try {
     const body = req.body as Partial<TradingSetup> & {
       userId?: string;
+      setupSelectedIds?: string[];
+      setupAvgPoints?: number;
+      setupGameGrade?: SetupGameGrade;
+      date?: string;
     };
 
     const {
       userId,
       market,
       direction,
-      htfTf,
-      htfBias,
-      entryTf,
-      htfD1Bias,
-      htfH4Bias,
-      htfH1Bias,
-      waitFor,
-      chartImageUrl,
-      setupLabel,
       patternType,
-      keyLevels,
-      structureNotes,
-      plannedEntryMin,
-      plannedEntryMax,
-      plannedStop,
-      plannedTarget,
-      plannedRR,
       status,
-      thoughtProcess,
-      decision,
-      outcome,
-      gameGrade,
-      reflection,
-      entryChecklistTemplate,
-      entryChecklistState,
-      linkedTradeId,
-      resolvedAt,
+
+      setupSelectedIds,
+      setupAvgPoints,
+      setupGameGrade,
+      date,
+
+      ...rest
     } = body;
 
-    // 🔎 Minimal-Validation: das muss da sein
     if (!userId || !market || !direction || !patternType || !status) {
       return res.status(400).json({
         message:
@@ -65,67 +78,50 @@ export default async function handler(
     }
 
     const { db } = await connectToDatabase();
-    const appData = db.collection("trading");
+    const col = db.collection<DbTradingSetup>("trading");
 
-    const mongoId = new ObjectId();
+    try {
+      await Promise.all([
+        col.createIndex({ type: 1, userId: 1, createdAt: -1 }),
+        col.createIndex({ type: 1, userId: 1, status: 1 }),
+        col.createIndex({ type: 1, userId: 1, date: -1 }),
+      ]);
+    } catch {
+      // ignore
+    }
+
     const now = new Date().toISOString();
+    const dayKey = toDateOnly(date) || toDateOnly(now);
 
     const doc: DbTradingSetup = {
-      _id: mongoId,
+      _id: new ObjectId(),
       type: "trading_setup_v2",
       userId,
       createdAt: now,
       updatedAt: now,
-      market,
-      direction,
+      date: dayKey,
 
-      chartImageUrl,
-
-      // Legacy-TFs + neue Bias-Felder
-      htfTf,
-      htfBias,
-      entryTf,
-      htfD1Bias,
-      htfH4Bias,
-      htfH1Bias,
-
-      waitFor,
-
-      setupLabel,
-      patternType,
-      keyLevels,
-      structureNotes,
-
-      plannedEntryMin,
-      plannedEntryMax,
-      plannedStop,
-      plannedTarget,
-      plannedRR,
-
-      status,
-      decision,
-      outcome,
-      linkedTradeId,
-      resolvedAt,
-
-      entryChecklistTemplate,
-      entryChecklistState,
-
-      gameGrade,
-      thoughtProcess,
-      reflection,
-    };
-
-    await appData.insertOne(doc);
-
-    // _id → string mappen, type rauswerfen
-    const { type, _id, ...rest } = doc;
-    const setupToReturn: TradingSetup = {
       ...rest,
-      _id: _id.toHexString(),
+
+      // ✅ Setup Game
+      setupSelectedIds: uniqStrings(setupSelectedIds),
+      setupAvgPoints:
+        Number.isFinite(Number(setupAvgPoints))
+          ? Number(setupAvgPoints)
+          : undefined,
+      setupGameGrade,
     };
 
-    return res.status(201).json({ setup: setupToReturn });
+    await col.insertOne(doc);
+
+    const { _id, type, ...clean } = doc;
+
+    return res.status(201).json({
+      setup: {
+        ...clean,
+        _id: _id.toHexString(),
+      },
+    });
   } catch (err) {
     console.error("Error creating trading setup", err);
     return res
