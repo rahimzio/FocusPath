@@ -232,18 +232,8 @@ export const TradingSetupsDashboard: React.FC<TradingSetupsDashboardProps> = ({
       </div>
 
       {/* Setup Filters */}
-      <SetupFilters
-        search={search}
-        onSearchChange={setSearch}
-        marketFilter={marketFilter}
-        onMarketChange={setMarketFilter}
-        directionFilter={directionFilter}
-        onDirectionChange={setDirectionFilter}
-        markets={markets}
-        onReset={resetSetupFilters}
-        setups={setups}
-        onFilterChange={setFilteredSetups}
-      />
+      <SetupFilters setups={setups} onFilterChange={setFilteredSetups} />
+
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
         <TabsList>
@@ -295,17 +285,8 @@ export const TradingSetupsDashboard: React.FC<TradingSetupsDashboardProps> = ({
 
         {/* ---------------- TRADES ---------------- */}
         <TabsContent value="trades" className="space-y-4 pt-4">
-          <TradeStatsGrid
-            trades={trades}
-            totalTrades={totalTrades}
-            wins={wins}
-            losses={losses}
-            bes={bes}
-            winRate={winRate}
-            totalPnL={totalPnL}
-            avgR={avgR}
-            bestR={bestR}
-          />
+          <TradeStatsGrid trades={trades} />
+
 
           <Card>
             <div className="p-4 flex gap-3">

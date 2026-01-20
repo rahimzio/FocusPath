@@ -1,5 +1,4 @@
 // components/trading/setup/setup-api.ts
-
 import { TradingSetup } from "@/utils/interface";
 
 export async function createSetup(
@@ -12,11 +11,12 @@ export async function createSetup(
     body: JSON.stringify(arg),
   });
 
+  const data = await res.json().catch(() => null);
+
   if (!res.ok) {
-    throw new Error("Failed to create setup");
+    throw new Error(data?.message ?? "Failed to create setup");
   }
 
-  const data = await res.json();
   return data.setup as TradingSetup;
 }
 
@@ -27,13 +27,16 @@ export async function updateSetup(
   const res = await fetch(url, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ updates: arg }),
+    // ✅ API erwartet payload (und akzeptiert auch updates/direkt)
+    body: JSON.stringify({ payload: arg }),
   });
 
+  const data = await res.json().catch(() => null);
+
   if (!res.ok) {
-    throw new Error("Failed to update setup");
+    // ✅ echte Fehlermeldung vom Server
+    throw new Error(data?.message ?? "Failed to update setup");
   }
 
-  const data = await res.json();
   return data.setup as TradingSetup;
 }

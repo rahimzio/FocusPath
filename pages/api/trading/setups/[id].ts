@@ -28,29 +28,25 @@ function stripUndefined<T extends Record<string, any>>(obj: T): Partial<T> {
   return out;
 }
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { id } = req.query;
 
   if (typeof id !== "string") {
     return res.status(400).json({ message: "Invalid id" });
   }
 
-  let mongoId: ObjectId;
-  try {
-    mongoId = new ObjectId(id);
-  } catch {
+  if (!ObjectId.isValid(id)) {
     return res.status(400).json({ message: "Invalid id" });
   }
+
+  const mongoId = new ObjectId(id);
 
   const { db } = await connectToDatabase();
   const col = db.collection<DbTradingSetup>("trading");
 
   // ---------------- GET ----------------
   if (req.method === "GET") {
-    const userId = String(req.query.userId || "");
+    const userId = String(req.query.userId || "").trim();
     if (!userId) {
       return res.status(400).json({ message: "userId required" });
     }
@@ -72,14 +68,20 @@ export default async function handler(
 
   // ---------------- PATCH ----------------
   if (req.method === "PATCH") {
-    const body = (req.body ?? {}) as {
-      payload?: Partial<TradingSetup>;
-    };
+    const body = (req.body ?? {}) as any;
 
-    const payload =
-      "payload" in body ? body.payload ?? {} : (body as any);
+    // ✅ akzeptiere mehrere Formen:
+    // - { payload: {...} }
+    // - { updates: {...} }   (dein bisheriger Client)
+    // - { data: {...} }
+    // - { ...fields }        (direkt)
+    const payload: Partial<TradingSetup> =
+      body?.payload ??
+      body?.updates ??
+      body?.data ??
+      body;
 
-    const userId = String((payload as any)?.userId || "").trim();
+    const userId = String((payload as any)?.userId || body?.userId || "").trim();
     if (!userId) {
       return res.status(400).json({ message: "userId required" });
     }
@@ -129,6 +131,7 @@ export default async function handler(
       setupAvgPoints: (payload as any).setupAvgPoints,
       setupGameGrade: (payload as any).setupGameGrade,
 
+      // ✅ wenn es soft-deleted war, wiederherstellen
       deleted: false,
     });
 
@@ -145,6 +148,7 @@ export default async function handler(
       _id: mongoId,
       type: "trading_setup_v2",
       userId,
+      deleted: { $ne: true },
     });
 
     if (!saved) {
@@ -161,17 +165,21 @@ export default async function handler(
   if (req.method === "DELETE") {
     const userId =
       typeof req.query.userId === "string"
-        ? req.query.userId
-        : String((req.body as any)?.userId || "");
+        ? String(req.query.userId).trim()
+        : String((req.body as any)?.userId || "").trim();
 
     if (!userId) {
       return res.status(400).json({ message: "userId required" });
     }
 
-    await col.updateOne(
+    const result = await col.updateOne(
       { _id: mongoId, type: "trading_setup_v2", userId },
       { $set: { deleted: true, updatedAt: new Date().toISOString() } }
     );
+
+    if (!result.matchedCount) {
+      return res.status(404).json({ message: "Setup not found" });
+    }
 
     return res.status(200).json({ ok: true });
   }

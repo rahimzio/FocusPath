@@ -12,11 +12,21 @@ type DbSetup = {
 };
 
 function toStrId(x: any) {
+  if (!x) return "";
   try {
-    return String(x?.toHexString ? x.toHexString() : x);
+    if (typeof x === "string") return x;
+    if (x?.toHexString) return x.toHexString();
+    if (x?.toString) return x.toString();
+    return String(x);
   } catch {
     return String(x);
   }
+}
+
+function normalizeStatus(status: any) {
+  // legacy fallback
+  if (status === "active") return "open";
+  return status;
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -27,8 +37,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const userId = typeof req.query.userId === "string" ? req.query.userId : "";
-    const id = typeof req.query.id === "string" ? req.query.id : "";
+    const userId = typeof req.query.userId === "string" ? req.query.userId.trim() : "";
+    const id = typeof req.query.id === "string" ? req.query.id.trim() : "";
 
     if (!userId) return res.status(400).json({ message: "userId required" });
     if (!id) return res.status(400).json({ message: "id required" });
@@ -41,21 +51,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const { db } = await connectToDatabase();
-    const col = db.collection<DbSetup>("trading");
 
-    const doc = await col.findOne({
-      _id: _id,
+    // ✅ Wichtig: nicht generisch typisieren, sonst TS-Filter-Overload Fehler
+    const col = db.collection("trading");
+
+    const filter = {
+      _id,
       type: "trading_setup_v2",
       userId,
       deleted: { $ne: true },
-    });
+    } as any;
+
+    const doc = (await col.findOne(filter)) as DbSetup | null;
 
     if (!doc) return res.status(404).json({ message: "Setup not found" });
 
     const { _id: mongoId, type, ...rest } = doc as any;
 
     return res.status(200).json({
-      setup: { ...rest, _id: toStrId(mongoId) },
+      setup: { ...rest, status: normalizeStatus(rest.status), _id: toStrId(mongoId) },
       meta: { durationMs: Date.now() - startedAt },
     });
   } catch (err: any) {

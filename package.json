@@ -37,7 +37,7 @@
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "dayjs": "^1.11.13",
-    "dotenv": "^16.4.7",
+    "dotenv": "^16.6.1",
     "framer-motion": "^12.23.26",
     "lucide-react": "^0.454.0",
     "mongodb": "^5.9.2",

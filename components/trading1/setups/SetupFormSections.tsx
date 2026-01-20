@@ -1,9 +1,10 @@
+// components/trading1/setup/SetupFormSections.tsx
 "use client";
 
 import * as React from "react";
-import type { UseFormReturn } from "react-hook-form";
+import { useFieldArray, type UseFormReturn } from "react-hook-form";
 
-import { SetupFormValues } from "../../../pages/api/trading/setups/setup-form-schema";
+import type { SetupFormValues } from "@/pages/api/trading/setups/setup-form-schema";
 
 import {
   FormField,
@@ -23,17 +24,27 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { DEFAULT_ENTRY_CHECKLIST } from "@/pages/api/trading/setups/setup-checklist";
+
 import GamePicker from "../GamePicker";
+import { Button } from "@/components/ui/button";
 
 type FormType = UseFormReturn<SetupFormValues>;
-
 type SetupGameGrade = "S" | "A" | "B" | "C";
 
 interface SectionProps {
   form: FormType;
   isEdit?: boolean;
   status?: string;
+}
+
+/** =========================================================
+ *  Helpers
+ *  ========================================================= */
+function makeId(prefix = "id") {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const c: any = globalThis as any;
+  if (c?.crypto?.randomUUID) return c.crypto.randomUUID();
+  return `${prefix}_${Date.now()}_${Math.random().toString(16).slice(2)}`;
 }
 
 /** =========================================================
@@ -46,6 +57,32 @@ function SetupBasicSection({ form, isEdit }: SectionProps) {
         <h3 className="text-sm font-semibold">Basis & Kontext</h3>
         <Badge variant="outline">{isEdit ? "Setup bearbeiten" : "Neues Setup"}</Badge>
       </div>
+
+      {/* ✅ Daytrade vs Swingtrade */}
+      <FormField
+        control={form.control}
+        name="tradeType"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Trade-Typ</FormLabel>
+            <Select value={(field.value as any) ?? ""} onValueChange={field.onChange}>
+              <FormControl>
+                <SelectTrigger>
+                  <SelectValue placeholder="Bitte wählen" />
+                </SelectTrigger>
+              </FormControl>
+              <SelectContent>
+                <SelectItem value="daytrade">Daytrade</SelectItem>
+                <SelectItem value="swingtrade">Swingtrade</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Du musst genau <b>eines</b> auswählen.
+            </p>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
 
       <FormField
         control={form.control}
@@ -331,12 +368,33 @@ function SetupStructureSection({ form }: SectionProps) {
 
 /** =========================================================
  *  SECTION 3 – Plan
+ *  - Entry Range
+ *  - Stop (optional)
+ *  - Planned Targets Builder: TP1/TP2/TP3/Runner (+ buyer/seller + label + price optional)
+ *  - plannedRR + actualRR
  *  ========================================================= */
 function SetupPlanSection({ form }: SectionProps) {
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: "plannedTargets",
+    keyName: "__key",
+  });
+
+  function addTarget(type: "tp1" | "tp2" | "tp3" | "runner") {
+    append({
+      id: makeId("pt"),
+      type,
+      price: "", // string im Form, wird im Submit zu number geparst
+      label: type.toUpperCase(),
+      side: undefined,
+    } as any);
+  }
+
   return (
     <div className="space-y-4 rounded-xl border p-4">
       <h3 className="text-sm font-semibold">Plan</h3>
 
+      {/* Entry Range + Stop */}
       <div className="grid gap-4 md:grid-cols-4">
         <FormField
           control={form.control}
@@ -351,6 +409,7 @@ function SetupPlanSection({ form }: SectionProps) {
             </FormItem>
           )}
         />
+
         <FormField
           control={form.control}
           name="plannedEntryMax"
@@ -364,35 +423,135 @@ function SetupPlanSection({ form }: SectionProps) {
             </FormItem>
           )}
         />
+
         <FormField
           control={form.control}
           name="plannedStop"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Stop</FormLabel>
+              <FormLabel>Stop (optional)</FormLabel>
               <FormControl>
-                <Input placeholder="SL" {...field} />
+                <Input placeholder="SL (optional)" {...field} />
               </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="plannedTarget"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Target</FormLabel>
-              <FormControl>
-                <Input placeholder="TP" {...field} />
-              </FormControl>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Optional – kannst du auch erst beim Entry festlegen.
+              </p>
               <FormMessage />
             </FormItem>
           )}
         />
       </div>
 
-      <div className="max-w-xs">
+      {/* Planned Targets Builder */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <p className="text-sm font-semibold">Geplante Targets</p>
+            <p className="text-xs text-muted-foreground">
+              TP1/TP2/TP3 + Runner. Preis ist optional. Label frei (z.B. „Buyer Level“ / „Seller Level“).
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" size="sm" variant="outline" onClick={() => addTarget("tp1")}>
+              + TP1
+            </Button>
+            <Button type="button" size="sm" variant="outline" onClick={() => addTarget("tp2")}>
+              + TP2
+            </Button>
+            <Button type="button" size="sm" variant="outline" onClick={() => addTarget("tp3")}>
+              + TP3
+            </Button>
+            <Button type="button" size="sm" variant="outline" onClick={() => addTarget("runner")}>
+              + Runner
+            </Button>
+          </div>
+        </div>
+
+        {fields.length === 0 ? (
+          <div className="rounded-lg border p-3">
+            <p className="text-xs text-muted-foreground">
+              Noch keine Targets. Du kannst später auch ohne Targets speichern.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {fields.map((f, index) => (
+              <div key={(f as any).__key} className="rounded-lg border p-3 space-y-3">
+                <input type="hidden" {...form.register(`plannedTargets.${index}.id` as const)} />
+                <input type="hidden" {...form.register(`plannedTargets.${index}.type` as const)} />
+
+                <div className="grid gap-3 md:grid-cols-12">
+                  {/* Type */}
+                  <div className="md:col-span-2">
+                    <div className="text-xs text-muted-foreground">Typ</div>
+                    <div className="mt-1">
+                      <Badge variant="outline" className="text-[10px] uppercase">
+                        {(form.getValues(`plannedTargets.${index}.type` as const) as any) ?? "target"}
+                      </Badge>
+                    </div>
+                  </div>
+
+                  {/* Label */}
+                  <div className="md:col-span-4 space-y-1">
+                    <label className="text-xs text-muted-foreground">Label (frei)</label>
+                    <Input
+                      placeholder='z.B. "Buyer Level" oder "TP1"'
+                      {...form.register(`plannedTargets.${index}.label` as const)}
+                    />
+                  </div>
+
+                  {/* Side */}
+                  <div className="md:col-span-3 space-y-1">
+                    <label className="text-xs text-muted-foreground">Side (optional)</label>
+                    <FormField
+                      control={form.control}
+                      name={`plannedTargets.${index}.side` as const}
+                      render={({ field }) => (
+                        <FormItem>
+                          <Select
+                            value={(field.value as any) ?? ""}
+                            onValueChange={(v) => field.onChange(v || undefined)}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="buyer/seller" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="buyer">Buyer</SelectItem>
+                              <SelectItem value="seller">Seller</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  {/* Price */}
+                  <div className="md:col-span-2 space-y-1">
+                    <label className="text-xs text-muted-foreground">Preis (optional)</label>
+                    <Input
+                      placeholder="z.B. 18250.5"
+                      {...form.register(`plannedTargets.${index}.price` as const)}
+                    />
+                  </div>
+
+                  {/* Remove */}
+                  <div className="md:col-span-1 flex items-end justify-end">
+                    <Button type="button" size="sm" variant="outline" onClick={() => remove(index)}>
+                      X
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* RR */}
+      <div className="grid gap-4 md:grid-cols-2">
         <FormField
           control={form.control}
           name="plannedRR"
@@ -406,63 +565,193 @@ function SetupPlanSection({ form }: SectionProps) {
             </FormItem>
           )}
         />
+
+        <FormField
+          control={form.control}
+          name="actualRR"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Tatsächliches R:R (optional)</FormLabel>
+              <FormControl>
+                <Input placeholder="z.B. 2.4" {...field} />
+              </FormControl>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Optional – kannst du nach dem Trade eintragen.
+              </p>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
       </div>
     </div>
   );
 }
 
 /** =========================================================
- *  SECTION 4 – Entry-Checkliste
+ *  SECTION 4 – Entry-Checkliste (Custom)
  *  ========================================================= */
 function SetupChecklistSection({ form }: SectionProps) {
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: "entryChecklistTemplate",
+    keyName: "__key",
+  });
+
+  const template = form.watch("entryChecklistTemplate") ?? [];
+
+  function syncAddState(id: string) {
+    const current = (form.getValues("checklistState") as Record<string, boolean>) ?? {};
+    if (current[id] !== undefined) return;
+    form.setValue("checklistState", { ...current, [id]: false }, { shouldDirty: true });
+  }
+
+  function syncRemoveState(id?: string) {
+    if (!id) return;
+    const current = (form.getValues("checklistState") as Record<string, boolean>) ?? {};
+    if (!(id in current)) return;
+
+    const next = { ...current };
+    delete next[id];
+    form.setValue("checklistState", next, { shouldDirty: true });
+  }
+
+  function handleAddItem() {
+    const id = makeId("cl");
+    append({ id, label: "", description: "", required: false } as any);
+    syncAddState(id);
+  }
+
+  function handleRemoveItem(index: number) {
+    const id =
+      (form.getValues(`entryChecklistTemplate.${index}.id`) as string | undefined) ??
+      (fields[index] as any)?.id;
+
+    remove(index);
+    syncRemoveState(id);
+  }
+
   return (
     <div className="space-y-4 rounded-xl border p-4">
-      <h3 className="text-sm font-semibold">Entry-Checkliste</h3>
-      <p className="text-xs text-muted-foreground">
-        Hake vor dem Entry die Bedingungen ab. Pflichtpunkte definieren dein A-Game.
-      </p>
+      <div className="space-y-1">
+        <h3 className="text-sm font-semibold">Entry-Checkliste</h3>
+        <p className="text-xs text-muted-foreground">
+          Erstelle deine eigene Checkliste. „Pflicht“ = A-Game Bedingungen.
+        </p>
+      </div>
+
+      <div className="space-y-3">
+        {fields.length === 0 ? (
+          <p className="text-xs text-muted-foreground">
+            Noch keine Punkte. Füge den ersten Punkt hinzu.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {fields.map((f, index) => (
+              <div key={(f as any).__key} className="rounded-lg border p-3 space-y-3">
+                <input type="hidden" {...form.register(`entryChecklistTemplate.${index}.id`)} />
+
+                <div className="grid gap-3 md:grid-cols-12">
+                  <div className="md:col-span-5 space-y-1">
+                    <label className="text-xs text-muted-foreground">Titel</label>
+                    <Input
+                      placeholder="z.B. HTF Bias aligned"
+                      {...form.register(`entryChecklistTemplate.${index}.label`)}
+                    />
+                  </div>
+
+                  <div className="md:col-span-5 space-y-1">
+                    <label className="text-xs text-muted-foreground">Beschreibung (optional)</label>
+                    <Input
+                      placeholder="z.B. D1 + H4 bullish, 1H Pullback"
+                      {...form.register(`entryChecklistTemplate.${index}.description`)}
+                    />
+                  </div>
+
+                  <div className="md:col-span-2 flex items-end justify-between gap-2">
+                    <label className="flex items-center gap-2 text-xs">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4"
+                        {...form.register(`entryChecklistTemplate.${index}.required`)}
+                      />
+                      Pflicht
+                    </label>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleRemoveItem(index)}
+                    >
+                      Löschen
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <Button type="button" size="sm" onClick={handleAddItem}>
+          + Punkt hinzufügen
+        </Button>
+      </div>
 
       <FormField
         control={form.control}
         name="checklistState"
         render={({ field }) => (
           <FormItem className="space-y-3">
-            <div className="space-y-2">
-              {DEFAULT_ENTRY_CHECKLIST.map((item) => {
-                const checked = field.value?.[item.id] ?? false;
-                return (
-                  <div
-                    key={item.id}
-                    className="flex items-start gap-2 rounded-lg border px-3 py-2"
-                  >
-                    <FormControl>
-                      <Checkbox
-                        checked={checked}
-                        onCheckedChange={(value) => {
-                          field.onChange({
-                            ...(field.value ?? {}),
-                            [item.id]: !!value,
-                          });
-                        }}
-                      />
-                    </FormControl>
-                    <div className="flex-1 space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium">{item.label}</span>
-                        {item.required && (
-                          <Badge variant="outline" className="text-[10px]">
-                            Pflicht
-                          </Badge>
-                        )}
+            <FormLabel className="text-xs text-muted-foreground">Preview (Abhaken)</FormLabel>
+
+            {template.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                Erstelle erst Punkte, dann kannst du sie abhaken.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {template.map((item: any) => {
+                  const checked = (field.value ?? {})[item.id] ?? false;
+
+                  return (
+                    <div
+                      key={item.id}
+                      className="flex items-start gap-2 rounded-lg border px-3 py-2"
+                    >
+                      <FormControl>
+                        <Checkbox
+                          checked={checked}
+                          onCheckedChange={(value) => {
+                            field.onChange({
+                              ...(field.value ?? {}),
+                              [item.id]: !!value,
+                            });
+                          }}
+                        />
+                      </FormControl>
+
+                      <div className="flex-1 space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">
+                            {item.label || "Unbenannter Punkt"}
+                          </span>
+                          {item.required && (
+                            <Badge variant="outline" className="text-[10px]">
+                              Pflicht
+                            </Badge>
+                          )}
+                        </div>
+
+                        {item.description ? (
+                          <p className="text-xs text-muted-foreground">{item.description}</p>
+                        ) : null}
                       </div>
-                      {item.description && (
-                        <p className="text-xs text-muted-foreground">{item.description}</p>
-                      )}
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
+
             <FormMessage />
           </FormItem>
         )}
@@ -473,8 +762,6 @@ function SetupChecklistSection({ form }: SectionProps) {
 
 /** =========================================================
  *  SECTION 5 – Setup Game (GamePicker)
- *  - speichert selectedIds/grade/avgPoints im Parent
- *  - optional: wenn du es im RHF speichern willst -> setValue hier ergänzen
  *  ========================================================= */
 function SetupGameSection({
   userId,
@@ -499,7 +786,8 @@ function SetupGameSection({
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Hake Faktoren an, die das Setup qualitativ erfüllen. Diese Auswahl wird als <b>setupSelectedIds</b> gespeichert.
+        Hake Faktoren an, die das Setup qualitativ erfüllen. Diese Auswahl wird als{" "}
+        <b>setupSelectedIds</b> gespeichert.
       </p>
 
       <GamePicker
@@ -552,16 +840,17 @@ function SetupStatusSection({ form, status }: SectionProps) {
         />
       </div>
 
+      {/* Kurznotiz (Detail-ThoughtLog ist im SetupDetailDialog) */}
       <FormField
         control={form.control}
         name="thoughtProcess"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Gedanken-Log</FormLabel>
+            <FormLabel>Gedanken-Log (kurz)</FormLabel>
             <FormControl>
               <Textarea
                 rows={4}
-                placeholder="Notiere über die Tage, wie du das Setup siehst, was sich ändert etc."
+                placeholder="Kurz-Notiz (optional). Detailliertes tägliches Log kommt im Setup-Detail."
                 {...field}
               />
             </FormControl>
@@ -677,9 +966,6 @@ function SetupStatusSection({ form, status }: SectionProps) {
 
 /** =========================================================
  *  ✅ WRAPPER: SetupFormSections
- *  - rendert alle Sektionen in Reihenfolge
- *  - hält GamePicker State (setupSelectedIds / grade / avgPoints)
- *  - hier kannst du später beim Submit die Werte an den Payload hängen
  *  ========================================================= */
 export default function SetupFormSections({
   form,
@@ -695,25 +981,6 @@ export default function SetupFormSections({
   const [setupSelectedIds, setSetupSelectedIds] = React.useState<string[]>([]);
   const [setupGameGrade, setSetupGameGrade] = React.useState<SetupGameGrade>("C");
   const [setupAvgPoints, setSetupAvgPoints] = React.useState<number>(0);
-
-  // Optional: wenn du beim Edit vorhandene Werte aus dem Form initialisieren willst:
-  // (setzt voraus, dass du setupSelectedIds im Schema/FormValues drin hast)
-  React.useEffect(() => {
-    const v = (form.getValues() as any)?.setupSelectedIds;
-    if (Array.isArray(v)) setSetupSelectedIds(v.map(String));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Optional: sync zurück ins RHF, falls du es als Field speichern willst:
-  React.useEffect(() => {
-    // nur wenn dein Schema das Feld kennt
-if ("setupSelectedIds" in form.getValues()) {
-  form.setValue("setupSelectedIds", setupSelectedIds, { shouldDirty: true });
-  form.setValue("setupGameGrade", setupGameGrade, { shouldDirty: true });
-  form.setValue("setupAvgPoints", setupAvgPoints, { shouldDirty: true });
-}
-
-  }, [form, setupSelectedIds, setupGameGrade, setupAvgPoints]);
 
   return (
     <div className="space-y-4">
@@ -735,8 +1002,6 @@ if ("setupSelectedIds" in form.getValues()) {
   );
 }
 
-// Optional: falls du einzelne Sections weiterhin extern importieren willst,
-// kannst du sie zusätzlich exportieren. (aktuell nur intern genutzt)
 export {
   SetupBasicSection,
   SetupStructureSection,
